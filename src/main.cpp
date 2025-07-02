@@ -12,14 +12,14 @@
 
 #include <Arduino.h>
 #include "StateMachine.h"
-#include "sensors/MAPSensor.h"
-#include "sensors/TPSSensor.h"
-#include "controllers/TurboController.h"
-#include "controllers/AcousticInjector.h"
-#include "ui/ConsoleUI.h"
-#include "ui/BLEUI.h"
-#include "utils/CalibrationManager.h"
-#include "utils/DebugManager.h"
+#include "MAPSensor.h"
+#include "TPSSensor.h"
+#include "TurboController.h"
+#include "AcousticInjector.h"
+#include "ConsoleUI.h"
+#include "BLEUI.h"
+#include "CalibrationManager.h"
+#include "DebugManager.h"
 
 // — PIN-OUT —  
 constexpr uint8_t PIN_MAP             = 34;  // Entrada analógica para sensor MAP  
