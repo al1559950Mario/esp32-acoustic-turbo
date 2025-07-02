@@ -1,6 +1,9 @@
 #pragma once
 
 #include "../utils/DebugManager.h"
+#include "TurboController.h"
+#include "AcousticInjector.h"
+
 
 /**
  * SystemState
@@ -28,7 +31,9 @@ public:
    * @param hasCalibration true si existen datos en NVS → arranca en OFF  
    *                       false → arranca en SIN_CALIBRAR
    */
-  void begin(bool hasCalibration);
+  void begin(bool hasCalibration,
+            TurboController* turboRef,
+            AcousticInjector* injectorRef);
 
   /**
    * update()
@@ -52,6 +57,10 @@ public:
 
 private:
   SystemState current;  // Estado interno actual
+
+  TurboController* turbo     = nullptr;
+  AcousticInjector* injector = nullptr;
+
 
   // Umbrales privados para transiciones
   static constexpr float MAP_WAKEUP_KPA     = 0.5f;   // OFF → IDLE

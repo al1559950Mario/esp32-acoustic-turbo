@@ -70,6 +70,7 @@ void setup() {
   bool hasCalib = calib.loadCalibration();
   fsm.begin(hasCalib);
 
+
   if (!hasCalib) {
     Serial.println("  Estado inicial: SIN_CALIBRAR (necesita calibración)");
   } else {
@@ -87,9 +88,13 @@ void setup() {
  * 5. Esperar 20 ms (≈50 Hz)
  */
 void loop() {
+  //Condicional de primera vez en Injector
+  static bool acousticActive = false;  // trackea si ya arrancamos el inyector
+
   // 1) Lectura de sensores
   float mapKPa = mapSensor.readkPa();
   float tpsPct = tpsSensor.readPct();
+  float tpsNorm = tpsSensor.readNormalized();
 
   // 2) Actualizar máquina de estados
   fsm.update(
@@ -124,10 +129,13 @@ void loop() {
       // Todo inactivo, vigilando umbrales
       break;
 
-    case SystemState::INYECCION_ACUSTICA:
-      // Activa inyector acústico con nivel de debug
-      injector.start(debugMgr.getLevel());
-      break;
+    case SystemState::INYECCION_ACUSTICA: {
+
+      float tpsNorm = tpsSensor.readNormalized();
+      float level   = constrain((tpsNorm - 0.30f) / 0.40f, 0.0f, 1.0f);
+      injector.setLevel(level);  // ajuste continuo
+      }
+
 
     case SystemState::TURBO:
       // Control dinámico del turbo según TPS y MAP
