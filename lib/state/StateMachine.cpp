@@ -95,4 +95,25 @@ void StateMachine::update(float mapKPa,
       // Modo debug mantiene estado hasta comando externo
       break;
   }
+  
+}
+
+void StateMachine::debugForceState(SystemState nuevoEstado) {
+  if (current == SystemState::DEBUG) {
+    current = nuevoEstado;
+    Serial.print(">> Estado forzado desde consola: ");
+    switch (nuevoEstado) {
+      case SystemState::OFF:                 Serial.println("OFF"); break;
+      case SystemState::SIN_CALIBRAR:        Serial.println("SIN_CALIBRAR"); break;
+      case SystemState::CALIBRATION:         Serial.println("CALIBRATION"); break;
+      case SystemState::IDLE:                Serial.println("IDLE"); break;
+      case SystemState::INYECCION_ACUSTICA:  Serial.println("INYECCION_ACUSTICA"); break;
+      case SystemState::TURBO:               Serial.println("TURBO"); break;
+      case SystemState::DESCAYENDO:          Serial.println("DESCAYENDO"); break;
+      case SystemState::DEBUG:               Serial.println("DEBUG"); break;
+      default:                               Serial.println("DESCONOCIDO"); break;
+    }
+  } else {
+    Serial.println("⚠️  Solo se permite forzar estado desde DEBUG.");
+  }
 }

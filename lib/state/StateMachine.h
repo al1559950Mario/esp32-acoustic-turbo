@@ -34,6 +34,8 @@ public:
   void begin(bool hasCalibration,
             TurboController* turboRef,
             AcousticInjector* injectorRef);
+            
+  void debugForceState(SystemState nuevoEstado);
 
   /**
    * update()
