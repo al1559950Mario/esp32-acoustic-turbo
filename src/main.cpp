@@ -130,16 +130,14 @@ void loop() {
       break;
 
     case SystemState::INYECCION_ACUSTICA: {
-
       float tpsNorm = tpsSensor.readNormalized();
       float level   = constrain((tpsNorm - 0.30f) / 0.40f, 0.0f, 1.0f);
       injector.setLevel(level);  // ajuste continuo
       }
 
-
     case SystemState::TURBO:
       // Control dinámico del turbo según TPS y MAP
-      turbo.update(tpsPct, mapKPa);
+      //turbo.update(tpsPct, mapKPa);
       break;
 
     case SystemState::DESCAYENDO:

@@ -55,6 +55,7 @@ void StateMachine::update(float mapKPa,
       // Transición a TURBO si cumple umbral y vacío
       if (tpsPct >= TURBO_TPS_ON && mapKPa <= TURBO_VAC_ON) {
         current = SystemState::TURBO;
+        turbo->start();
       }
       // Retrocede a IDLE si condiciones de inyección ya no se mantienen
       else if (tpsPct <= INJ_TPS_OFF || mapKPa < INJ_VAC_OFF) {
@@ -68,6 +69,7 @@ void StateMachine::update(float mapKPa,
       if (tpsPct < TURBO_TPS_OFF) {
         current = SystemState::DESCAYENDO;
         injector->stop();
+        turbo->stop();
       }
       break;
 
