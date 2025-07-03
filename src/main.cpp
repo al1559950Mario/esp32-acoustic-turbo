@@ -20,6 +20,9 @@
 #include "BLEUI.h"
 #include "CalibrationManager.h"
 #include "DebugManager.h"
+#include <BluetoothSerial.h>
+BluetoothSerial SerialBT;
+
 
 // — PIN-OUT —  
 constexpr uint8_t PIN_MAP             = 34;  // Entrada analógica para sensor MAP  
@@ -57,9 +60,13 @@ void setup() {
   tpsSensor.begin(PIN_TPS);
   turbo.begin(PIN_RELAY_TURBO);
   injector.begin(PIN_DAC_ACOUSTIC, PIN_RELAY_ACOUSTIC);
-  consoleUI.begin(115200);
-  bleUI.begin();
-  debugMgr.begin();
+  consoleUI.begin();
+  consoleUI.setFSM(&fsm);  // Asocia FSM al ConsoleUI
+
+  // Si usas BLE también
+  SerialBT.begin("TurboAcoustic");
+  bleUI.begin(&SerialBT);
+  bleUI.setFSM(&fsm);
   calib.begin();
 
   // Asegurar relés inicializados en OFF
@@ -68,7 +75,7 @@ void setup() {
 
   // Cargar calibración y determinar estado inicial
   bool hasCalib = calib.loadCalibration();
-  fsm.begin(hasCalib);
+  fsm.begin(hasCalib, &turbo, &injector);
 
 
   if (!hasCalib) {
@@ -91,6 +98,12 @@ void loop() {
   //Condicional de primera vez en Injector
   static bool acousticActive = false;  // trackea si ya arrancamos el inyector
 
+  consoleUI.update();                   // Escucha comandos USB
+  bleUI.update(fsm.getState());        // Escucha comandos BLE
+
+  // Lógica general del sistema...
+  debugMgr.updateFromSerial(Serial);
+
   // 1) Lectura de sensores
   float mapKPa = mapSensor.readkPa();
   float tpsPct = tpsSensor.readPct();
@@ -100,15 +113,17 @@ void loop() {
   fsm.update(
     mapKPa,
     tpsPct,
-    consoleUI.calibrationRequested(),
-    bleUI.calibrationRequested(),
+    consoleUI.getCalibRequest(),
+    bleUI.getCalibRequest(),
     debugMgr
   );
 
+
   // 3) Atención de interfaces
-  consoleUI.poll();
-  bleUI.poll();
-  debugMgr.poll();
+  consoleUI.update();
+  bleUI.update(fsm.getState());
+  debugMgr.updateFromSerial(Serial);
+
 
   // 4) Acciones por estado
   switch (fsm.getState()) {
@@ -152,6 +167,7 @@ void loop() {
         injector.start(debugMgr.getLevel());
       break;
   }
+  
 
   // 5) Frecuencia de ciclo
   delay(20);
