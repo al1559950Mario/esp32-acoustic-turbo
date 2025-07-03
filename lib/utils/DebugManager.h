@@ -62,6 +62,7 @@ public:
    * @param serial Puerto Serial conectado al simulador Python
    */
   void updateFromSerial(Stream& serial);
+  void updateFromLine(const String& line);
 
 private:
   static constexpr int OVERRIDE_COUNT = 4;  // Total de canales soportados

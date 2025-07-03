@@ -91,3 +91,13 @@ void DebugManager::setIfPresent(const String& line,
     enableOverride(target, valor);
   }
 }
+
+void DebugManager::updateFromLine(const String& line) {
+  String trimmed = line;
+  trimmed.trim();
+
+  setIfPresent(trimmed, "tps:", DebugTarget::TPS);
+  setIfPresent(trimmed, "map:", DebugTarget::MAP);
+  setIfPresent(trimmed, "turbo:", DebugTarget::TURBO);
+  setIfPresent(trimmed, "iny:", DebugTarget::INYECTOR);
+}

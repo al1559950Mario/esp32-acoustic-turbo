@@ -1,0 +1,16 @@
+{
+  "build": {
+    "core": "bare",
+    "cpu": "native",
+    "f_cpu": "100000000",
+    "mcu": "native"
+  },
+  "frameworks": ["bare"],
+  "name": "Native Simulation (PC)",
+  "upload": {
+    "maximum_ram_size": 0,
+    "maximum_size": 0
+  },
+  "url": "",
+  "vendor": "custom"
+}

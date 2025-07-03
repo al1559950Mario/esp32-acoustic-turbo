@@ -1,6 +1,14 @@
 import time
 import serial
 
+
+def enviar(payload):
+    if 'ser' in globals() and ser:
+        ser.write(payload.encode('utf-8'))
+    else:
+        print(payload)
+
+
 # --- Parámetros de simulación ---
 IDLE_RPM       = 800
 MAX_RPM        = 7000
@@ -71,7 +79,7 @@ try:
 
         # 7) Enviar por Serial (JSON o CSV según conveniencia)
         payload = f"tps:{tps_v:.3f},map:{map_v:.3f}\n"
-        ser.write(payload.encode('utf-8'))
+        enviar(payload)
 
         log = (
             f"[{elapsed:5.2f}s] Gear:{gear+1} | "
