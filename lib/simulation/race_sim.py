@@ -70,8 +70,16 @@ try:
         print(log)
 
         # 7) Enviar por Serial (JSON o CSV según conveniencia)
-        payload = f"{elapsed:.2f},{gear+1},{rpm:.0f},{tps_v:.3f},{map_v:.3f}\n"
+        payload = f"tps:{tps_v:.3f},map:{map_v:.3f}\n"
         ser.write(payload.encode('utf-8'))
+
+        log = (
+            f"[{elapsed:5.2f}s] Gear:{gear+1} | "
+            f"Throttle:{throttle:.2f} | RPM:{rpm:.0f} | "
+            f"TPS:{tps_v:.3f}V | MAP:{map_v:.3f}V"
+        )
+        print(log)
+
 
         time.sleep(DT)
 
