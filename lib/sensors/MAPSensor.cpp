@@ -42,3 +42,8 @@ float MAPSensor::readkPa() {
   const float kpaMax = 105.0f;  // Presión atmosférica o aceleración a fondo
   return kpaMin + norm * (kpaMax - kpaMin);
 }
+
+float MAPSensor::readVolts() const {
+  uint16_t raw = analogRead(_pin);
+  return (raw * 3.3f) / 4095.0f;
+}

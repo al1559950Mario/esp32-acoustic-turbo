@@ -12,6 +12,7 @@ public:
   uint16_t readRaw();     // Lectura en crudo (0–4095)
   float readkPa();        // Conversión calibrada a kPa
   float readNormalized(); // Valor entre 0.0 y 1.0
+  float readVolts() const;
 
 private:
   uint8_t _pin;

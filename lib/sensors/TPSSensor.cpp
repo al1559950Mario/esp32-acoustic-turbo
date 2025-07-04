@@ -39,3 +39,9 @@ float TPSSensor::readNormalized() {
 float TPSSensor::readPct() {
   return readNormalized() * 100.0f;
 }
+
+float TPSSensor::readVolts() const {
+  uint16_t raw = analogRead(_pin);
+  return (raw * 3.3f) / 4095.0f;
+}
+

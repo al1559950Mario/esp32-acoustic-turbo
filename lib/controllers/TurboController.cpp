@@ -26,3 +26,10 @@ void TurboController::stop() {
 bool TurboController::isOn() const {
   return active;
 }
+
+void TurboController::updatePowerLevel(float level) {
+  if (!active) return;
+
+  // 🚧 Futuro: aplicar PWM, DAC o lógica de control variable
+  // Por ahora no hace nada
+}

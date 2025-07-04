@@ -12,6 +12,8 @@ public:
   uint16_t readRaw();     // Lectura en crudo (0–4095)
   float readPct();        // Conversión calibrada a % (0.0 – 100.0)
   float readNormalized(); // Valor entre 0.0 y 1.0
+  float readVolts() const;
+
 
 private:
   uint8_t _pin;

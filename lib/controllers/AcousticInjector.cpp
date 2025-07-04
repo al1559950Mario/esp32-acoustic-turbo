@@ -25,8 +25,16 @@ void AcousticInjector::begin(uint8_t dacPin, uint8_t relayPin) {
   pinMode(_relayPin, OUTPUT);
   digitalWrite(_relayPin, LOW);
 
-  // Habilita canal DAC (canal = dacPin-25)
-  dac_output_enable((dac_channel_t)(dacPin - 25));
+  // Habilita canal DAC (GPIO25 → CHANNEL_1, GPIO26 → CHANNEL_2)
+  dac_channel_t channel;
+  if (_dacPin == 25) {
+    channel = DAC_CHANNEL_1;
+  } else if (_dacPin == 26) {
+    channel = DAC_CHANNEL_2;
+  } else {
+    return;
+  }
+  dac_output_enable(channel);
 
   // Configura timerHW: prescaler 80 → tick = 1µs
   _timer = timerBegin(0, 80, true);
@@ -59,7 +67,10 @@ void AcousticInjector::stop() {
   digitalWrite(_relayPin, LOW);
 
   // Silencia DAC a nivel medio
-  dac_output_voltage((dac_channel_t)(_dacPin - 25), 128);
+  dac_channel_t channel = (_dacPin == 25)
+    ? DAC_CHANNEL_1
+    : DAC_CHANNEL_2;
+  dac_output_voltage(channel, 128);
 }
 
 void AcousticInjector::setLevel(float level) {
@@ -78,30 +89,31 @@ void AcousticInjector::update() {
   }
 }
 
-/**
- * ISR periódica a SAMPLE_RATE:
- *  - Toma muestra de _sineTable
- *  - Escala por _level (amplitud)
- *  - Escribe al DAC
- */
+uint8_t AcousticInjector::getCurrentDAC() const {
+  return _lastDACValue;
+}
+
+bool AcousticInjector::isActive() const {
+  return timerAlarmEnabled(_timer);  // true si la ISR está activa
+}
+
 void IRAM_ATTR AcousticInjector::onTimer() {
   if (!_instance) return;
 
-  // Muestra base [0..255], centra: delta ∈ [-128..127]
+  // Onda base [0–255]
   uint8_t raw   = _instance->_sineTable[_instance->_index];
   int16_t delta = (int16_t)raw - 128;
 
-  // Aplica factor de amplitud y re-centra
+  // Aplica nivel de amplitud (_level ∈ [0.0 – 1.0]) y re-centra
   int16_t out = 128 + (delta * _instance->_level);
 
-  // Sirve al DAC
-  dac_output_voltage(
-    (dac_channel_t)(_instance->_dacPin - 25),
-    constrain(out, 0, 255)
-  );
+  // Guarda valor para consola y envía a DAC
+  _instance->_lastDACValue = constrain(out, 0, 255);
+  dac_output_voltage(_instance->_dacChannel, _instance->_lastDACValue);
 
   // Avanza índice cíclico
   if (++_instance->_index >= TABLE_SIZE) {
     _instance->_index = 0;
   }
 }
+

@@ -21,7 +21,12 @@ public:
    * @param tpsPct: Porcentaje de acelerador [0.0 – 100.0]
    * @param mapKPa: Presión absoluta del múltiple en kPa
    */
-  void update(float tpsPct, float mapKPa);
+  /**
+   * updatePowerLevel()
+   * Preparado para controlar el turbo con nivel escalable [0.0 – 1.0]
+   * @param level: Potencia relativa del turbo, normalizada
+   */
+  void updatePowerLevel(float level);
 
   /**
    * start()
@@ -41,8 +46,15 @@ public:
    */
   bool isOn() const;
 
+    /**
+   * isActive()
+   * Devuelve true si el relé está activado (nivel HIGH).
+   */
+  bool isActive() const;
+
 private:
   uint8_t relayPin = 255;   // Pin asignado al relé
+  uint8_t _relayPin = 0;
   bool active      = false; // Estado actual del turbo
 
   // Umbrales con histéresis

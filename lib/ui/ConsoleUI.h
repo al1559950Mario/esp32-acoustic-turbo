@@ -1,61 +1,42 @@
 #pragma once
-
 #include <Arduino.h>
 #include "StateMachine.h"
+#include "MAPSensor.h"
+#include "TPSSensor.h"
+#include "AcousticInjector.h"
+#include "TurboController.h"
 
 /**
  * ConsoleUI
- * Interfaz de comandos por consola serial para diagnóstico, pruebas y control manual.
- * No modifica el hardware directamente — solo activa flags o llama funciones públicas de FSM.
+ * Interfaz por consola serial interactiva. Incluye:
+ *  - Menu principal
+ *  - Modo desarrollador extendido
+ *  - Dashboard en tiempo real
  */
 class ConsoleUI {
 public:
-  /**
-   * begin()
-   * Inicializa el puerto serie e imprime mensaje de bienvenida.
-   */
   void begin();
-
-  /**
-   * update()
-   * Procesa comandos entrantes del usuario por consola serial.
-   * Debe llamarse cada ciclo.
-   */
   void update();
-
-  /**
-   * setFSM()
-   * Asocia una referencia a la FSM para poder consultar estado o activar funciones.
-   */
   void setFSM(StateMachine* fsmRef);
 
-  /**
-   * getCalibRequest()
-   * @return true si el usuario ha solicitado calibración por consola.
-   * Se limpia automáticamente tras ser consultado una vez.
-   */
+  void attachSensors(MAPSensor* mapPtr, TPSSensor* tpsPtr);
+  void attachActuators(TurboController* turboPtr, AcousticInjector* injectorPtr);
+
   bool getCalibRequest();
 
 private:
-  StateMachine* fsm = nullptr;
+  StateMachine*      fsm         = nullptr;
+  MAPSensor*         mapSensor   = nullptr;
+  TPSSensor*         tpsSensor   = nullptr;
+  TurboController*   turbo       = nullptr;
+  AcousticInjector*  injector    = nullptr;
 
-  bool consoleCalibRequested = false;  // Flag local de calibración
+  bool consoleCalibRequested     = false;
+  bool developerMode             = false;
+  unsigned long lastTransitionMS = 0;
+  SystemState lastState          = SystemState::OFF;
 
-  /**
-   * imprimirHelp()
-   * Muestra el listado de comandos disponibles.
-   */
-  void imprimirHelp();
-
-  /**
-   * imprimirEstado()
-   * Muestra el estado actual del sistema y FSM.
-   */
-  void imprimirEstado();
-
-  /**
-   * interpretarComando(char c)
-   * Ejecuta la acción correspondiente al comando recibido.
-   */
   void interpretarComando(char c);
+  void imprimirDashboard();
+  void imprimirHelp();
 };
