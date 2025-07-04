@@ -21,7 +21,7 @@ public:
 
   void attachSensors(MAPSensor* mapPtr, TPSSensor* tpsPtr);
   void attachActuators(TurboController* turboPtr, AcousticInjector* injectorPtr);
-
+  void imprimirDashboard();
   bool getCalibRequest();
 
 private:
@@ -37,6 +37,6 @@ private:
   SystemState lastState          = SystemState::OFF;
 
   void interpretarComando(char c);
-  void imprimirDashboard();
+
   void imprimirHelp();
 };

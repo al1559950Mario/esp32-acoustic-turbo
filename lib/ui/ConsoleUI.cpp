@@ -95,8 +95,14 @@ void ConsoleUI::interpretarComando(char c) {
 void ConsoleUI::imprimirDashboard() {
   if (!fsm || !mapSensor || !tpsSensor || !injector || !turbo) {
     Serial.println("⚠️  Dashboard incompleto: referencias no conectadas.");
+    Serial.print("FSM: ");     Serial.println((uintptr_t)fsm,     HEX);
+    Serial.print("MAP: ");     Serial.println((uintptr_t)mapSensor, HEX);
+    Serial.print("TPS: ");     Serial.println((uintptr_t)tpsSensor, HEX);
+    Serial.print("Injector: ");Serial.println((uintptr_t)injector, HEX);
+    Serial.print("Turbo: ");   Serial.println((uintptr_t)turbo,   HEX);
     return;
   }
+
 
   SystemState estado = fsm->getState();
   const char* estadoStr = 

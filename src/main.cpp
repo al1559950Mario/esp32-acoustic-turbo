@@ -40,8 +40,13 @@ void setup() {
   turbo.begin(PIN_RELAY_TURBO);
   injector.begin(PIN_DAC_ACOUSTIC, PIN_RELAY_ACOUSTIC);
 
+  // Consola + FSM + BLE
   consoleUI.begin();
   consoleUI.setFSM(&fsm);
+  consoleUI.attachSensors(&mapSensor, &tpsSensor);
+  consoleUI.attachActuators(&turbo, &injector);
+  consoleUI.imprimirDashboard(); // ← ya con referencias conectadas
+
 
   SerialBT.begin("TurboAcoustic");
   bleUI.begin(&SerialBT);
