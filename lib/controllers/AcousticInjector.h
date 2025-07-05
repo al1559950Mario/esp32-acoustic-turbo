@@ -1,93 +1,34 @@
-// AcousticInjector.h
 #pragma once
 
 #include <Arduino.h>
 #include "driver/dac.h"
-#include "driver/timer.h"
 
-/**
- * AcousticInjector
- *
- * Genera una onda senoidal en f₀ ≈ 6370 Hz por el DAC del ESP32 y
- * controla un relé que alimenta el amplificador/acoplador acústico.
- * 
- * Incluye:
- *  - Arranque “mudo” (level empieza en 0 antes de cerrar el relé)
- *  - Rampado suave hasta el nivel deseado para evitar clics
- *  - Ajuste de nivel en tiempo real sin reiniciar la ISR ni el relé
- */
+
 class AcousticInjector {
 public:
-  AcousticInjector() = default;
+  static constexpr uint8_t TABLE_SIZE = 64;
+  static constexpr uint16_t SAMPLE_RATE = 8000; // Hz
+  static constexpr float RAMP_STEP = 0.01f;
 
-  /**
-   * begin()
-   * Inicializa DAC y relé, y prepara timer de alta precisión.
-   * @param dacPin   Pin GPIO para salida DAC (25–26 en ESP32)
-   * @param relayPin Pin digital que acciona el relé (HIGH = ON)
-   */
   void begin(uint8_t dacPin, uint8_t relayPin);
-
-  /**
-   * start()
-   * Enciende el relé y arranca la señal:
-   *  - level inicia en 0
-   *  - targetLevel se fija a level
-   *  - ISR arranca pero genera salida muda hasta rampar
-   * @param level Nivel final deseado [0.0 … 1.0]
-   */
   void start(float level);
-
-  /**
-   * stop()
-   * Detiene la señal y el relé:
-   *  - Deshabilita timer/ISR
-   *  - Lleva DAC a valor medio (silencio)
-   *  - Apaga relé
-   */
   void stop();
-
-  /**
-   * setLevel()
-   * Ajusta el nivel objetivo sin detener la señal. Se rampará en update().
-   * @param level Nuevo nivel objetivo [0.0 … 1.0]
-   */
   void setLevel(float level);
-
-  /**
-   * update()
-   * Debe llamarse periódicamente (p.ej. cada loop):
-   *  - Realiza el rampado suave desde level → targetLevel
-   */
-  void update();
-    /**
-   * getCurrentDAC()
-   * Devuelve el valor actual generado por la onda DAC.
-   * Útil para diagnósticos en consola.
-   */
+  void update();               // Ramp de nivel
+  void applyPendingDAC();      // ← ¡NUEVO! Aplica DAC fuera del ISR
   uint8_t getCurrentDAC() const;
-
-    /**
-   * isActive()
-   * Devuelve true si el inyector está generando señal (timer activo).
-   */
   bool isActive() const;
+  static void IRAM_ATTR onTimer();
 
 private:
-  static constexpr uint32_t SAMPLE_RATE = 64 * 6370;  // 407680 Hz
-  static constexpr uint8_t  TABLE_SIZE  = 64;
-  static constexpr float    RAMP_STEP   = 0.02f;
-  uint8_t _lastDACValue = 128;  // cacheada desde onTimer()
+  uint8_t  _dacPin = 0;
+  uint8_t  _relayPin = 0;
+  uint8_t  _index = 0;
+  float    _level = 0.0f;
+  float    _targetLevel = 0.0f;
+  uint8_t  _lastDACValue = 128;
+  dac_channel_t _dacChannel;
+  hw_timer_t* _timer = nullptr;
 
   static const uint8_t _sineTable[TABLE_SIZE];
-
-  uint8_t       _dacPin     = 0;
-  uint8_t       _relayPin   = 0;
-  dac_channel_t _dacChannel = DAC_CHANNEL_MAX;
-  float         _level      = 0.0f;
-  float         _targetLevel= 0.0f;
-  uint8_t       _index      = 0;
-  hw_timer_t*   _timer      = nullptr;
-
-  static void IRAM_ATTR onTimer();
 };
