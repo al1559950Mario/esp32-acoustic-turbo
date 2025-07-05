@@ -93,18 +93,20 @@ void ConsoleUI::interpretarComando(char c) {
 }
 
 void ConsoleUI::imprimirDashboard() {
-  if (!fsm || !mapSensor || !tpsSensor || !injector || !turbo) {
-    Serial.println("⚠️  Dashboard incompleto: referencias no conectadas.");
-    Serial.print("FSM: ");     Serial.println((uintptr_t)fsm,     HEX);
-    Serial.print("MAP: ");     Serial.println((uintptr_t)mapSensor, HEX);
-    Serial.print("TPS: ");     Serial.println((uintptr_t)tpsSensor, HEX);
-    Serial.print("Injector: ");Serial.println((uintptr_t)injector, HEX);
-    Serial.print("Turbo: ");   Serial.println((uintptr_t)turbo,   HEX);
-    return;
-  }
+  static float lastTPS = -1.0f;
+  static float lastMAP = -1.0f;
+  static uint8_t lastDAC = 0;
 
-
+  float tpsV  = tpsSensor->readVolts();
+  float mapV  = mapSensor->readVolts();
+  float tpsFuente = tpsV * 2.0f;
+  float mapFuente = mapV * 2.0f;
+  uint8_t dac = injector->getCurrentDAC();
+  bool turboOn    = turbo->isOn();
+  bool injectorOn = injector->isActive();
   SystemState estado = fsm->getState();
+  unsigned long elapsed = (millis() - lastTransitionMS) / 1000;
+
   const char* estadoStr = 
     (estado == SystemState::OFF)              ? "OFF" :
     (estado == SystemState::SIN_CALIBRAR)     ? "SIN_CALIB" :
@@ -115,25 +117,25 @@ void ConsoleUI::imprimirDashboard() {
     (estado == SystemState::DESCAYENDO)       ? "DESCAYENDO" :
     (estado == SystemState::DEBUG)            ? "DEBUG" : "???";
 
-  float tpsV  = tpsSensor->readVolts();
-  float mapV  = mapSensor->readVolts();
-  uint8_t dac = injector->getCurrentDAC();  // método que debes exponer
-  bool turboOn    = turbo->isOn();      // método que debes exponer
-  bool injectorOn = injector->isActive();   // método que debes exponer
+  if (abs(tpsV - lastTPS) > 0.02f || abs(mapV - lastMAP) > 0.02f || dac != lastDAC) {
+    lastTPS = tpsV;
+    lastMAP = mapV;
+    lastDAC = dac;
 
-  unsigned long elapsed = (millis() - lastTransitionMS) / 1000;
+    Serial.println("\n=== TURBO SYSTEM DASHBOARD ===");
+    Serial.printf("Estado motor:      %s\n", estadoStr);
+    Serial.printf("DAC Output:        %u (PWM)\n", dac);
+    Serial.printf("Turbo:             %s\n", turboOn ? "ON" : "OFF");
+    Serial.printf("Inyector sónico:   %s\n", injectorOn ? "ON" : "OFF");
+    Serial.printf("Último cambio:     %s → %s (hace %lu s)\n",
+                  lastState == SystemState::OFF ? "OFF" : "…",
+                  estadoStr, elapsed);
+    Serial.println("==============================");
+  }
 
-  Serial.println("\n=== TURBO SYSTEM DASHBOARD ===");
-  Serial.printf("Estado motor:      %s\n", estadoStr);
-  Serial.printf("TPS:               %.2f V\n", tpsV);
-  Serial.printf("MAP:               %.2f V\n", mapV);
-  Serial.printf("DAC Output:        %u (PWM)\n", dac);
-  Serial.printf("Turbo:             %s\n", turboOn ? "ON" : "OFF");
-  Serial.printf("Inyector sónico:   %s\n", injectorOn ? "ON" : "OFF");
-  Serial.printf("Último cambio:     %s → %s (hace %lu s)\n",
-                 lastState == SystemState::OFF ? "OFF" : "…",
-                 estadoStr, elapsed);
-  Serial.println("==============================\n");
+    // Visualización rápida en HUD
+  Serial.printf("\rHUD: TPS ADC=%.2fV Sensor=%.2f V| MAP ADC=%.2fV Sensor=%.2f V| DAC=%u PWM  ", tpsV, tpsFuente, mapV, mapFuente, dac);
+
 }
 
 void ConsoleUI::imprimirHelp() {

@@ -14,7 +14,7 @@
 BluetoothSerial SerialBT;
 
 // PIN-OUT
-constexpr uint8_t PIN_MAP             = 33;
+constexpr uint8_t PIN_MAP             = 35;
 constexpr uint8_t PIN_TPS             = 34;
 constexpr uint8_t PIN_RELAY_TURBO     =  2;
 constexpr uint8_t PIN_DAC_ACOUSTIC    = 25;
@@ -86,8 +86,13 @@ void loop() {
   injector.setLevel(level);         // ← actualiza nivel deseado (ya lo haces)
   injector.update();                // ← aplica rampa si estás usando `update()` para suavizado
   injector.applyPendingDAC();      // ← DAC aplicado fuera del ISR (nuevo paso seguro)
-  consoleUI.imprimirDashboard();
+  static unsigned long lastPrint = 0;
+  if (millis() - lastPrint > 300) {  // Actualiza cada 100 ms
+    consoleUI.imprimirDashboard();
+    lastPrint = millis();
+  }
 
 
-  delay(200);
+
+  delay(20);
 }

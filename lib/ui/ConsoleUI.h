@@ -26,6 +26,10 @@ public:
 
 private:
   StateMachine*      fsm         = nullptr;
+  float lastTPS = -1.0f;
+  float lastMAP = -1.0f;
+  uint8_t lastDAC = 0;
+
   MAPSensor*         mapSensor   = nullptr;
   TPSSensor*         tpsSensor   = nullptr;
   TurboController*   turbo       = nullptr;
