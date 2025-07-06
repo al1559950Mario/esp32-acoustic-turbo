@@ -42,7 +42,7 @@ void CalibrationManager::clearCalibration() {
   prefs.begin("calib", false);
   prefs.clear();
   prefs.end();
-
+  
   mapMin = mapMax = tpsMin = tpsMax = 0;
   Serial.println(">> Umbrales borrados. Requiere calibración.");
 }

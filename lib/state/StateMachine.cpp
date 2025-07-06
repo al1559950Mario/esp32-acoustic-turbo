@@ -52,7 +52,7 @@ void StateMachine::update(float mapKPa,
     case SystemState::CALIBRATION:
       // La lógica de calibración (runMAPCalibration/runTPS…) se ejecuta en main()
       // Tras completarla, main deberá invocar saveCalibration() y realizar:
-      //     fsm.debugForceState(SystemState::OFF);
+           debugForceState(SystemState::OFF);
       break;
 
     case SystemState::IDLE:
@@ -107,6 +107,7 @@ void StateMachine::update(float mapKPa,
 
     case SystemState::DEBUG:
       // Queda a la espera de debugForceState()
+      //debugForceState();
       break;
   }
 }

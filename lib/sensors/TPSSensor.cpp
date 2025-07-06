@@ -18,11 +18,19 @@ void TPSSensor::begin(uint8_t analogPin) {
 uint16_t TPSSensor::readRaw() const {
   uint16_t raw = analogRead(_pin);
 
-  if (raw < 50 || raw > 4045) {
-  return CalibrationManager::getInstance().getTPSMin();  // ← más seguro que 0
+  // Umbrales para detectar lecturas erráticas
+  constexpr uint16_t RAW_ERR_LOW  = 50;
+  constexpr uint16_t RAW_ERR_HIGH = 4045;
+
+  // Si raw está por debajo del rango físico “útil”, asumimos cable desconectado
+  if (raw < RAW_ERR_LOW) {
+    return 0;       // mínimo de ADC
   }
-
-
+  // Si raw está por encima, asumimos saturación o cortocircuito
+  if (raw > RAW_ERR_HIGH) {
+    return 4095;    // máximo de ADC
+  }
+  // En rango “válido”, devolvemos la lectura tal cual
   return raw;
 }
 
@@ -56,9 +64,6 @@ float TPSSensor::readPct() {
  */
 float TPSSensor::readVolts() const {
   uint16_t raw    = readRaw();
-  auto& calib     = CalibrationManager::getInstance();
-  uint16_t rawCalMin = calib.getTPSMin();  // tu mínimo calibrado
-  uint16_t rawCalMax = calib.getTPSMax();  // tu máximo calibrado
 
   // 1) Si cae en la zona “desconectado” (muy cerca de 0), devuelvo 0 V
   if (raw <= 5) {

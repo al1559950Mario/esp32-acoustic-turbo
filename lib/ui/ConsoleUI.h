@@ -15,7 +15,7 @@
  */
 class ConsoleUI {
 public:
-  bool dashboardEnabled = false;
+  bool dashboardEnabled = true;
 
   void begin();
   void update();

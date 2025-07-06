@@ -88,6 +88,16 @@ void ConsoleUI::interpretarComando(char c) {
         Serial.println(">> Paro manual: regresando a IDLE.");
       }
       break;
+    case 'r':
+      CalibrationManager::getInstance().clearCalibration();
+      if (fsm) {
+        fsm->debugForceState(SystemState::SIN_CALIBRAR);
+        Serial.println(">> Se requiere recalibrar de nuevo para poder usar el sistema");
+      } else {
+        Serial.println("⚠️ No se puede cambiar estado: FSM no está disponible.");
+      }
+      break;
+
 
     case 'i': case 't': case 'u': case 'v':
       if (!developerMode) {
@@ -101,7 +111,7 @@ void ConsoleUI::interpretarComando(char c) {
         case 'v': Serial.println(">> [visualización de curva] …"); break;
       }
       break;
-
+      
     default:
       Serial.print("❓ Comando no reconocido: ");
       Serial.println(c);
@@ -168,8 +178,9 @@ void ConsoleUI::imprimirDashboard() {
 
 void ConsoleUI::imprimirHelp() {
   Serial.println(F("\n📘 Comandos disponibles:"));
-  Serial.println(F("  s  → Mostrar dashboard del sistema"));
-  Serial.println(F("  c  → Ejecutar rutina de calibración"));
+  Serial.println(F("  s  → Activar/Desactivar dashboard del sistema"));
+  Serial.println(F("  c  → Ejecutar rutina de calibración de sensores"));
+  Serial.println(F("  r  → Borrar calibración actual (solo clear)"));
   Serial.println(F("  x  → Paro manual, volver a IDLE"));
   Serial.println(F("  ?  → Mostrar esta ayuda"));
   Serial.println(F("  d  → Activar modo desarrollador"));
