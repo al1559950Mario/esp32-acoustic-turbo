@@ -33,3 +33,7 @@ void TurboController::updatePowerLevel(float level) {
   // 🚧 Futuro: aplicar PWM, DAC o lógica de control variable
   // Por ahora no hace nada
 }
+
+bool TurboController::isActive() const {
+  return active;  // ← o lo que estés usando para rastrear el estado actual
+}

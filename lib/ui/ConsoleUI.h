@@ -16,7 +16,7 @@
 class ConsoleUI {
 public:
   bool dashboardEnabled = true;
-
+  
   void begin();
   void update();
   void setFSM(StateMachine* fsmRef);
@@ -28,6 +28,7 @@ public:
   void runConsoleCalibration();
   bool isSistemaActivo() const { return sistemaActivo; }
   void toggleSistema();  // Nuevo método para alternar
+  int parseValor(const String& linea, const String& clave);
 
 private:
   bool sistemaActivo = true; // Inicia encendido por defecto
@@ -52,3 +53,5 @@ private:
 
   void imprimirHelp();
 };
+
+

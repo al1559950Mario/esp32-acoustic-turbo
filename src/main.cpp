@@ -18,7 +18,7 @@ constexpr uint8_t PIN_MAP             = 35;
 constexpr uint8_t PIN_TPS             = 34;
 constexpr uint8_t PIN_RELAY_TURBO     =  2;
 constexpr uint8_t PIN_DAC_ACOUSTIC    = 25;
-constexpr uint8_t PIN_RELAY_ACOUSTIC  = 26;
+constexpr uint8_t PIN_RELAY_ACOUSTIC  =  4;
 
 // Objetos globales
 StateMachine       fsm;

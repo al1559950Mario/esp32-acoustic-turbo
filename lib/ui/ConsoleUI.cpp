@@ -36,29 +36,35 @@ bool ConsoleUI::getCalibRequest() {
 void ConsoleUI::update() {
   if (!fsm) return;
 
+  // 1. Transición de estado
   if (fsm->getState() != lastState) {
     lastTransitionMS = millis();
     lastState = fsm->getState();
   }
 
-  // 1. Comandos de consola
+  // 2. Lectura y procesamiento serial (comando o simulación)
   if (Serial.available()) {
-    char c = Serial.read();
-    interpretarComando(c);
-  }
-
-  // 2. Lectura de simulación (si está activa)
-  if (simulacionActiva && Serial.available()) {
     String linea = Serial.readStringUntil('\n');
-    int idxTPS = linea.indexOf("tps_raw:");
-    int idxMAP = linea.indexOf("map_raw:");
+    linea.trim();  // elimina espacios o saltos extras
 
-    if (idxTPS != -1 && idxMAP != -1) {
-      uint16_t tpsRaw = linea.substring(idxTPS + 8, linea.indexOf(",", idxTPS)).toInt();
-      uint16_t mapRaw = linea.substring(idxMAP + 8).toInt();
+    if (simulacionActiva && linea.startsWith("tps_raw:")) {
+      // Extracción por substring manual (si no quieres usar parseValor):
+      int idxTPS = linea.indexOf("tps_raw:");
+      int idxMAP = linea.indexOf("map_raw:");
 
-      tpsSensor->setSimulatedRaw(tpsRaw);
-      mapSensor->setSimulatedRaw(mapRaw);
+      if (idxTPS != -1 && idxMAP != -1) {
+        uint16_t tpsRaw = linea.substring(idxTPS + 8, linea.indexOf(",", idxTPS)).toInt();
+        uint16_t mapRaw = linea.substring(idxMAP + 8).toInt();
+
+        tpsSensor->setSimulatedRaw(tpsRaw);
+        mapSensor->setSimulatedRaw(mapRaw);
+
+        Serial.println("Recibido tps=" + String(tpsRaw) + " map=" + String(mapRaw));
+      }
+    } else if (linea.length() == 1) {
+      interpretarComando(linea.charAt(0));
+    } else {
+      Serial.println("⚠️  Comando no reconocido o fuera de modo simulación.");
     }
   }
 
@@ -151,6 +157,9 @@ void ConsoleUI::interpretarComando(char c) {
       case 'a':
         toggleSistema();
         break;
+      case 'b':
+        injector->test();
+        break;
       case 'z':
         if (!developerMode) {
           Serial.println("⚠️  Comando exclusivo del modo desarrollador.");
@@ -159,7 +168,7 @@ void ConsoleUI::interpretarComando(char c) {
         simulacionActiva = !simulacionActiva;
         Serial.printf(">> Modo simulación %s.\n", simulacionActiva ? "ACTIVADO" : "DESACTIVADO");
         break;
-
+      
       
     default:
       Serial.print("❓ Comando no reconocido: ");
@@ -240,7 +249,9 @@ void ConsoleUI::imprimirHelp() {
     Serial.println(F("  i  → Activar rele INYECCION_ACUSTICA"));
     Serial.println(F("  t  → Activar rele TURBO"));
     Serial.println(F("  v  → Visualizar curva TPS-MAP(Pendiente desarrollar)"));
+    Serial.println(F("  b  → Probar sonido acústico"));
   }
+
 }
 
 void ConsoleUI::runConsoleCalibration() {
@@ -257,3 +268,16 @@ void ConsoleUI::toggleSistema() {
   sistemaActivo = !sistemaActivo;
   Serial.printf(">> Sistema %s.\n", sistemaActivo ? "ACTIVADO" : "DESACTIVADO");
 }
+
+int ConsoleUI::parseValor(const String& linea, const String& clave) {
+  int inicio = linea.indexOf(clave + ":");
+  if (inicio == -1) return -1;
+
+  inicio += clave.length() + 1;
+  int fin = linea.indexOf(',', inicio);
+  if (fin == -1) fin = linea.length();
+
+  String valorStr = linea.substring(inicio, fin);
+  return valorStr.toInt();
+}
+

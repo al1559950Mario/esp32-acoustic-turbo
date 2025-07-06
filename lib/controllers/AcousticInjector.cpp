@@ -91,3 +91,21 @@ void AcousticInjector::testRelay(bool on) {
 bool AcousticInjector::isRelayActive() const {
   return digitalRead(_relayPin) == HIGH;
 }
+
+void AcousticInjector::test() {
+  Serial.println(F("🔊 Prueba acústica iniciada..."));
+
+  // Activa rele si está conectado
+  testRelay(true);
+
+  // Inicia señal DAC a nivel máximo
+  start(1.0f);
+
+  delay(500);  // Duración del pulso acústico
+
+  // Detiene señal y desactiva rele
+  stop();
+  testRelay(false);
+
+  Serial.println(F("✅ Prueba finalizada."));
+}

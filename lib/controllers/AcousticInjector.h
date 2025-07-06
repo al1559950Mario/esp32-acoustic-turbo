@@ -21,7 +21,8 @@ public:
   static void IRAM_ATTR onTimer();
   void testRelay(bool);
   bool isRelayActive() const;
-  
+  void test();  // Ejecuta una prueba rápida del sonido acústico
+
 private:
   uint8_t  _dacPin = 0;
   uint8_t  _relayPin = 0;
