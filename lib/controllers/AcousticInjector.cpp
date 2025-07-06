@@ -37,6 +37,7 @@ void AcousticInjector::start(float level) {
   delay(10);
   _index = 0;
   timerAlarmEnable(_timer);
+  Serial.printf("[DAC] start(level=%.2f), index=0, timer ENABLED\n", _targetLevel);
 }
 
 void AcousticInjector::stop() {
@@ -95,17 +96,37 @@ bool AcousticInjector::isRelayActive() const {
 void AcousticInjector::test() {
   Serial.println(F("🔊 Prueba acústica iniciada..."));
 
-  // Activa rele si está conectado
   testRelay(true);
-
-  // Inicia señal DAC a nivel máximo
   start(1.0f);
 
-  delay(500);  // Duración del pulso acústico
+  for (int i = 0; i < 250; i++) {  // 250 × 20ms = 5s
+    update();
+    applyPendingDAC();
+    delay(20);
+  }
 
-  // Detiene señal y desactiva rele
   stop();
   testRelay(false);
 
   Serial.println(F("✅ Prueba finalizada."));
+}
+
+void AcousticInjector::emitResonant(float level) {
+  Serial.println(F("🎼 Emitiendo onda resonante (Helmholtz)..."));
+
+  float freq = 6370.0f;                      // Frecuencia de resonancia en Hz
+  float amplitude = 127.0f * level;          // Escalado de amplitud (p₀)
+  const uint8_t bias = 128;                  // Punto medio del DAC
+  const float dt = 1.0f / 64000.0f;          // Muestra cada 15.6 us ~ 64 kHz
+  const int sampleCount = 64000;              // Muestras totales (~4ms de señal)
+
+  for (int i = 0; i < sampleCount; ++i) {
+    float t = i * dt;
+    float value = bias + amplitude * sinf(2.0f * PI * freq * t);
+    dac_output_voltage(_dacChannel, constrain((int)value, 0, 255));
+    delayMicroseconds(15);  // Espaciado temporal (~64kHz)
+  }
+
+  dac_output_voltage(_dacChannel, bias);  // Silencio
+  Serial.println(F("✅ Onda resonante emitida."));
 }

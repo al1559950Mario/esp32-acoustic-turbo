@@ -22,6 +22,7 @@ public:
   void testRelay(bool);
   bool isRelayActive() const;
   void test();  // Ejecuta una prueba rápida del sonido acústico
+  void emitResonant(float level);
 
 private:
   uint8_t  _dacPin = 0;
