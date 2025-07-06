@@ -41,28 +41,46 @@ void ConsoleUI::update() {
     lastState = fsm->getState();
   }
 
+  // 1. Comandos de consola
   if (Serial.available()) {
     char c = Serial.read();
     interpretarComando(c);
   }
 
+  // 2. Lectura de simulación (si está activa)
+  if (simulacionActiva && Serial.available()) {
+    String linea = Serial.readStringUntil('\n');
+    int idxTPS = linea.indexOf("tps_raw:");
+    int idxMAP = linea.indexOf("map_raw:");
+
+    if (idxTPS != -1 && idxMAP != -1) {
+      uint16_t tpsRaw = linea.substring(idxTPS + 8, linea.indexOf(",", idxTPS)).toInt();
+      uint16_t mapRaw = linea.substring(idxMAP + 8).toInt();
+
+      tpsSensor->setSimulatedRaw(tpsRaw);
+      mapSensor->setSimulatedRaw(mapRaw);
+    }
+  }
+
+  // 3. Proceso de calibración
   if (getCalibRequest()) {
     runConsoleCalibration();
   }
-  // Nuevo: HUD en tiempo real
+
+  // 4. HUD en tiempo real
   if (dashboardEnabled) {
-     static unsigned long lastPrint = 0;
-    if (millis() - lastPrint > 300) {  // Actualiza cada 300 ms
+    static unsigned long lastPrint = 0;
+    if (millis() - lastPrint > 300) {
       imprimirDashboard();
       lastPrint = millis();
     }
   }
-
 }
+
 
 void ConsoleUI::interpretarComando(char c) {
   switch (c) {
-    case '?':
+    case 'm':
       imprimirHelp();
       break;
 
@@ -127,10 +145,21 @@ void ConsoleUI::interpretarComando(char c) {
               Serial.println("⚠️ Turbo no disponible.");
             }
             break;
-        case 'u': Serial.println(">> [offsets internos] …"); break;
         case 'v': Serial.println(">> [visualización de curva] …"); break;
       }
       break;
+      case 'a':
+        toggleSistema();
+        break;
+      case 'z':
+        if (!developerMode) {
+          Serial.println("⚠️  Comando exclusivo del modo desarrollador.");
+          return;
+        }
+        simulacionActiva = !simulacionActiva;
+        Serial.printf(">> Modo simulación %s.\n", simulacionActiva ? "ACTIVADO" : "DESACTIVADO");
+        break;
+
       
     default:
       Serial.print("❓ Comando no reconocido: ");
@@ -198,19 +227,19 @@ void ConsoleUI::imprimirDashboard() {
 
 void ConsoleUI::imprimirHelp() {
   Serial.println(F("\n📘 Comandos disponibles:"));
+  Serial.println(F("  a  → Activar/Desactivar sistema completo (seguridad/falla)"));
   Serial.println(F("  s  → Activar/Desactivar dashboard del sistema"));
   Serial.println(F("  c  → Ejecutar rutina de calibración de sensores"));
   Serial.println(F("  r  → Borrar calibración actual (solo clear)"));
   Serial.println(F("  x  → Paro manual, volver a IDLE"));
-  Serial.println(F("  ?  → Mostrar esta ayuda"));
   Serial.println(F("  d  → Activar modo desarrollador"));
+  Serial.println(F("  m  → Mostrar menu de comandos"));
 
   if (developerMode) {
     Serial.println(F("\n🧪 Modo desarrollador activo:"));
     Serial.println(F("  i  → Activar rele INYECCION_ACUSTICA"));
     Serial.println(F("  t  → Activar rele TURBO"));
-    Serial.println(F("  u  → Mostrar offsets internos"));
-    Serial.println(F("  v  → Visualizar curva TPS-MAP"));
+    Serial.println(F("  v  → Visualizar curva TPS-MAP(Pendiente desarrollar)"));
   }
 }
 
@@ -222,4 +251,9 @@ void ConsoleUI::runConsoleCalibration() {
   calib.runMAPCalibration(*mapSensor);
   calib.saveCalibration();
   Serial.println(">> Calibración completada.");
+}
+
+void ConsoleUI::toggleSistema() {
+  sistemaActivo = !sistemaActivo;
+  Serial.printf(">> Sistema %s.\n", sistemaActivo ? "ACTIVADO" : "DESACTIVADO");
 }

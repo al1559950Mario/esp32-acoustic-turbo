@@ -23,7 +23,7 @@ uint16_t MAPSensor::readRaw() {
  * Utiliza valores de calibración guardados en NVS.
  */
 float MAPSensor::readNormalized() {
-  uint16_t raw = readRaw();
+  uint16_t raw = isSimulationActive() ? getSimulatedRaw() : analogRead(_pin);
   uint16_t min = CalibrationManager::getInstance().getMAPMin();
   uint16_t max = CalibrationManager::getInstance().getMAPMax();
 

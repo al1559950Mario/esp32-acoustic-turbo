@@ -1,12 +1,13 @@
 #pragma once
 
 #include <Arduino.h>
+#include <SimulableSensor.h>
 
 /**
  * MAPSensor
  * Lee el sensor de presión absoluta del múltiple y lo convierte a kPa o valor normalizado.
  */
-class MAPSensor {
+class MAPSensor : public SimulableSensor {
 public:
   void begin(uint8_t analogPin);
   uint16_t readRaw();     // Lectura en crudo (0–4095)

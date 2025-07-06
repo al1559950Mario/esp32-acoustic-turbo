@@ -69,9 +69,17 @@ try:
                f"TPS:{tps_v:0.3f}V | MAP:{map_v:0.3f}V")
         print(log)
 
-        # 7) Enviar por Serial (JSON o CSV según conveniencia)
-        payload = f"tps:{tps_v:.3f},map:{map_v:.3f}\n"
+        # 7) Convertir voltajes simulados a valores crudos ADC
+        def volt_to_adc(volts):
+            return int((volts / 3.3) * 4095)
+
+        tps_adc = volt_to_adc(tps_v)
+        map_adc = volt_to_adc(map_v)
+
+        # 8) Enviar valores simulados como ADC crudo por Serial
+        payload = f"tps_raw:{tps_adc},map_raw:{map_adc}\n"
         ser.write(payload.encode('utf-8'))
+
 
         log = (
             f"[{elapsed:5.2f}s] Gear:{gear+1} | "

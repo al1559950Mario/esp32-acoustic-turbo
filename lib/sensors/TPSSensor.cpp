@@ -38,18 +38,17 @@ uint16_t TPSSensor::readRaw() const {
  * Devuelve el valor normalizado entre 0.0 y 1.0 en base a los valores de calibración.
  * Evita división por cero y lecturas fuera de rango calibrado.
  */
+
 float TPSSensor::readNormalized() {
-  uint16_t raw = readRaw();
+  uint16_t raw = isSimulationActive() ? getSimulatedRaw() : analogRead(_pin);
   uint16_t min = CalibrationManager::getInstance().getTPSMin();
   uint16_t max = CalibrationManager::getInstance().getTPSMax();
 
-  if (max <= min || raw < min || raw > max) {
-    //Serial.println(">> TPSSensor fuera de rango de calibración");
-    return 0.0f;
-  }
+  if (max <= min || raw < min || raw > max) return 0.0f;
 
   return constrain((float)(raw - min) / (max - min), 0.0f, 1.0f);
 }
+
 
 /**
  * Convierte la lectura a porcentaje de apertura del acelerador (0–100%)
@@ -86,3 +85,4 @@ bool TPSSensor::isValidReading() {
   uint16_t raw = analogRead(_pin);
   return (raw >= 50 && raw <= 4045);
 }
+

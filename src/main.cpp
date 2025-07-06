@@ -64,28 +64,34 @@ void setup() {
   else
     Serial.println("  Estado inicial: OFF (calibración cargada)");
 }
-
 void loop() {
   consoleUI.update();
   bleUI.update(fsm.getState());
   debugMgr.updateFromSerial(Serial);
 
-  float mapKPa   = mapSensor.readkPa();
-  float tpsPct   = tpsSensor.readPct();
-  float tpsNorm  = tpsSensor.readNormalized();
-  float level    = constrain((tpsNorm - 0.30f) / 0.40f, 0.0f, 1.0f);
+  if (consoleUI.isSistemaActivo()) {
+    float mapKPa   = mapSensor.readkPa();
+    float tpsPct   = tpsSensor.readPct();
+    float tpsNorm  = tpsSensor.readNormalized();
+    float level    = constrain((tpsNorm - 0.30f) / 0.40f, 0.0f, 1.0f);
 
-  fsm.update(
-    mapKPa,
-    tpsPct,
-    consoleUI.getCalibRequest(),
-    bleUI.getCalibRequest(),
-    debugMgr
-  );
+    fsm.update(
+      mapKPa,
+      tpsPct,
+      consoleUI.getCalibRequest(),
+      bleUI.getCalibRequest(),
+      debugMgr
+    );
 
-  injector.setLevel(level);         // ← actualiza nivel deseado (ya lo haces)
-  injector.update();                // ← aplica rampa si estás usando `update()` para suavizado
-  injector.applyPendingDAC();      // ← DAC aplicado fuera del ISR (nuevo paso seguro)
+    injector.setLevel(level);
+    injector.update();
+    injector.applyPendingDAC();
+  } else {
+    // Opcional: Apagar subsistemas activos como seguridad
+    injector.stop();
+    turbo.stop(); 
+  }
 
   delay(20);
 }
+

@@ -26,12 +26,17 @@ public:
   void imprimirDashboard();
   bool getCalibRequest();
   void runConsoleCalibration();
+  bool isSistemaActivo() const { return sistemaActivo; }
+  void toggleSistema();  // Nuevo método para alternar
 
 private:
+  bool sistemaActivo = true; // Inicia encendido por defecto
   StateMachine*      fsm         = nullptr;
   float lastTPS = -1.0f;
   float lastMAP = -1.0f;
   uint8_t lastDAC = 0;
+
+  bool simulacionActiva = false;
 
   MAPSensor*         mapSensor   = nullptr;
   TPSSensor*         tpsSensor   = nullptr;
