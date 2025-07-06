@@ -19,7 +19,9 @@ public:
   uint8_t getCurrentDAC() const;
   bool isActive() const;
   static void IRAM_ATTR onTimer();
-
+  void testRelay(bool);
+  bool isRelayActive() const;
+  
 private:
   uint8_t  _dacPin = 0;
   uint8_t  _relayPin = 0;

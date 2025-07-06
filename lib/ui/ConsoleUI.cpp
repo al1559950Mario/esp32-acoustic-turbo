@@ -105,8 +105,28 @@ void ConsoleUI::interpretarComando(char c) {
         return;
       }
       switch (c) {
-        case 'i': fsm->debugForceState(SystemState::INYECCION_ACUSTICA); break;
-        case 't': fsm->debugForceState(SystemState::TURBO); break;
+        case 'i': 
+          if (injector) {
+            bool estadoActual = injector->isRelayActive();
+            injector->testRelay(!estadoActual);  // Lo invierte
+            Serial.printf(">> Relé %s.\n", !estadoActual ? "activado" : "desactivado");
+          } else {
+            Serial.println("⚠️ Inyector no disponible.");
+          }
+          break;
+        case 't': 
+          if (turbo) {
+            if (turbo->isActive()) {
+                turbo->stop();
+                Serial.println(">> Turbo desactivado.");
+              } else {
+                turbo->start();
+                Serial.println(">> Turbo activado.");
+              }
+            } else {
+              Serial.println("⚠️ Turbo no disponible.");
+            }
+            break;
         case 'u': Serial.println(">> [offsets internos] …"); break;
         case 'v': Serial.println(">> [visualización de curva] …"); break;
       }
@@ -187,8 +207,8 @@ void ConsoleUI::imprimirHelp() {
 
   if (developerMode) {
     Serial.println(F("\n🧪 Modo desarrollador activo:"));
-    Serial.println(F("  i  → Forzar INYECCION_ACUSTICA"));
-    Serial.println(F("  t  → Forzar TURBO"));
+    Serial.println(F("  i  → Activar rele INYECCION_ACUSTICA"));
+    Serial.println(F("  t  → Activar rele TURBO"));
     Serial.println(F("  u  → Mostrar offsets internos"));
     Serial.println(F("  v  → Visualizar curva TPS-MAP"));
   }

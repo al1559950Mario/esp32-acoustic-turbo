@@ -83,3 +83,11 @@ void IRAM_ATTR AcousticInjector::onTimer() {
     _instance->_index = 0;
 }
 
+void AcousticInjector::testRelay(bool on) {
+  digitalWrite(_relayPin, on ? HIGH : LOW);
+  Serial.printf(">> Relé %s manualmente.\n", on ? "activado" : "desactivado");
+}
+
+bool AcousticInjector::isRelayActive() const {
+  return digitalRead(_relayPin) == HIGH;
+}
