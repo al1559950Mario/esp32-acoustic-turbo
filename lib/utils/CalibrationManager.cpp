@@ -78,10 +78,10 @@ void CalibrationManager::runMAPCalibration(MAPSensor& sensor) {
   delay(500);
 
   // 1) Captura MAP_MAX (atmósfera)
-  Serial.println(" [1] Motor apagado: tomando muestras 5s para mapMax");
+  Serial.println(" [1] Motor apagado: tomando muestras 12s para mapMax");
   uint16_t candidateMax = 0;
   unsigned long start = millis();
-  while (millis() - start < 5000) {
+  while (millis() - start < 12000) {
     uint16_t raw = sensor.readRaw();
     candidateMax = max(candidateMax, raw);
     Serial.printf("\r    raw=%4u | candidatoMax=%4u", raw, candidateMax);
@@ -92,10 +92,10 @@ void CalibrationManager::runMAPCalibration(MAPSensor& sensor) {
   saveStep(CalibStep::MAP_MAX, mapMax);
 
   // 2) Captura MAP_MIN (vacío)
-  Serial.println("\n [2] Motor en ralentí: tomando muestras 5s para mapMin");
+  Serial.println("\n [2] Motor en ralentí: tomando muestras 12s para mapMin");
   uint16_t candidateMin = UINT16_MAX;
   start = millis();
-  while (millis() - start < 5000) {
+  while (millis() - start < 12000) {
     uint16_t raw = sensor.readRaw();
     candidateMin = min(candidateMin, raw);
     Serial.printf("\r    raw=%4u |  candidatoMin=%4u", raw, candidateMin);
@@ -110,14 +110,14 @@ void CalibrationManager::runMAPCalibration(MAPSensor& sensor) {
 
 // Captura en tiempo real TPS_MIN y TPS_MAX
 void CalibrationManager::runTPSCalibration(TPSSensor& sensor) {
-  Serial.println("\n=== Calibración TPS (Min then Max) ===");
+  Serial.println("\n=== Calibración TPS Motor apagado llave abierta(Min then Max) ===");
   delay(500);
 
   // 1) TPS_MIN (pedal suelto)
-  Serial.println(" [1] Pedal suelto: tomando muestras 5s para tpsMin");
+  Serial.println(" [1] Pedal suelto: tomando muestras 12s para tpsMin");
   uint16_t candidateMin = UINT16_MAX;
   unsigned long start = millis();
-  while (millis() - start < 5000) {
+  while (millis() - start < 12000) {
     uint16_t raw = sensor.readRaw();
     candidateMin = min(candidateMin, raw);
     Serial.printf("\r    raw=%4u |  candidatoMin=%4u", raw, candidateMin);
@@ -128,10 +128,10 @@ void CalibrationManager::runTPSCalibration(TPSSensor& sensor) {
   saveStep(CalibStep::TPS_MIN, tpsMin);
 
   // 2) TPS_MAX (pedal a fondo)
-  Serial.println("\n [2] Pedal a fondo: tomando muestras 5s para tpsMax");
+  Serial.println("\n [2] Pedal a fondo: tomando muestras 12s para tpsMax");
   uint16_t candidateMax = 0;
   start = millis();
-  while (millis() - start < 5000) {
+  while (millis() - start < 12000) {
     uint16_t raw = sensor.readRaw();
     candidateMax = max(candidateMax, raw);
     Serial.printf("\r    raw=%4u | candidatoMax=%4u", raw, candidateMax);

@@ -60,7 +60,6 @@ void ConsoleUI::update() {
 
 }
 
-
 void ConsoleUI::interpretarComando(char c) {
   switch (c) {
     case '?':
@@ -110,49 +109,58 @@ void ConsoleUI::interpretarComando(char c) {
 }
 
 void ConsoleUI::imprimirDashboard() {
-  static float lastTPS = -1.0f;
-  static float lastMAP = -1.0f;
-  static uint8_t lastDAC = 0;
-
-  float tpsV  = tpsSensor->readVolts();
-  float mapV  = mapSensor->readVolts();
-  float tpsFuente = tpsV * 2.0f;
-  float mapFuente = mapV * 2.0f;
-  uint8_t dac = injector->getCurrentDAC();
+  // Lecturas en tiempo real
+  float tpsV      = tpsSensor->readVolts();
+  float mapV      = mapSensor->readVolts();
+  float tpsPct    = tpsV * 100.0f / 3.3f;    // ejemplo % sobre rango
+  float mapKPa    = mapV * (100.0f / 3.3f);  // ejemplo en kPa
+  uint8_t dac     = injector->getCurrentDAC();
   bool turboOn    = turbo->isOn();
-  bool injectorOn = injector->isActive();
-  SystemState estado = fsm->getState();
+  bool injOn      = injector->isActive();
+  SystemState st  = fsm->getState();
   unsigned long elapsed = (millis() - lastTransitionMS) / 1000;
 
-  const char* estadoStr = 
-    (estado == SystemState::OFF)              ? "OFF" :
-    (estado == SystemState::SIN_CALIBRAR)     ? "SIN_CALIB" :
-    (estado == SystemState::CALIBRATION)      ? "CALIBRANDO" :
-    (estado == SystemState::IDLE)             ? "IDLE" :
-    (estado == SystemState::INYECCION_ACUSTICA)? "SONIC FLOW" :
-    (estado == SystemState::TURBO)            ? "BOOST" :
-    (estado == SystemState::DESCAYENDO)       ? "DESCAYENDO" :
-    (estado == SystemState::DEBUG)            ? "DEBUG" : "???";
+  // Umbrales de calibración
+  auto& calib     = CalibrationManager::getInstance();
+  uint16_t tpsMin = calib.getTPSMin();
+  uint16_t tpsMax = calib.getTPSMax();
+  uint16_t mapMin = calib.getMAPMin();
+  uint16_t mapMax = calib.getMAPMax();
 
-  if (abs(tpsV - lastTPS) > 0.02f || abs(mapV - lastMAP) > 0.02f || dac != lastDAC) {
-    lastTPS = tpsV;
-    lastMAP = mapV;
-    lastDAC = dac;
+  // Estado en string corto
+  static const char* stateNames[] = {
+    "OFF", "SIN_CAL", "CALIB", "IDLE",
+    "SONIC", "BOOST","DESCAY","DEBUG","??"
+  };
+  const char* stName = stateNames[int(st)];
 
-    Serial.println("\n=== TURBO SYSTEM DASHBOARD ===");
-    Serial.printf("Estado motor:      %s\n", estadoStr);
+  // HUD compacto con casi todo:
+  Serial.printf(
+    "\r[%s|%lus] TPS=%.2fV(%u–%u) | MAP=%.2fV(%u–%u) | DAC=%3u | T:%c | I:%c     ",
+    stName,
+    elapsed,
+    tpsV, tpsMin, tpsMax,
+    mapV, mapMin, mapMax,
+    dac,
+    turboOn ? '1' : '0',
+    injOn   ? '1' : '0'
+  );
+
+  // Dashboard grande solo en transición de estado
+  if (st != lastState) {
+    lastState = st;
+    Serial.println("\n\n=== TURBO SYSTEM DASHBOARD ===");
+    Serial.printf("Estado motor:      %s\n", stName);
+    Serial.printf("TPS Voltage:       %.3f V (raw %u–%u)\n",
+                  tpsV, tpsMin, tpsMax);
+    Serial.printf("MAP Voltage:       %.3f V (raw %u–%u)\n",
+                  mapV, mapMin, mapMax);
     Serial.printf("DAC Output:        %u (PWM)\n", dac);
     Serial.printf("Turbo:             %s\n", turboOn ? "ON" : "OFF");
-    Serial.printf("Inyector sónico:   %s\n", injectorOn ? "ON" : "OFF");
-    Serial.printf("Último cambio:     %s → %s (hace %lu s)\n",
-                  lastState == SystemState::OFF ? "OFF" : "…",
-                  estadoStr, elapsed);
-    Serial.println("==============================");
+    Serial.printf("Inyector sónico:   %s\n", injOn ? "ON" : "OFF");
+    Serial.printf("Último cambio:     hace %lu s\n", elapsed);
+    Serial.println("==============================\n");
   }
-
-    // Visualización rápida en HUD
-  Serial.printf("\rHUD: TPS ADC=%.2fV Sensor=%.2f V| MAP ADC=%.2fV Sensor=%.2f V| DAC=%u PWM  ", tpsV, tpsFuente, mapV, mapFuente, dac);
-
 }
 
 void ConsoleUI::imprimirHelp() {
