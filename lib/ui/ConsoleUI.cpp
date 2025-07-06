@@ -1,4 +1,6 @@
 #include "ConsoleUI.h"
+#include "CalibrationManager.h" 
+
 
 void ConsoleUI::begin() {
   Serial.begin(115200);
@@ -44,6 +46,9 @@ void ConsoleUI::update() {
     interpretarComando(c);
   }
 
+  if (getCalibRequest()) {
+    runConsoleCalibration();
+  }
   // Nuevo: HUD en tiempo real
   if (dashboardEnabled) {
      static unsigned long lastPrint = 0;
@@ -165,4 +170,14 @@ void ConsoleUI::imprimirHelp() {
     Serial.println(F("  u  → Mostrar offsets internos"));
     Serial.println(F("  v  → Visualizar curva TPS-MAP"));
   }
+}
+
+void ConsoleUI::runConsoleCalibration() {
+  Serial.println(">> Iniciando calibración…");
+  auto& calib = CalibrationManager::getInstance();
+  calib.clearCalibration();
+  calib.runTPSCalibration(*tpsSensor);
+  calib.runMAPCalibration(*mapSensor);
+  calib.saveCalibration();
+  Serial.println(">> Calibración completada.");
 }

@@ -1,37 +1,38 @@
 #pragma once
+#include "MAPSensor.h"
+#include "TPSSensor.h"
+#include <Preferences.h>
 
-#include <Arduino.h>
+enum class CalibStep {
+  TPS_MIN,
+  TPS_MAX,
+  MAP_MIN,
+  MAP_MAX
+};
 
-/**
- * CalibrationManager
- * Encargado de capturar, guardar y recuperar los valores de calibración
- * de sensores analógicos como el MAP y TPS. Se apoya en NVS para
- * almacenamiento persistente entre reinicios.
- */
 class CalibrationManager {
 public:
   static CalibrationManager& getInstance();
 
   void begin();
-
-  // Guardar y cargar calibración desde NVS
   bool loadCalibration();
-  bool saveCalibration();
+  void clearCalibration();
 
-  // Calibración interactiva desde consola o BLE
-  void runMAPCalibration(class MAPSensor& sensor);
-  void runTPScalibration(class TPSSensor& sensor);
+  bool saveCalibration();         // guarda mapMin, mapMax, tpsMin, tpsMax
+  void runMAPCalibration(MAPSensor& sensor);
+  void runTPSCalibration(TPSSensor& sensor);
 
-  // Getters públicos usados por sensores
   uint16_t getMAPMin() const;
   uint16_t getMAPMax() const;
   uint16_t getTPSMin() const;
   uint16_t getTPSMax() const;
 
 private:
-  // Rango calibrado de valores crudos (ADC)
-  uint16_t mapMin = 0, mapMax = 4095;
-  uint16_t tpsMin = 0, tpsMax = 4095;
+  CalibrationManager() = default;
+  Preferences prefs;
 
-  CalibrationManager() = default; // Singleton
+  uint16_t mapMin = 0, mapMax = 0;
+  uint16_t tpsMin = 0, tpsMax = 0;
+
+  void saveStep(CalibStep step, uint16_t value);
 };

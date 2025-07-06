@@ -1,119 +1,150 @@
 #include "CalibrationManager.h"
-#include "MAPSensor.h"
-#include "TPSSensor.h"
-#include <Preferences.h>
+#include <Arduino.h>
 
-static Preferences prefs; // Objeto persistente de NVS
-
-/**
- * Devuelve la instancia única (singleton)
- */
 CalibrationManager& CalibrationManager::getInstance() {
-  static CalibrationManager instance;
-  return instance;
+  static CalibrationManager inst;
+  return inst;
 }
 
-/**
- * Inicializa la partición NVS donde se guardan datos de calibración.
- */
 void CalibrationManager::begin() {
-  prefs.begin("calib", false);  // false = lectura/escritura
+  prefs.begin("calib", false);
+  prefs.end();
 }
 
-/**
- * Carga los datos previamente almacenados en NVS.
- * Comprueba integridad básica de los valores.
- */
+// Si no existen las 4 claves, pide calibración
 bool CalibrationManager::loadCalibration() {
-  mapMin = prefs.getUShort("map_min", 0);
-  mapMax = prefs.getUShort("map_max", 4095);
-  tpsMin = prefs.getUShort("tps_min", 0);
-  tpsMax = prefs.getUShort("tps_max", 4095);
+  prefs.begin("calib", false);
+  bool ready = prefs.isKey("map_min")
+            && prefs.isKey("map_max")
+            && prefs.isKey("tps_min")
+            && prefs.isKey("tps_max");
+  if (!ready) {
+    Serial.println(">> No hay datos de calibración. Ejecute calibración.");
+    prefs.end();
+    return false;
+  }
 
-  bool valid = (mapMax > mapMin) && (tpsMax > tpsMin);
+  mapMin = prefs.getUShort("map_min");
+  mapMax = prefs.getUShort("map_max");
+  tpsMin = prefs.getUShort("tps_min");
+  tpsMax = prefs.getUShort("tps_max");
+  prefs.end();
+
+  bool valid = mapMax > mapMin && tpsMax > tpsMin;
   Serial.printf(">> Calibración cargada: MAP[%u–%u], TPS[%u–%u] %s\n",
-                mapMin, mapMax, tpsMin, tpsMax, valid ? "(OK)" : "(inválido)");
+                mapMin, mapMax, tpsMin, tpsMax,
+                valid ? "(OK)" : "(inválido)");
   return valid;
 }
 
-/**
- * Guarda los valores actuales de calibración en NVS.
- */
+// Borra NVS y valores en RAM
+void CalibrationManager::clearCalibration() {
+  prefs.begin("calib", false);
+  prefs.clear();
+  prefs.end();
+
+  mapMin = mapMax = tpsMin = tpsMax = 0;
+  Serial.println(">> Umbrales borrados. Requiere calibración.");
+}
+
+// Graba los 4 valores actuales
 bool CalibrationManager::saveCalibration() {
+  prefs.begin("calib", false);
   prefs.putUShort("map_min", mapMin);
   prefs.putUShort("map_max", mapMax);
   prefs.putUShort("tps_min", tpsMin);
   prefs.putUShort("tps_max", tpsMax);
-  prefs.end();  // Finaliza sesión NVS
+  prefs.end();
+  Serial.println(">> Valores de calibración guardados en NVS.");
   return true;
 }
 
-/**
- * Rutina guiada para calibrar el sensor MAP.
- * Instrucciones:
- *  - motor apagado → mapMax (presión atmosférica)
- *  - motor en ralentí → mapMin (vacío estable)
- */
+// Guarda un solo paso inmediatamente
+void CalibrationManager::saveStep(CalibStep step, uint16_t value) {
+  prefs.begin("calib", false);
+  switch(step) {
+    case CalibStep::MAP_MAX: prefs.putUShort("map_max", value); break;
+    case CalibStep::MAP_MIN: prefs.putUShort("map_min", value); break;
+    case CalibStep::TPS_MIN: prefs.putUShort("tps_min", value); break;
+    case CalibStep::TPS_MAX: prefs.putUShort("tps_max", value); break;
+  }
+  prefs.end();
+  Serial.printf(">> Paso %d guardado: %u\n", int(step), value);
+}
+
+// Captura en tiempo real el máximo y mínimo de MAP
 void CalibrationManager::runMAPCalibration(MAPSensor& sensor) {
-  Serial.println("\n=== 🧭 Calibración de sensor MAP ===");
-  delay(1000);
+  Serial.println("\n=== Calibración MAP (Max then Min) ===");
+  delay(500);
 
-  Serial.println("[1] Enciende la llave (motor apagado): midiendo presión atmosférica");
-  for (int i = 5; i > 0; --i) {
+  // 1) Captura MAP_MAX (atmósfera)
+  Serial.println(" [1] Motor apagado: tomando muestras 5s para mapMax");
+  uint16_t candidateMax = 0;
+  unsigned long start = millis();
+  while (millis() - start < 5000) {
     uint16_t raw = sensor.readRaw();
-    float volt = raw * 3.3f / 4095.0f;
-    Serial.printf("  -> ADC: %4u (%.2f V)  [%ds]\n", raw, volt, i);
-    delay(1000);
+    candidateMax = max(candidateMax, raw);
+    Serial.printf("\r    raw=%4u | candidatoMax=%4u", raw, candidateMax);
+    delay(200);
   }
-  mapMax = sensor.readRaw();  // presión más alta posible
-  Serial.printf("✔️  mapMax capturado = %u\n\n", mapMax);
+  mapMax = candidateMax;
+  Serial.printf("\n✔ mapMax final = %u\n", mapMax);
+  saveStep(CalibStep::MAP_MAX, mapMax);
 
-  Serial.println("[2] Enciende el motor y déjalo en ralentí: midiendo vacío");
-  for (int i = 5; i > 0; --i) {
+  // 2) Captura MAP_MIN (vacío)
+  Serial.println("\n [2] Motor en ralentí: tomando muestras 5s para mapMin");
+  uint16_t candidateMin = UINT16_MAX;
+  start = millis();
+  while (millis() - start < 5000) {
     uint16_t raw = sensor.readRaw();
-    float volt = raw * 3.3f / 4095.0f;
-    Serial.printf("  -> ADC: %4u (%.2f V)  [%ds]\n", raw, volt, i);
-    delay(1000);
+    candidateMin = min(candidateMin, raw);
+    Serial.printf("\r    raw=%4u |  candidatoMin=%4u", raw, candidateMin);
+    delay(200);
   }
-  mapMin = sensor.readRaw();  // vacío estable a ralentí
-  Serial.printf("✔️  mapMin capturado = %u\n", mapMin);
+  mapMin = candidateMin;
+  Serial.printf("\n✔ mapMin final = %u\n", mapMin);
+  saveStep(CalibStep::MAP_MIN, mapMin);
 
-  Serial.printf("✅ Calibración MAP completada: min=%u, max=%u\n\n", mapMin, mapMax);
+  Serial.printf("\n✅ Calibración MAP completada: min=%u, max=%u\n\n", mapMin, mapMax);
 }
 
-/**
- * Rutina guiada para calibrar el sensor TPS.
- * Instrucciones:
- *  - pedal suelto → tpsMin
- *  - pedal a fondo → tpsMax
- */
-void CalibrationManager::runTPScalibration(TPSSensor& sensor) {
-  Serial.println("\n=== 🧭 Calibración de sensor TPS ===");
-  delay(1000);
+// Captura en tiempo real TPS_MIN y TPS_MAX
+void CalibrationManager::runTPSCalibration(TPSSensor& sensor) {
+  Serial.println("\n=== Calibración TPS (Min then Max) ===");
+  delay(500);
 
-  Serial.println("[1] Asegúrate de que el pedal esté totalmente SUELTO");
-  for (int i = 5; i > 0; --i) {
+  // 1) TPS_MIN (pedal suelto)
+  Serial.println(" [1] Pedal suelto: tomando muestras 5s para tpsMin");
+  uint16_t candidateMin = UINT16_MAX;
+  unsigned long start = millis();
+  while (millis() - start < 5000) {
     uint16_t raw = sensor.readRaw();
-    float volt = raw * 3.3f / 4095.0f;
-    Serial.printf("  -> ADC: %4u (%.2f V)  [%ds]\n", raw, volt, i);
-    delay(1000);
+    candidateMin = min(candidateMin, raw);
+    Serial.printf("\r    raw=%4u |  candidatoMin=%4u", raw, candidateMin);
+    delay(200);
   }
-  tpsMin = sensor.readRaw();
-  Serial.printf("✔️  tpsMin capturado = %u\n\n", tpsMin);
+  tpsMin = candidateMin;
+  Serial.printf("\n✔ tpsMin final = %u\n", tpsMin);
+  saveStep(CalibStep::TPS_MIN, tpsMin);
 
-  Serial.println("[2] Pisa el pedal de acelerador A FONDO y mantenlo presionado");
-  for (int i = 5; i > 0; --i) {
+  // 2) TPS_MAX (pedal a fondo)
+  Serial.println("\n [2] Pedal a fondo: tomando muestras 5s para tpsMax");
+  uint16_t candidateMax = 0;
+  start = millis();
+  while (millis() - start < 5000) {
     uint16_t raw = sensor.readRaw();
-    float volt = raw * 3.3f / 4095.0f;
-    Serial.printf("  -> ADC: %4u (%.2f V)  [%ds]\n", raw, volt, i);
-    delay(1000);
+    candidateMax = max(candidateMax, raw);
+    Serial.printf("\r    raw=%4u | candidatoMax=%4u", raw, candidateMax);
+    delay(200);
   }
-  tpsMax = sensor.readRaw();
-  Serial.printf("✔️  tpsMax capturado = %u\n", tpsMax);
+  tpsMax = candidateMax;
+  Serial.printf("\n✔ tpsMax final = %u\n", tpsMax);
+  saveStep(CalibStep::TPS_MAX, tpsMax);
 
-  Serial.printf("✅ Calibración TPS completada: min=%u, max=%u\n\n", tpsMin, tpsMax);
+  Serial.printf("\n✅ Calibración TPS completada: min=%u, max=%u\n\n", tpsMin, tpsMax);
 }
 
+// Getters
 uint16_t CalibrationManager::getMAPMin() const { return mapMin; }
 uint16_t CalibrationManager::getMAPMax() const { return mapMax; }
 uint16_t CalibrationManager::getTPSMin() const { return tpsMin; }

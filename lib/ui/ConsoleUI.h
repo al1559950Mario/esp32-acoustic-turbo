@@ -25,6 +25,7 @@ public:
   void attachActuators(TurboController* turboPtr, AcousticInjector* injectorPtr);
   void imprimirDashboard();
   bool getCalibRequest();
+  void runConsoleCalibration();
 
 private:
   StateMachine*      fsm         = nullptr;
