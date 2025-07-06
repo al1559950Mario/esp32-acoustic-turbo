@@ -112,8 +112,6 @@ void ConsoleUI::imprimirDashboard() {
   // Lecturas en tiempo real
   float tpsV      = tpsSensor->readVolts();
   float mapV      = mapSensor->readVolts();
-  float tpsPct    = tpsV * 100.0f / 3.3f;    // ejemplo % sobre rango
-  float mapKPa    = mapV * (100.0f / 3.3f);  // ejemplo en kPa
   uint8_t dac     = injector->getCurrentDAC();
   bool turboOn    = turbo->isOn();
   bool injOn      = injector->isActive();
@@ -130,17 +128,22 @@ void ConsoleUI::imprimirDashboard() {
   // Estado en string corto
   static const char* stateNames[] = {
     "OFF", "SIN_CAL", "CALIB", "IDLE",
-    "SONIC", "BOOST","DESCAY","DEBUG","??"
+    "BEAM", "BOOST","DESCAY","DEBUG","??"
   };
   const char* stName = stateNames[int(st)];
 
   // HUD compacto con casi todo:
+  // Antes de imprimir HUD, convierte los raw a voltios:
+  float tpsMinV = tpsMin * 3.3f / 4095.0f;
+  float tpsMaxV = tpsMax * 3.3f / 4095.0f;
+  float mapMinV = mapMin * 3.3f / 4095.0f;
+  float mapMaxV = mapMax * 3.3f / 4095.0f;
   Serial.printf(
-    "\r[%s|%lus] TPS=%.2fV(%u–%u) | MAP=%.2fV(%u–%u) | DAC=%3u | T:%c | I:%c     ",
+    "\r[%s|%lus] TPS=%.2fV(%.2f–%.2fV) | MAP=%.2fV(%.2f–%.2fV) | DAC=%3u | T:%c | I:%c     ",
     stName,
     elapsed,
-    tpsV, tpsMin, tpsMax,
-    mapV, mapMin, mapMax,
+    tpsV, tpsMinV, tpsMaxV,
+    mapV, mapMinV, mapMaxV,
     dac,
     turboOn ? '1' : '0',
     injOn   ? '1' : '0'

@@ -11,7 +11,7 @@ class TPSSensor {
 public:
   void begin(uint8_t analogPin);      // Inicializa el pin analógico
 
-  uint16_t readRaw();                 // Lectura cruda (0–4095) con validación de rango
+  uint16_t readRaw() const;                 // Lectura cruda (0–4095) con validación de rango
   float readNormalized();            // Valor entre 0.0 y 1.0 según calibración
   float readPct();                   // Porcentaje estimado (0.0–100.0%)
   float readVolts() const;           // Conversión directa a volts

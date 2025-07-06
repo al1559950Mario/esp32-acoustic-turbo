@@ -15,7 +15,7 @@ void TPSSensor::begin(uint8_t analogPin) {
  * Protege contra lecturas erráticas fuera de rango.
  * @return Valor confiable de 0 a 4095.
  */
-uint16_t TPSSensor::readRaw() {
+uint16_t TPSSensor::readRaw() const {
   uint16_t raw = analogRead(_pin);
 
   if (raw < 50 || raw > 4045) {
@@ -55,15 +55,23 @@ float TPSSensor::readPct() {
  * Protege contra valores extremos.
  */
 float TPSSensor::readVolts() const {
-  uint16_t raw = analogRead(_pin);
-  if (raw < 50 || raw > 4045) {
-    uint16_t fallback = CalibrationManager::getInstance().getTPSMin();
-    return (fallback * 3.3f) / 4095.0f;
+  uint16_t raw    = readRaw();
+  auto& calib     = CalibrationManager::getInstance();
+  uint16_t rawCalMin = calib.getTPSMin();  // tu mínimo calibrado
+  uint16_t rawCalMax = calib.getTPSMax();  // tu máximo calibrado
+
+  // 1) Si cae en la zona “desconectado” (muy cerca de 0), devuelvo 0 V
+  if (raw <= 5) {
+    return 0.0f;
   }
-
-
-  return (raw * 3.3f) / 4095.0f;
+  // 2) Si cae en la zona “saturado/desconectado” (muy cerca de 4095), devuelvo 3.3 V
+  if (raw >= 4090) {
+    return 3.3f;
+  }
+  // 3) Si está dentro del rango físico, convierto directamente
+  return raw * 3.3f / 4095.0f;
 }
+
 
 /**
  * Verifica si la lectura actual del TPS es confiable.
