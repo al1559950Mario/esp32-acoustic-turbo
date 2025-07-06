@@ -86,13 +86,6 @@ void loop() {
   injector.setLevel(level);         // ← actualiza nivel deseado (ya lo haces)
   injector.update();                // ← aplica rampa si estás usando `update()` para suavizado
   injector.applyPendingDAC();      // ← DAC aplicado fuera del ISR (nuevo paso seguro)
-  static unsigned long lastPrint = 0;
-  if (millis() - lastPrint > 300) {  // Actualiza cada 100 ms
-    consoleUI.imprimirDashboard();
-    lastPrint = millis();
-  }
-
-
 
   delay(20);
 }

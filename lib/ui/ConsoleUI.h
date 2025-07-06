@@ -15,6 +15,8 @@
  */
 class ConsoleUI {
 public:
+  bool dashboardEnabled = false;
+
   void begin();
   void update();
   void setFSM(StateMachine* fsmRef);

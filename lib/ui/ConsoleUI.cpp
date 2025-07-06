@@ -34,7 +34,6 @@ bool ConsoleUI::getCalibRequest() {
 void ConsoleUI::update() {
   if (!fsm) return;
 
-  // Detecta cambio de estado
   if (fsm->getState() != lastState) {
     lastTransitionMS = millis();
     lastState = fsm->getState();
@@ -44,7 +43,18 @@ void ConsoleUI::update() {
     char c = Serial.read();
     interpretarComando(c);
   }
+
+  // Nuevo: HUD en tiempo real
+  if (dashboardEnabled) {
+     static unsigned long lastPrint = 0;
+    if (millis() - lastPrint > 300) {  // Actualiza cada 300 ms
+      imprimirDashboard();
+      lastPrint = millis();
+    }
+  }
+
 }
+
 
 void ConsoleUI::interpretarComando(char c) {
   switch (c) {
@@ -53,8 +63,10 @@ void ConsoleUI::interpretarComando(char c) {
       break;
 
     case 's':
-      imprimirDashboard();
+      dashboardEnabled = !dashboardEnabled;
+      Serial.printf(">> Dashboard en tiempo real %s.\n", dashboardEnabled ? "ACTIVADO" : "DESACTIVADO");
       break;
+
 
     case 'c':
       consoleCalibRequested = true;
