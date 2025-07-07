@@ -23,7 +23,7 @@ enum class SystemState {
  * @class StateMachine
  * @brief Gestiona las transiciones y acciones de los estados del sistema.
  *
- * Usa lecturas de presión (MAP) y pedal (% TPS), además de peticiones de
+ * Usa lecturas de vacío MAP (inHg) y pedal (% TPS), además de peticiones de
  * calibración por consola o BLE, para decidir en qué estado operar.
  */
 class StateMachine {
@@ -47,13 +47,13 @@ public:
 
   /**
    * Realiza la lógica de transición de estados.
-   * @param mapKPa Lectura de presión MAP en kPa.
+   * @param vacuumInHg Lectura de vacío MAP en inHg (valor negativo o 0).
    * @param tpsPct Lectura de TPS en porcentaje [0–100].
    * @param consoleCalibReq true si hubo petición de calibración por consola.
    * @param bleCalibReq true si hubo petición de calibración por BLE.
    * @param dbg Objeto DebugManager que puede forzar estado DEBUG.
    */
-  void update(float mapKPa,
+  void update(float vacuumInHg,
               float tpsPct,
               bool consoleCalibReq,
               bool bleCalibReq,
@@ -63,7 +63,7 @@ public:
    * Ejecuta las acciones de salida según el estado actual.
    * @param acousticLevel Nivel de inyección acústica normalizado [0–1].
    */
-  void handleActions(float acousticLevel);
+  void handleActions();
 
   /**
    * Si el estado actual es DEBUG, lo reemplaza por uno nuevo.
@@ -71,18 +71,29 @@ public:
    */
   void debugForceState(SystemState nuevoEstado);
 
+  void StateMachine::setInputs(float tpsNormalized) {
+    currentLevel = constrain((tpsNormalized - 0.30f) / 0.40f, 0.0f, 1.0f);
+  }
+
+
 private:
   SystemState        current{SystemState::OFF};   ///< Estado actual
   TurboController*   turboPtr{nullptr};           ///< Controlador de turbo
   AcousticInjector*  injectorPtr{nullptr};        ///< Manejador acústico
+  float currentLevel{0.0f};  ///< Nivel actual de inyección acústica calculado internamente
 
-  // Umbrales de transición (ajusta según tu aplicación/calibración)
-  static constexpr float MAP_WAKEUP_KPA   = 1.0f;   ///< kPa mínimos para pasar OFF→IDLE
-  static constexpr float INJ_TPS_ON       = 10.0f;  ///< % TPS para iniciar inyección acústica
-  static constexpr float INJ_VAC_ON       = 15.0f;  ///< kPa MAP para iniciar inyección acústica
-  static constexpr float INJ_TPS_OFF      = 8.0f;   ///< % TPS para detener inyección acústica
-  static constexpr float INJ_VAC_OFF      = 12.0f;  ///< kPa MAP para detener inyección acústica
-  static constexpr float TURBO_TPS_ON     = 40.0f;  ///< % TPS para arrancar turbo
-  static constexpr float TURBO_VAC_ON     = 10.0f;  ///< kPa MAP para arrancar turbo
-  static constexpr float TURBO_TPS_OFF    = 30.0f;  ///< % TPS para apagar turbo
+  bool readyForInjection(float tps, float vac) {
+    return tps >= INJ_TPS_ON && vac <= INJ_VAC_ON;
+  }
+
+
+  // Umbrales de transición en unidades reales (ajusta según aplicación/calibración)
+  static constexpr float MAP_WAKEUP_INHG   = -1.0f;   ///< inHg mínimos para pasar OFF→IDLE (casi sin vacío)
+  static constexpr float INJ_TPS_ON        = 10.0f;   ///< % TPS para iniciar inyección acústica
+  static constexpr float INJ_VAC_ON        = -12.0f;  ///< inHg para iniciar inyección acústica (vacío moderado)
+  static constexpr float INJ_TPS_OFF       = 8.0f;    ///< % TPS para detener inyección acústica
+  static constexpr float INJ_VAC_OFF       = -9.0f;   ///< inHg para detener inyección acústica
+  static constexpr float TURBO_TPS_ON      = 40.0f;   ///< % TPS para arrancar turbo
+  static constexpr float TURBO_VAC_ON      = -4.0f;   ///< inHg para arrancar turbo (presión alta, casi sin vacío)
+  static constexpr float TURBO_TPS_OFF     = 30.0f;   ///< % TPS para apagar turbo
 };

@@ -5,15 +5,15 @@
 
 /**
  * MAPSensor
- * Lee el sensor de presión absoluta del múltiple y lo convierte a kPa o valor normalizado.
+ * Lee el sensor de presión absoluta del múltiple y lo convierte a vacío relativo en pulgadas de mercurio (inHg).
  */
 class MAPSensor : public SimulableSensor {
 public:
-  void begin(uint8_t analogPin);
-  uint16_t readRaw();     // Lectura en crudo (0–4095)
-  float readkPa();        // Conversión calibrada a kPa
-  float readNormalized(); // Valor entre 0.0 y 1.0
-  float readVolts() const;
+  void begin(uint8_t analogPin);             // Inicializa el pin analógico
+  uint16_t readRaw();                        // Lectura cruda (0–4095)
+  float readNormalized();                    // Valor calibrado entre 0.0 y 1.0
+  float readVacuum_inHg();                   // Vacío relativo en pulgadas de mercurio (–18 a 0 inHg)
+  float readVolts() const;                   // Voltaje del sensor (útil para depuración)
 
 private:
   uint8_t _pin;

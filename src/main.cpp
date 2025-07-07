@@ -17,8 +17,8 @@ BluetoothSerial SerialBT;
 constexpr uint8_t PIN_MAP             = 35;
 constexpr uint8_t PIN_TPS             = 34;
 constexpr uint8_t PIN_RELAY_TURBO     =  2;
-constexpr uint8_t PIN_DAC_ACOUSTIC    = 25;
 constexpr uint8_t PIN_RELAY_ACOUSTIC  =  4;
+constexpr uint8_t PIN_DAC_ACOUSTIC    = 25;
 
 // Objetos globales
 StateMachine       fsm;
@@ -64,28 +64,26 @@ void setup() {
   else
     Serial.println("  Estado inicial: OFF (calibración cargada)");
 }
+
 void loop() {
   consoleUI.update();
   bleUI.update(fsm.getState());
   debugMgr.updateFromSerial(Serial);
 
   if (consoleUI.isSistemaActivo()) {
-    float mapKPa   = mapSensor.readkPa();
+    float mapVacuum   = mapSensor.readVacuum_inHg();
     float tpsPct   = tpsSensor.readPct();
     float tpsNorm  = tpsSensor.readNormalized();
-    float level    = constrain((tpsNorm - 0.30f) / 0.40f, 0.0f, 1.0f);
 
     fsm.update(
-      mapKPa,
+      mapVacuum,
       tpsPct,
       consoleUI.getCalibRequest(),
       bleUI.getCalibRequest(),
       debugMgr
     );
+    fsm.handleActions();
 
-    injector.setLevel(level);
-    injector.update();
-    injector.applyPendingDAC();
   } else {
     // Opcional: Apagar subsistemas activos como seguridad
     injector.stop();

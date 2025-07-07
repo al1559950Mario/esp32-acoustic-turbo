@@ -31,14 +31,22 @@ void AcousticInjector::begin(uint8_t dacPin, uint8_t relayPin) {
 }
 
 void AcousticInjector::start(float level) {
-  _level = 0.0f;
   _targetLevel = constrain(level, 0.0f, 1.0f);
+  _level = 0.0f;
+  _index = 0;
   digitalWrite(_relayPin, HIGH);
   delay(10);
-  _index = 0;
+
+  // Activamos el temporizador
   timerAlarmEnable(_timer);
-  Serial.printf("[DAC] start(level=%.2f), index=0, timer ENABLED\n", _targetLevel);
+
+  // Generamos manualmente la primera muestra
+  dacPending = _sineTable[_index];
+  applyPendingDAC();
+
+  //Serial.printf("[DAC] start(level=%.2f), index=0, timer ENABLED\n", _targetLevel);
 }
+
 
 void AcousticInjector::stop() {
   timerAlarmDisable(_timer);

@@ -27,22 +27,27 @@ float MAPSensor::readNormalized() {
   uint16_t min = CalibrationManager::getInstance().getMAPMin();
   uint16_t max = CalibrationManager::getInstance().getMAPMax();
 
-  if (max <= min) return 0.0f; // Evita división por cero o datos corruptos
+  if (max <= min) return 0.0f; // Evita división por cero o calibración corrupta
 
   return constrain((float)(raw - min) / (max - min), 0.0f, 1.0f);
 }
 
 /**
- * Convierte la lectura MAP a kilopascales (kPa) utilizando una interpolación sobre el rango físico estimado.
- * @return Presión estimada del múltiple en kPa (usualmente entre 20 y 105).
+ * Calcula vacío relativo en pulgadas de mercurio (inHg) usando el valor normalizado.
+ * Se asume que el rango físico calibrado va de –18 inHg (máximo vacío) a 0 inHg (presión atmosférica).
+ * @return Vacío estimado en inHg entre –18.0f y 0.0f
  */
-float MAPSensor::readkPa() {
+float MAPSensor::readVacuum_inHg() {
   float norm = readNormalized();
-  const float kpaMin = 20.0f;   // Vacío en deceleración (~ -18 inHg)
-  const float kpaMax = 105.0f;  // Presión atmosférica o aceleración a fondo
-  return kpaMin + norm * (kpaMax - kpaMin);
+  constexpr float vacMin = -18.0f; // Máximo vacío
+  constexpr float vacMax = 0.0f;   // Sin vacío (atmósfera)
+  return vacMin + norm * (vacMax - vacMin);
 }
 
+/**
+ * Convierte la lectura cruda del sensor a voltaje real.
+ * @return Voltaje entre 0.0V y 3.3V para depuración o monitoreo.
+ */
 float MAPSensor::readVolts() const {
   uint16_t raw = analogRead(_pin);
   return (raw * 3.3f) / 4095.0f;
