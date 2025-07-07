@@ -7,7 +7,7 @@
 class AcousticInjector {
 public:
   static constexpr uint8_t TABLE_SIZE = 64;
-  static constexpr uint16_t SAMPLE_RATE = 8000; // Hz
+  static constexpr uint32_t SAMPLE_RATE = 407680; // Hz para f₀ ≈ 6370 Hz con tabla de 64 muestras
   static constexpr float RAMP_STEP = 0.01f;
 
   void begin(uint8_t dacPin, uint8_t relayPin);

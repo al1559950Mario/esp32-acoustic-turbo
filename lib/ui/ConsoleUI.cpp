@@ -160,6 +160,8 @@ void ConsoleUI::interpretarComando(char c) {
       case 'b':
         injector->emitResonant(1.0f);
         break;
+      case 'n':
+        injector->stop();
       case 'z':
         if (!developerMode) {
           Serial.println("⚠️  Comando exclusivo del modo desarrollador.");

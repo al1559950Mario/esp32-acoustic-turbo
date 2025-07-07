@@ -112,21 +112,27 @@ void AcousticInjector::test() {
 }
 
 void AcousticInjector::emitResonant(float level) {
-  Serial.println(F("🎼 Emitiendo onda resonante (Helmholtz)..."));
+  Serial.println(F("🎼 Emitiendo señal resonante por fase acumulada (5s)..."));
 
-  float freq = 6370.0f;                      // Frecuencia de resonancia en Hz
-  float amplitude = 127.0f * level;          // Escalado de amplitud (p₀)
-  const uint8_t bias = 128;                  // Punto medio del DAC
-  const float dt = 1.0f / 64000.0f;          // Muestra cada 15.6 us ~ 64 kHz
-  const int sampleCount = 64000;              // Muestras totales (~4ms de señal)
+  const float freq = 6370.0f;
+  const float amplitude = 127.0f * level;
+  const uint8_t bias = 128;
+  const float sampleRate = 64000.0f;         // Hz
+  const float dPhase = 2.0f * PI * freq / sampleRate;
+
+  const int sampleCount = (int)(5.0f * sampleRate);  // 5 segundos de señal
+  float phase = 0.0f;
 
   for (int i = 0; i < sampleCount; ++i) {
-    float t = i * dt;
-    float value = bias + amplitude * sinf(2.0f * PI * freq * t);
+    float value = bias + amplitude * sinf(phase);
     dac_output_voltage(_dacChannel, constrain((int)value, 0, 255));
-    delayMicroseconds(15);  // Espaciado temporal (~64kHz)
+    phase += dPhase;
+    if (phase >= 2.0f * PI) phase -= 2.0f * PI;
+
+    delayMicroseconds(15);  // Teóricamente ~64kHz
   }
 
-  dac_output_voltage(_dacChannel, bias);  // Silencio
-  Serial.println(F("✅ Onda resonante emitida."));
+  dac_output_voltage(_dacChannel, bias);
+  Serial.println(F("✅ Señal por fase acumulada finalizada."));
 }
+
