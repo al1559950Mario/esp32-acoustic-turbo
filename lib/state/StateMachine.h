@@ -71,11 +71,9 @@ public:
    */
   void debugForceState(SystemState nuevoEstado);
 
-  void StateMachine::setInputs(float tpsNormalized) {
-    currentLevel = constrain((tpsNormalized - 0.30f) / 0.40f, 0.0f, 1.0f);
-  }
+  void setInputs(float tpsNormalized);
 
-
+  
 private:
   SystemState        current{SystemState::OFF};   ///< Estado actual
   TurboController*   turboPtr{nullptr};           ///< Controlador de turbo

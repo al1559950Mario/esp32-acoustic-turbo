@@ -135,3 +135,7 @@ void StateMachine::debugForceState(SystemState nuevoEstado) {
     Serial.println(static_cast<int>(nuevoEstado));
   }
 }
+
+void StateMachine::setInputs(float tpsNormalized) {
+  currentLevel = constrain((tpsNormalized - 0.30f) / 0.40f, 0.0f, 1.0f);
+}
