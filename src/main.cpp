@@ -72,12 +72,11 @@ void loop() {
 
   if (consoleUI.isSistemaActivo()) {
     float mapVacuum   = mapSensor.readVacuum_inHg();
-    float tpsPct   = tpsSensor.readPct();
-    float tpsNorm  = tpsSensor.readNormalized();
+    float tpsPorcent   = tpsSensor.readPorcent();
 
     fsm.update(
       mapVacuum,
-      tpsPct,
+      tpsPorcent,
       consoleUI.getCalibRequest(),
       bleUI.getCalibRequest(),
       debugMgr

@@ -53,7 +53,7 @@ float TPSSensor::readNormalized() {
 /**
  * Convierte la lectura a porcentaje de apertura del acelerador (0–100%)
  */
-float TPSSensor::readPct() {
+float TPSSensor::readPorcent() {
   return readNormalized() * 100.0f;
 }
 

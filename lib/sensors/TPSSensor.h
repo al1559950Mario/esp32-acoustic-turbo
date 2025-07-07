@@ -14,7 +14,7 @@ public:
 
   uint16_t readRaw() const;                 // Lectura cruda (0–4095) con validación de rango
   float readNormalized();            // Valor entre 0.0 y 1.0 según calibración
-  float readPct();                   // Porcentaje estimado (0.0–100.0%)
+  float readPorcent();                   // Porcentaje estimado (0.0–100.0%)
   float readVolts() const;           // Conversión directa a volts
   bool isValidReading();             // Verifica si la lectura está dentro de los límites seguros
 private:
