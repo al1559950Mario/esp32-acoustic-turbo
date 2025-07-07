@@ -77,32 +77,40 @@ void CalibrationManager::runMAPCalibration(MAPSensor& sensor) {
   Serial.println("\n=== Calibración MAP (Max then Min) ===");
   delay(500);
 
-  // 1) Captura MAP_MAX (atmósfera)
-  Serial.println(" [1] Motor apagado: tomando muestras 12s para mapMax");
+  // 1) Captura MAP_MAX (motor apagado)
+  Serial.println(" [1] Motor apagado: capturando valor máximo");
+  Serial.println(" >> Presiona ENTER cuando el valor en consola sea adecuado");
+
   uint16_t candidateMax = 0;
-  unsigned long start = millis();
-  while (millis() - start < 12000) {
-    uint16_t raw = sensor.readRaw();
+  uint16_t raw = 0;
+  while (!Serial.available()) {
+    raw = sensor.readRaw();
     candidateMax = max(candidateMax, raw);
     Serial.printf("\r    raw=%4u | candidatoMax=%4u", raw, candidateMax);
     delay(200);
   }
+  while (Serial.available()) Serial.read();
+  delay(250);
   mapMax = candidateMax;
-  Serial.printf("\n✔ mapMax final = %u\n", mapMax);
+  Serial.printf("\n✔ mapMax = %u\n", mapMax);
   saveStep(CalibStep::MAP_MAX, mapMax);
 
-  // 2) Captura MAP_MIN (vacío)
-  Serial.println("\n [2] Motor en ralentí: tomando muestras 12s para mapMin");
+  // 2) Captura MAP_MIN (motor en ralentí)
+  Serial.println("\n [2] Motor en ralentí: capturando valor mínimo");
+  Serial.println(" >> Presiona ENTER cuando el valor en consola sea adecuado");
+
   uint16_t candidateMin = UINT16_MAX;
-  start = millis();
-  while (millis() - start < 12000) {
-    uint16_t raw = sensor.readRaw();
+  raw = 0;
+  while (!Serial.available()) {
+    raw = sensor.readRaw();
     candidateMin = min(candidateMin, raw);
-    Serial.printf("\r    raw=%4u |  candidatoMin=%4u", raw, candidateMin);
+    Serial.printf("\r    raw=%4u | candidatoMin=%4u", raw, candidateMin);
     delay(200);
   }
+  while (Serial.available()) Serial.read();
+  delay(250);
   mapMin = candidateMin;
-  Serial.printf("\n✔ mapMin final = %u\n", mapMin);
+  Serial.printf("\n✔ mapMin = %u\n", mapMin);
   saveStep(CalibStep::MAP_MIN, mapMin);
 
   Serial.printf("\n✅ Calibración MAP completada: min=%u, max=%u\n\n", mapMin, mapMax);
@@ -110,35 +118,43 @@ void CalibrationManager::runMAPCalibration(MAPSensor& sensor) {
 
 // Captura en tiempo real TPS_MIN y TPS_MAX
 void CalibrationManager::runTPSCalibration(TPSSensor& sensor) {
-  Serial.println("\n=== Calibración TPS Motor apagado llave abierta(Min then Max) ===");
+  Serial.println("\n=== Calibración TPS (Min then Max) ===");
   delay(500);
 
   // 1) TPS_MIN (pedal suelto)
-  Serial.println(" [1] Pedal suelto: tomando muestras 12s para tpsMin");
+  Serial.println(" [1] Pedal suelto: capturando valor mínimo");
+  Serial.println(" >> Presiona ENTER cuando el valor en consola sea adecuado");
+
   uint16_t candidateMin = UINT16_MAX;
-  unsigned long start = millis();
-  while (millis() - start < 12000) {
-    uint16_t raw = sensor.readRaw();
+  uint16_t raw = 0;
+  while (!Serial.available()) {
+    raw = sensor.readRaw();
     candidateMin = min(candidateMin, raw);
-    Serial.printf("\r    raw=%4u |  candidatoMin=%4u", raw, candidateMin);
+    Serial.printf("\r    raw=%4u | candidatoMin=%4u", raw, candidateMin);
     delay(200);
   }
+  while (Serial.available()) Serial.read();
+  delay(250);
   tpsMin = candidateMin;
-  Serial.printf("\n✔ tpsMin final = %u\n", tpsMin);
+  Serial.printf("\n✔ tpsMin = %u\n", tpsMin);
   saveStep(CalibStep::TPS_MIN, tpsMin);
 
   // 2) TPS_MAX (pedal a fondo)
-  Serial.println("\n [2] Pedal a fondo: tomando muestras 12s para tpsMax");
+  Serial.println("\n [2] Pedal a fondo: capturando valor máximo");
+  Serial.println(" >> Presiona ENTER cuando el valor en consola sea adecuado");
+
   uint16_t candidateMax = 0;
-  start = millis();
-  while (millis() - start < 12000) {
-    uint16_t raw = sensor.readRaw();
+  raw = 0;
+  while (!Serial.available()) {
+    raw = sensor.readRaw();
     candidateMax = max(candidateMax, raw);
     Serial.printf("\r    raw=%4u | candidatoMax=%4u", raw, candidateMax);
     delay(200);
   }
+  while (Serial.available()) Serial.read();
+  delay(250);
   tpsMax = candidateMax;
-  Serial.printf("\n✔ tpsMax final = %u\n", tpsMax);
+  Serial.printf("\n✔ tpsMax = %u\n", tpsMax);
   saveStep(CalibStep::TPS_MAX, tpsMax);
 
   Serial.printf("\n✅ Calibración TPS completada: min=%u, max=%u\n\n", tpsMin, tpsMax);
@@ -149,3 +165,4 @@ uint16_t CalibrationManager::getMAPMin() const { return mapMin; }
 uint16_t CalibrationManager::getMAPMax() const { return mapMax; }
 uint16_t CalibrationManager::getTPSMin() const { return tpsMin; }
 uint16_t CalibrationManager::getTPSMax() const { return tpsMax; }
+
