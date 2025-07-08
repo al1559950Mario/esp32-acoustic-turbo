@@ -30,28 +30,28 @@ public:
   void toggleSistema();  // Nuevo método para alternar
   int parseValor(const String& linea, const String& clave);
 
-private:
-  bool sistemaActivo = true; // Inicia encendido por defecto
-  StateMachine*      fsm         = nullptr;
+protected:
+  bool sistemaActivo = true;
+  StateMachine*      fsm = nullptr;
   float lastTPS = -1.0f;
   float lastMAP = -1.0f;
   uint8_t lastDAC = 0;
 
   bool simulacionActiva = false;
 
-  MAPSensor*         mapSensor   = nullptr;
-  TPSSensor*         tpsSensor   = nullptr;
-  TurboController*   turbo       = nullptr;
-  AcousticInjector*  injector    = nullptr;
+  MAPSensor*         mapSensor = nullptr;
+  TPSSensor*         tpsSensor = nullptr;
+  TurboController*   turbo = nullptr;
+  AcousticInjector*  injector = nullptr;
 
-  bool consoleCalibRequested     = false;
-  bool developerMode             = false;
+  bool consoleCalibRequested = false;
+  bool developerMode = false;
   unsigned long lastTransitionMS = 0;
-  SystemState lastState          = SystemState::OFF;
+  SystemState lastState = SystemState::OFF;
 
   void interpretarComando(char c);
-
   void imprimirHelp();
+
 };
 
 

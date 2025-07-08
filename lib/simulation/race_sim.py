@@ -31,7 +31,7 @@ SERIAL_PORT    = "COM6"
 BAUDRATE       = 115200
 
 # --- Modo Debug: evita abrir puerto y muestra datos por consola ---
-DEBUG_MODE     = False
+DEBUG_MODE     = True
 
 # --- Inicialización ---
 throttle = 0.0

@@ -1,94 +1,87 @@
 #include "BLEUI.h"
+#include "CalibrationManager.h"
 
-BLEUI::BLEUI() {}
-
-void BLEUI::begin(Stream* serialRef) {
-  bleSerial = serialRef;
+BLEUI::BLEUI() {
+  // Constructor vacío — todo se configura en begin()
 }
 
-void BLEUI::setFSM(StateMachine* fsmRef) {
-  fsm = fsmRef;
+void BLEUI::begin(const String& nombreBT) {
+  SerialBT.begin(nombreBT);
+  SerialBT.println(">> Bluetooth iniciado como \"" + nombreBT + "\"");
+  ConsoleUI::imprimirHelp();
 }
 
-bool BLEUI::getCalibRequest() {
-  bool flag = calibRequested;
-  calibRequested = false;
-  return flag;
-}
+void BLEUI::update() {
+  if (!fsm) return;
 
-void BLEUI::update(SystemState fsmState) {
-  if (!bleSerial || !bleSerial->available()) return;
+  // 1. Transición de estado
+  if (fsm->getState() != lastState) {
+    lastTransitionMS = millis();
+    lastState = fsm->getState();
+  }
 
-  char cmd = bleSerial->read();
+  // 2. Lectura y procesamiento por Bluetooth
+  if (SerialBT.available()) {
+    String linea = SerialBT.readStringUntil('\n');
+    linea.trim();
 
-  switch (cmd) {
-    case 's':
-      imprimirEstado(fsmState);
-      break;
+    if (simulacionActiva && linea.startsWith("tps_raw:")) {
+      int idxTPS = linea.indexOf("tps_raw:");
+      int idxMAP = linea.indexOf("map_raw:");
 
-    case 'c':
-      calibRequested = true;
-      bleSerial->println(">> Petición de calibración recibida.");
-      break;
+      if (idxTPS != -1 && idxMAP != -1) {
+        uint16_t tpsRaw = linea.substring(idxTPS + 8, linea.indexOf(",", idxTPS)).toInt();
+        uint16_t mapRaw = linea.substring(idxMAP + 8).toInt();
 
-    case 'i':
-    case 't':
-    case 'x':
-      if (fsm && fsm->getState() == SystemState::DEBUG) {
-        switch (cmd) {
-          case 'i':
-            bleSerial->println(">> Forzando INYECCION_ACUSTICA (DEBUG)");
-            fsm->debugForceState(SystemState::INYECCION_ACUSTICA);
-            break;
-          case 't':
-            bleSerial->println(">> Forzando TURBO (DEBUG)");
-            fsm->debugForceState(SystemState::TURBO);
-            break;
-          case 'x':
-            bleSerial->println(">> Volviendo a IDLE (DEBUG)");
-            fsm->debugForceState(SystemState::IDLE);
-            break;
-        }
-      } else {
-        bleSerial->println("⚠️  Comando solo válido en modo DEBUG.");
+        tpsSensor->setSimulatedRaw(tpsRaw);
+        mapSensor->setSimulatedRaw(mapRaw);
+
+        SerialBT.println("Recibido tps=" + String(tpsRaw) + " map=" + String(mapRaw));
       }
-      break;
-
-    case '?':
-      imprimirHelp();
-      break;
-
-    default:
-      bleSerial->print("❓ Comando no reconocido: ");
-      bleSerial->println(cmd);
-      break;
+    } else if (linea.length() == 1) {
+      interpretarComando(linea.charAt(0));  // hereda del padre
+    } else {
+      SerialBT.println("⚠️ Comando no reconocido o fuera de modo simulación.");
+    }
   }
-}
 
-void BLEUI::imprimirEstado(SystemState s) {
-  bleSerial->print("📡 Estado actual: ");
-  switch (s) {
-    case SystemState::OFF:                 bleSerial->println("OFF"); break;
-    case SystemState::SIN_CALIBRAR:        bleSerial->println("SIN_CALIBRAR"); break;
-    case SystemState::CALIBRATION:         bleSerial->println("CALIBRATION"); break;
-    case SystemState::IDLE:                bleSerial->println("IDLE"); break;
-    case SystemState::INYECCION_ACUSTICA:  bleSerial->println("INYECCION_ACUSTICA"); break;
-    case SystemState::TURBO:               bleSerial->println("TURBO"); break;
-    case SystemState::DESCAYENDO:          bleSerial->println("DESCAYENDO"); break;
-    case SystemState::DEBUG:               bleSerial->println("DEBUG"); break;
-    default:                               bleSerial->println("DESCONOCIDO"); break;
+  // 3. Proceso de calibración
+  if (getCalibRequest()) {
+    SerialBT.println(">> Iniciando calibración...");
+    auto& calib = CalibrationManager::getInstance();
+    calib.clearCalibration();
+    calib.runTPSCalibration(*tpsSensor);
+    calib.runMAPCalibration(*mapSensor);
+    calib.saveCalibration();
+    SerialBT.println(">> Calibración completada.");
   }
-}
 
-void BLEUI::imprimirHelp() {
-  bleSerial->println(F("\n📘 Comandos BLE disponibles:"));
-  bleSerial->println(F("  c  → Solicitar calibración"));
-  bleSerial->println(F("  s  → Mostrar estado del sistema"));
-  bleSerial->println(F("  ?  → Mostrar esta ayuda"));
+  // 4. HUD en tiempo real
+  if (dashboardEnabled) {
+    static unsigned long lastPrint = 0;
+    if (millis() - lastPrint > 300) {
+      float tpsV = tpsSensor->readVolts();
+      float mapV = mapSensor->readVolts();
+      uint8_t dac = injector->getCurrentDAC();
+      bool turboOn = turbo->isOn();
+      bool injOn = injector->isActive();
+      SystemState st = fsm->getState();
+      unsigned long elapsed = (millis() - lastTransitionMS) / 1000;
 
-  if (fsm && fsm->getState() == SystemState::DEBUG) {
-    bleSerial->println(F("  i  → Forzar inyección acústica (DEBUG)"));
-    bleSerial->println(F("  t  → Forzar turbo (DEBUG)"));
-    bleSerial->println(F("  x  → Paro manual del sistema (DEBUG)"));
+      const char* stateNames[] = {
+        "OFF", "SIN_CAL", "CALIB", "IDLE",
+        "BEAM", "BOOST", "DESCAY", "DEBUG", "??"
+      };
+      const char* stName = stateNames[int(st)];
+
+      SerialBT.printf(
+        "\r[%s|%lus] TPS=%.2fV | MAP=%.2fV | DAC=%3u | T:%c | I:%c     \n",
+        stName, elapsed,
+        tpsV, mapV, dac,
+        turboOn ? '1' : '0',
+        injOn   ? '1' : '0'
+      );
+      lastPrint = millis();
+    }
   }
 }
