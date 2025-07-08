@@ -33,6 +33,14 @@ void StateMachine::update(float vacuumInHg,
     return;
   }
 
+  if (current != SystemState::DEBUG) {
+      currentLevel = 0.9f * currentLevel + 0.1f * (tpsPct / 100.0f);
+      Serial.printf("Nivel acústico dinámico: %.2f\n", currentLevel);
+
+  }
+  
+
+
   
   switch (current) {
 

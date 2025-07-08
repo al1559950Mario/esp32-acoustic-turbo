@@ -49,7 +49,7 @@ void setup() {
 
 
   SerialBT.begin("TurboAcoustic");
-  bleUI.begin(&SerialBT);
+  bleUI.begin();
   bleUI.setFSM(&fsm);
 
   calib.begin();
@@ -67,7 +67,7 @@ void setup() {
 
 void loop() {
   consoleUI.update();
-  bleUI.update(fsm.getState());
+  bleUI.update();
   debugMgr.updateFromSerial(Serial);
 
   if (consoleUI.isSistemaActivo()) {
