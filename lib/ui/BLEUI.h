@@ -1,48 +1,44 @@
 #pragma once
 
 #include <Arduino.h>
+#include <BluetoothSerial.h>
+#include "ConsoleUI.h"
 #include "StateMachine.h"
+#include "MAPSensor.h"
+#include "TPSSensor.h"
+#include "AcousticInjector.h"
+#include "TurboController.h"
 
 /**
  * BLEUI
- * Interfaz de usuario vía Bluetooth Serial para diagnóstico y control remoto.
- * Recibe comandos de un cliente BLE (como Serial Bluetooth Terminal) y comunica con FSM.
+ * Extiende ConsoleUI para comunicación por Bluetooth Serial.
+ * Permite que el celular acceda al serial vía Bluetooth.
+ * Usa PIN fijo "0000" para emparejamiento.
  */
-class BLEUI {
+class BLEUI : public ConsoleUI {
 public:
   BLEUI();
 
   /**
-   * begin()
-   * Inicializa la referencia al puerto BLE (ej. SerialBT).
+   * Inicializa Bluetooth con nombre y PIN 0000.
    */
-  void begin(Stream* serialRef);
+  void begin(const String& nombreBT = "CalibradorESP32");
 
   /**
-   * setFSM()
-   * Asocia una instancia de la FSM para poder consultar y modificar el estado.
+   * Override update() para leer comandos desde Bluetooth en lugar de USB Serial.
    */
-  void setFSM(StateMachine* fsmRef);
-
-  /**
-   * update()
-   * Procesa comandos recibidos desde BLE y ejecuta acciones asociadas.
-   */
-  void update(SystemState fsmState);
-
-  /**
-   * getCalibRequest()
-   * @return true si el usuario ha solicitado calibración por BLE.
-   * Se limpia automáticamente después de leerlo.
-   */
-  bool getCalibRequest();
+  void update() override;
 
 private:
-  Stream* bleSerial = nullptr;
-  StateMachine* fsm = nullptr;
+  BluetoothSerial SerialBT;
 
-  bool calibRequested = false;  // Flag local de calibración
+  /**
+   * Interpreta comandos recibidos por Bluetooth.
+   */
+  void interpretarComando(char c) override;
 
-  void imprimirEstado(SystemState s);
-  void imprimirHelp();
+  /**
+   * Imprime ayuda por Bluetooth.
+   */
+  void imprimirHelp() override;
 };
