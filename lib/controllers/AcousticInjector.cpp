@@ -36,11 +36,15 @@ void AcousticInjector::begin(uint8_t dacPin, uint8_t relayPin) {
   _level = 0.0f;
   _targetLevel = 0.0f;
   _index = 0;
+  _levelInt = (uint8_t)(_level * 255.0f);
+
 }
 
 void AcousticInjector::start(float level) {
   _targetLevel = constrain(level, 0.0f, 1.0f);
   _level = 0.0f;
+  _levelInt = (uint8_t)(_level * 255.0f);
+
   _index = 0;
   digitalWrite(_relayPin, HIGH);
   delay(10);
@@ -69,8 +73,10 @@ void AcousticInjector::update() {
     _level = min(_level + RAMP_STEP, _targetLevel);
   else if (_level > _targetLevel)
     _level = max(_level - RAMP_STEP, _targetLevel);
-}
+  _levelInt = (uint8_t)(_level * 255.0f);
 
+}
+  
 void AcousticInjector::applyPendingDAC() {
   int16_t delta = (int16_t)dacPending - 128;
   int16_t out = 128 + (int16_t)(delta * _level);
@@ -91,11 +97,19 @@ bool AcousticInjector::isActive() const {
 void IRAM_ATTR AcousticInjector::onTimer() {
   if (!_instance) return;
 
-  // Modo tabla senoidal (simple)
   uint8_t raw = _instance->_sineTable[_instance->_index];
-  dac_output_voltage(_instance->_dacChannel, raw);
+  int16_t delta = (int16_t)raw - 128;
+  
+  // Multiplicación entera escalando por nivel, luego ajustar
+  int16_t modulated = 128 + ((delta * _instance->_levelInt) >> 8);
+
+  uint8_t output = constrain(modulated, 0, 255);
+
+  dac_output_voltage(_instance->_dacChannel, output);
+
   _instance->_index = (_instance->_index + 1) % TABLE_SIZE;
 }
+
 
 void AcousticInjector::testRelay(bool on) {
   digitalWrite(_relayPin, on ? HIGH : LOW);

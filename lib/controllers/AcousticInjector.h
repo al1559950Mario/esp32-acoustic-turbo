@@ -34,6 +34,8 @@ private:
   uint8_t  _lastDACValue = 128;
   dac_channel_t _dacChannel;
   hw_timer_t* _timer = nullptr;
+  volatile uint8_t _levelInt = 0;  // nivel escalado 0-255 para ISR
+
 
   // Tabla seno 16 muestras para ISR rápido (0-255)
   static const uint8_t _sineTable[TABLE_SIZE];
