@@ -1,19 +1,25 @@
 #include "AcousticInjector.h"
 #include "driver/dac.h"
 #include "driver/timer.h"
+#include <math.h>
 
 volatile uint8_t dacPending = 128;
-static AcousticInjector* _instance = nullptr;
+AcousticInjector* AcousticInjector::_instance = nullptr;
 
-/// Seno de 64 muestras (0–255)
-const uint8_t AcousticInjector::_sineTable[TABLE_SIZE] = {
-  128,140,152,164,175,186,196,205,214,222,229,235,240,244,246,248,
-  249,248,246,244,240,235,229,222,214,205,196,186,175,164,152,140,
-  128,115,103,91,80,69,59,50,41,33,26,20,15,11,9,7,
-  6,7,9,11,15,20,26,33,41,50,59,69,80,91,103,115
+// ISR redireccionada para timer
+void IRAM_ATTR onTimerForwarder() {
+  if (AcousticInjector::_instance)
+    AcousticInjector::_instance->onTimer();
+}
+
+// Tabla seno 16 muestras para ISR rápido (0-255)
+const uint8_t AcousticInjector::_sineTable[AcousticInjector::TABLE_SIZE] = {
+  128,176,218,245,255,245,218,176,
+  128,80,38,11,1,11,38,80
 };
 
 void AcousticInjector::begin(uint8_t dacPin, uint8_t relayPin) {
+  _instance = this;
   _dacPin = dacPin;
   _relayPin = relayPin;
   pinMode(_relayPin, OUTPUT);
@@ -22,12 +28,14 @@ void AcousticInjector::begin(uint8_t dacPin, uint8_t relayPin) {
   _dacChannel = (_dacPin == 25) ? DAC_CHANNEL_1 : DAC_CHANNEL_2;
   dac_output_enable(_dacChannel);
 
-  _timer = timerBegin(0, 80, true);
-  timerAttachInterrupt(_timer, onTimer, true);
-  timerAlarmWrite(_timer, 1000000 / SAMPLE_RATE, true);
+  _timer = timerBegin(0, 80, true); // Prescaler 80 = 1us tick @80 MHz APB
+  timerAttachInterrupt(_timer, &onTimerForwarder, true);
+  timerAlarmWrite(_timer, 1000000 / SAMPLE_RATE, true); // 64kHz
   timerAlarmDisable(_timer);
 
-  _instance = this;
+  _level = 0.0f;
+  _targetLevel = 0.0f;
+  _index = 0;
 }
 
 void AcousticInjector::start(float level) {
@@ -37,21 +45,19 @@ void AcousticInjector::start(float level) {
   digitalWrite(_relayPin, HIGH);
   delay(10);
 
-  // Activamos el temporizador
   timerAlarmEnable(_timer);
 
-  // Generamos manualmente la primera muestra
+  // Primera muestra directa
   dacPending = _sineTable[_index];
   applyPendingDAC();
-
-  //Serial.printf("[DAC] start(level=%.2f), index=0, timer ENABLED\n", _targetLevel);
 }
-
 
 void AcousticInjector::stop() {
   timerAlarmDisable(_timer);
   digitalWrite(_relayPin, LOW);
   dac_output_voltage(_dacChannel, 128);
+  _level = 0.0f;
+  _targetLevel = 0.0f;
 }
 
 void AcousticInjector::setLevel(float level) {
@@ -67,7 +73,7 @@ void AcousticInjector::update() {
 
 void AcousticInjector::applyPendingDAC() {
   int16_t delta = (int16_t)dacPending - 128;
-  int16_t out = 128 + (delta * _level);  // ← fuera del ISR, sí puede usar float
+  int16_t out = 128 + (int16_t)(delta * _level);
   uint8_t final = constrain(out, 0, 255);
   dac_output_voltage(_dacChannel, final);
   _lastDACValue = final;
@@ -81,15 +87,14 @@ bool AcousticInjector::isActive() const {
   return timerAlarmEnabled(_timer);
 }
 
+// ISR timer
 void IRAM_ATTR AcousticInjector::onTimer() {
   if (!_instance) return;
 
+  // Modo tabla senoidal (simple)
   uint8_t raw = _instance->_sineTable[_instance->_index];
-  dacPending = raw;  // ← sin escalamiento aquí
-  _instance->_lastDACValue = raw;
-
-  if (++_instance->_index >= TABLE_SIZE)
-    _instance->_index = 0;
+  dac_output_voltage(_instance->_dacChannel, raw);
+  _instance->_index = (_instance->_index + 1) % TABLE_SIZE;
 }
 
 void AcousticInjector::testRelay(bool on) {
@@ -107,10 +112,12 @@ void AcousticInjector::test() {
   testRelay(true);
   start(1.0f);
 
-  for (int i = 0; i < 250; i++) {  // 250 × 20ms = 5s
+  for (int i = 0; i < 250; i++) {
     update();
-    applyPendingDAC();
     delay(20);
+    if (i % 50 == 0) {
+      Serial.printf("Nivel actual: %.2f\n", _level);
+    }
   }
 
   stop();
@@ -123,9 +130,9 @@ void AcousticInjector::emitResonant(float level) {
   Serial.println(F("🎼 Emitiendo señal resonante por fase acumulada (5s)..."));
 
   const float freq = 6370.0f;
-  const float amplitude = 127.0f * level;
+  const float amplitude = 127.0f * constrain(level, 0.0f, 1.0f);
   const uint8_t bias = 128;
-  const float sampleRate = 64000.0f;         // Hz
+  const float sampleRate = 64000.0f;  // Hz
   const float dPhase = 2.0f * PI * freq / sampleRate;
 
   const int sampleCount = (int)(5.0f * sampleRate);  // 5 segundos de señal
@@ -136,11 +143,9 @@ void AcousticInjector::emitResonant(float level) {
     dac_output_voltage(_dacChannel, constrain((int)value, 0, 255));
     phase += dPhase;
     if (phase >= 2.0f * PI) phase -= 2.0f * PI;
-
-    delayMicroseconds(15);  // Teóricamente ~64kHz
+    delayMicroseconds(15);  // Aproximadamente 64kHz
   }
 
   dac_output_voltage(_dacChannel, bias);
   Serial.println(F("✅ Señal por fase acumulada finalizada."));
 }
-

@@ -158,7 +158,7 @@ void ConsoleUI::interpretarComando(char c) {
         toggleSistema();
         break;
       case 'b':
-        injector->emitResonant(1.0f);
+        injector->test();
         break;
       case 'n':
         injector->stop();
