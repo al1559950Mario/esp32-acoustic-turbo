@@ -32,7 +32,7 @@ void StateMachine::update(float vacuumInHg,
   if (current == SystemState::DEBUG) {
     return;
   }
-
+  
   if (current != SystemState::DEBUG) {
       currentLevel = 0.9f * currentLevel + 0.1f * (tpsPct / 100.0f);
       Serial.printf("Nivel acústico dinámico: %.2f\n", currentLevel);
@@ -134,6 +134,12 @@ void StateMachine::handleActions() {
     injectorPtr->applyPendingDAC();
   }
   // Resto de estados no requieren acciones periódicas
+    // DEBUG: mostrar nivel actual cada cierto tiempo
+  static uint32_t lastPrint = 0;
+  if (millis() - lastPrint > 500) {
+    lastPrint = millis();
+    Serial.printf("TPS: %.1f%% → Level: %.2f\n", currentLevel * 100.0f, injectorPtr->getLevel());
+  }
 }
 
 void StateMachine::debugForceState(SystemState nuevoEstado) {
@@ -143,3 +149,8 @@ void StateMachine::debugForceState(SystemState nuevoEstado) {
     Serial.println(static_cast<int>(nuevoEstado));
   }
 }
+
+float StateMachine::getLevel() const {
+  return currentLevel;
+}
+

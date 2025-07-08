@@ -70,6 +70,8 @@ public:
    * @param nuevoEstado Estado al que forzar la FSM.
    */
   void debugForceState(SystemState nuevoEstado);
+  float getLevel() const;
+
 
 
 private:
