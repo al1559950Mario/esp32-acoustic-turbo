@@ -7,7 +7,8 @@
 class AcousticInjector {
 public:
   static constexpr uint8_t TABLE_SIZE = 64;
-  static constexpr uint32_t SAMPLE_RATE = 407680; // Hz para f₀ ≈ 6370 Hz con tabla de 64 muestras
+  //static constexpr uint32_t SAMPLE_RATE = 407680; // Hz para f₀ ≈ 6370 Hz con tabla de 64 muestras
+  static constexpr uint32_t SAMPLE_RATE = 64000;
   static constexpr float RAMP_STEP = 0.01f;
 
   void begin(uint8_t dacPin, uint8_t relayPin);
@@ -23,6 +24,8 @@ public:
   bool isRelayActive() const;
   void test();  // Ejecuta una prueba rápida del sonido acústico
   void emitResonant(float level);
+  static AcousticInjector* _instance;
+
 
 private:
   uint8_t  _dacPin = 0;
@@ -33,6 +36,7 @@ private:
   uint8_t  _lastDACValue = 128;
   dac_channel_t _dacChannel;
   hw_timer_t* _timer = nullptr;
+
 
   static const uint8_t _sineTable[TABLE_SIZE];
 };
