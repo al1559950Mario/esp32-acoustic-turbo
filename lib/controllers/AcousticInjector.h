@@ -14,7 +14,7 @@ public:
   void stop();
   void setLevel(float level);
   void update();               // Rampa de nivel
-  void applyPendingDAC();      // Aplica valor DAC calculado fuera del ISR
+  void IRAM_ATTR applyPendingDAC(); // ✅ Safe para llamar desde interrupción
   uint8_t getCurrentDAC() const;
   bool isActive() const;
   static void IRAM_ATTR onTimer();

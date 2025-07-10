@@ -16,8 +16,11 @@
  * Usa PIN fijo "0000" para emparejamiento.
  */
 class BLEUI : public ConsoleUI {
+  SensorManager* sensors = nullptr;  // puntero a SensorManager para acceder a sensores
+
 public:
   BLEUI();
+  void attachSensors(SensorManager* sensorManagerPtr);
 
   /**
    * Inicializa Bluetooth con nombre y PIN 0000.

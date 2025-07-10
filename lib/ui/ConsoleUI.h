@@ -1,33 +1,27 @@
 #pragma once
 #include <Arduino.h>
 #include "StateMachine.h"
-#include "MAPSensor.h"
-#include "TPSSensor.h"
+#include "SensorManager.h"
 #include "AcousticInjector.h"
 #include "TurboController.h"
 
-/**
- * ConsoleUI
- * Interfaz por consola serial interactiva. Incluye:
- *  - Menu principal
- *  - Modo desarrollador extendido
- *  - Dashboard en tiempo real
- */
 class ConsoleUI {
 public:
   bool dashboardEnabled = true;
-  
+
   virtual void begin();
   virtual void update();
   virtual void setFSM(StateMachine* fsmRef);
 
-  virtual void attachSensors(MAPSensor* mapPtr, TPSSensor* tpsPtr);
+  // Ahora solo un método para conectar el SensorManager
+  virtual void attachSensors(SensorManager* sensorManagerPtr);
+
   virtual void attachActuators(TurboController* turboPtr, AcousticInjector* injectorPtr);
   virtual void imprimirDashboard();
   virtual bool getCalibRequest();
   virtual void runConsoleCalibration();
   bool isSistemaActivo() const { return sistemaActivo; }
-  void toggleSistema();  // Nuevo método para alternar
+  void toggleSistema();
   int parseValor(const String& linea, const String& clave);
 
 protected:
@@ -39,8 +33,8 @@ protected:
 
   bool simulacionActiva = false;
 
-  MAPSensor*         mapSensor = nullptr;
-  TPSSensor*         tpsSensor = nullptr;
+  // Solo el SensorManager, no sensores separados
+  SensorManager*     sensors = nullptr;
   TurboController*   turbo = nullptr;
   AcousticInjector*  injector = nullptr;
 
@@ -51,5 +45,4 @@ protected:
 
   virtual void interpretarComando(char c);
   virtual void imprimirHelp();
-
 };
