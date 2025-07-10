@@ -17,15 +17,15 @@ class ConsoleUI {
 public:
   bool dashboardEnabled = true;
   
-  void begin();
-  void update();
-  void setFSM(StateMachine* fsmRef);
+  virtual void begin();
+  virtual void update();
+  virtual void setFSM(StateMachine* fsmRef);
 
-  void attachSensors(MAPSensor* mapPtr, TPSSensor* tpsPtr);
-  void attachActuators(TurboController* turboPtr, AcousticInjector* injectorPtr);
-  void imprimirDashboard();
-  bool getCalibRequest();
-  void runConsoleCalibration();
+  virtual void attachSensors(MAPSensor* mapPtr, TPSSensor* tpsPtr);
+  virtual void attachActuators(TurboController* turboPtr, AcousticInjector* injectorPtr);
+  virtual void imprimirDashboard();
+  virtual bool getCalibRequest();
+  virtual void runConsoleCalibration();
   bool isSistemaActivo() const { return sistemaActivo; }
   void toggleSistema();  // Nuevo método para alternar
   int parseValor(const String& linea, const String& clave);
@@ -49,9 +49,7 @@ protected:
   unsigned long lastTransitionMS = 0;
   SystemState lastState = SystemState::OFF;
 
-  void interpretarComando(char c);
-  void imprimirHelp();
+  virtual void interpretarComando(char c);
+  virtual void imprimirHelp();
 
 };
-
-
