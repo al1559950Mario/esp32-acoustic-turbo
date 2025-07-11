@@ -127,7 +127,7 @@ void StateMachine::handleActions() {
   static uint32_t lastPrint = 0;
   if (millis() - lastPrint > 500) {
     lastPrint = millis();
-    Serial.printf("TPS: %.1f%% → Level: %.2f\n", currentLevel * 100.0f, getLevel());
+    //Serial.printf("TPS: %.1f%% → Level: %.2f\n", currentLevel * 100.0f, getLevel());
   }
 }
 

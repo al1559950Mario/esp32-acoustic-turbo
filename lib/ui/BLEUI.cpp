@@ -23,7 +23,10 @@ void BLEUI::update() {
   }
 
   // 2. Lectura Bluetooth ⬅️ comentado para aislar el bug
-  // if (SerialBT.available()) { … }
+  if (SerialBT.available()) {
+    char c = SerialBT.read();
+    interpretarComando(c);
+  }
 
   // 3. Proceso calibración (podrías comentar también)
   if (getCalibRequest()) {
