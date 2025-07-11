@@ -44,7 +44,7 @@ float TPSSensor::readVolts() {
     return 0.0f;
   }
   uint16_t raw = analogRead(_pin);
-  Serial.printf("TPSSensor readVolts (test), pin: %d, raw: %u\n", _pin, raw);
+  //Serial.printf("TPSSensor readVolts (test), pin: %d, raw: %u\n", _pin, raw);
 
   if (raw <= 5) return 0.0f;
   if (raw >= 4090) return 3.3f;

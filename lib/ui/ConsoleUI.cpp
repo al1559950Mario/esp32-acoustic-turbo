@@ -10,17 +10,23 @@ void ConsoleUI::begin() {
 
 void ConsoleUI::setFSM(StateMachine* ref) {
   fsm = ref;
-  lastState = fsm->getState();
-  lastTransitionMS = millis();
+  if (fsm) {  // opcional: verifica si está lista
+    lastState = fsm->getState();
+    lastTransitionMS = millis();
+  } else {
+    lastState = SystemState::UNKNOWN;
+    lastTransitionMS = 0;
+  }
 }
+
+
 
 void ConsoleUI::attachSensors(SensorManager* sensorManagerPtr) {
   sensors = sensorManagerPtr;
 }
 
-void ConsoleUI::attachActuators(TurboController* turboPtr, AcousticInjector* injectorPtr) {
-  turbo = turboPtr;
-  injector = injectorPtr;
+void ConsoleUI::attachActuators(ActuatorManager* actuatorManagerPtr) {
+    actuators = actuatorManagerPtr;
 }
 
 bool ConsoleUI::getCalibRequest() {
@@ -35,33 +41,31 @@ void ConsoleUI::update() {
   if (!fsm) return;
 
   // Paso 1: Verifica transición de estado
-  // if (fsm->getState() != lastState) {
-  //   lastTransitionMS = millis();
-  //   lastState = fsm->getState();
-  // }
+   if (fsm->getState() != lastState) {
+     lastTransitionMS = millis();
+     lastState = fsm->getState();
+   }
 
   // Paso 2: Lectura serial
-  // if (Serial.available()) {
-  //   String linea = Serial.readStringUntil('\n');
-  //   linea.trim();
-  //   ...
-  // }
+   if (Serial.available()) {
+     String linea = Serial.readStringUntil('\n');
+     linea.trim();
+    // ...
+   }
 
   // Paso 3: Calibración
-  // if (getCalibRequest()) {
-  //   runConsoleCalibration();
-  // }
+   if (getCalibRequest()) {
+     runConsoleCalibration();
+   }
 
   // Paso 4: Dashboard
-  // if (dashboardEnabled) {
-  //   static unsigned long lastPrint = 0;
-  //   if (millis() - lastPrint > 300) {
-  //     imprimirDashboard();
-  //     lastPrint = millis();
-  //   }
-  // }
-
-  Serial.println("ConsoleUI::update() activa, sin bloque interno.");
+   if (dashboardEnabled) {
+     static unsigned long lastPrint = 0;
+     if (millis() - lastPrint > 300) {
+       imprimirDashboard();
+       lastPrint = millis();
+     }
+   }
 }
 
 void ConsoleUI::interpretarComando(char c) {
@@ -109,21 +113,21 @@ void ConsoleUI::interpretarComando(char c) {
       }
       switch (c) {
         case 'i': 
-          if (injector) {
-            bool estadoActual = injector->isRelayActive();
-            injector->testRelay(!estadoActual);
+          if (actuators->getAcousticInjector().isActive()) {
+            bool estadoActual = actuators->getAcousticInjector().isRelayActive();
+            actuators->getAcousticInjector().testRelay(!estadoActual);
             Serial.printf(">> Relé %s.\n", !estadoActual ? "activado" : "desactivado");
           } else {
             Serial.println("⚠️ Inyector no disponible.");
           }
           break;
         case 't': 
-          if (turbo) {
-            if (turbo->isActive()) {
-              turbo->stop();
+          if (actuators->getTurboController().isActive()) {
+            if (actuators->getTurboController().isActive()) {
+              actuators->stopTurbo();
               Serial.println(">> Turbo desactivado.");
             } else {
-              turbo->start();
+              actuators->startTurbo();
               Serial.println(">> Turbo activado.");
             }
           } else {
@@ -139,11 +143,11 @@ void ConsoleUI::interpretarComando(char c) {
       break;
 
     case 'b':
-      if (injector) injector->test();
+      if (actuators->isAcousticOn()) actuators->getAcousticInjector().test();
       break;
 
     case 'n':
-      if (injector) injector->stop();
+      if (actuators->isAcousticOn()) actuators->stopAcoustic();
       break;
 
     case 'z':
@@ -164,9 +168,10 @@ void ConsoleUI::interpretarComando(char c) {
 void ConsoleUI::imprimirDashboard() {
   float tpsV = sensors->getTPS().readVolts();
   float mapV = sensors->getMAP().readVolts();
-  uint8_t dac = injector->getCurrentDAC();
-  bool turboOn = turbo->isOn();
-  bool injOn = injector->isActive();
+  uint8_t dac = actuators->getAcousticInjector().getCurrentDAC();
+  bool turboOn = actuators->isTurboOn();
+  bool injOn = actuators->isAcousticOn();
+
   SystemState st = fsm->getState();
   unsigned long elapsed = (millis() - lastTransitionMS) / 1000;
 

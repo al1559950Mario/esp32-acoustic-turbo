@@ -4,6 +4,8 @@
 #include "SensorManager.h"
 #include "AcousticInjector.h"
 #include "TurboController.h"
+#include "ActuatorManager.h"
+
 
 class ConsoleUI {
 public:
@@ -16,7 +18,7 @@ public:
   // Ahora solo un método para conectar el SensorManager
   virtual void attachSensors(SensorManager* sensorManagerPtr);
 
-  virtual void attachActuators(TurboController* turboPtr, AcousticInjector* injectorPtr);
+  virtual void attachActuators(ActuatorManager* actuatorManagerPtr);
   virtual void imprimirDashboard();
   virtual bool getCalibRequest();
   virtual void runConsoleCalibration();
@@ -35,8 +37,8 @@ protected:
 
   // Solo el SensorManager, no sensores separados
   SensorManager*     sensors = nullptr;
-  TurboController*   turbo = nullptr;
-  AcousticInjector*  injector = nullptr;
+  ActuatorManager* actuators = nullptr;
+
 
   bool consoleCalibRequested = false;
   bool developerMode = false;

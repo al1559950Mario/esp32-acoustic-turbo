@@ -13,11 +13,12 @@ public:
   // Actualiza lógica interna (por ejemplo, rampas, timers)
   void update();
 
+  void stopAll();
   // Control Turbo
   void startTurbo();
   void stopTurbo();
-  void updateTurboPower(float level);
   bool isTurboOn() const;
+  void setTurboLevel(float level);
 
   // Control Acoustic Injector
   void startAcoustic(float level);

@@ -15,8 +15,7 @@ void BLEUI::begin(const String& nombreBT) {
 
 void BLEUI::update() {
   if (!fsm) return;
-  if (!sensors) return;    // evita crash si nadie hizo attachSensors()
-  if (!injector) return; 
+  if (!actuators) return;    // evita crash si nadie hizo attachSensors()
   // 1. Estado (mantenemos)
   if (fsm->getState() != lastState) {
     lastTransitionMS = millis();
