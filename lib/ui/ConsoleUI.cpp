@@ -40,33 +40,52 @@ bool ConsoleUI::getCalibRequest() {
 void ConsoleUI::update() {
   if (!fsm) return;
 
-  // Paso 1: Verifica transición de estado
-   if (fsm->getState() != lastState) {
-     lastTransitionMS = millis();
-     lastState = fsm->getState();
-   }
+  // 1. Transición de estado
+  if (fsm->getState() != lastState) {
+    lastTransitionMS = millis();
+    lastState = fsm->getState();
+  }
 
-  // Paso 2: Lectura serial
-   if (Serial.available()) {
-     String linea = Serial.readStringUntil('\n');
-     linea.trim();
-    // ...
-   }
+  // 2. Lectura y procesamiento serial (comando o simulación)
+  if (Serial.available()) {
+    String linea = Serial.readStringUntil('\n');
+    linea.trim();  // elimina espacios o saltos extras
 
-  // Paso 3: Calibración
-   if (getCalibRequest()) {
-     runConsoleCalibration();
-   }
+    if (simulacionActiva && linea.startsWith("tps_raw:")) {
+      int idxTPS = linea.indexOf("tps_raw:");
+      int idxMAP = linea.indexOf("map_raw:");
 
-  // Paso 4: Dashboard
-   if (dashboardEnabled) {
-     static unsigned long lastPrint = 0;
-     if (millis() - lastPrint > 300) {
-       imprimirDashboard();
-       lastPrint = millis();
-     }
-   }
+      if (idxTPS != -1 && idxMAP != -1) {
+        uint16_t tpsRaw = linea.substring(idxTPS + 8, linea.indexOf(",", idxTPS)).toInt();
+        uint16_t mapRaw = linea.substring(idxMAP + 8).toInt();
+
+        sensors->getTPS().setSimulatedRaw(tpsRaw);
+        sensors->getMAP().setSimulatedRaw(mapRaw);
+
+        Serial.println("Recibido tps=" + String(tpsRaw) + " map=" + String(mapRaw));
+      }
+    } else if (linea.length() == 1) {
+      interpretarComando(linea.charAt(0));
+    } else {
+      Serial.println("⚠️  Comando no reconocido o fuera de modo simulación.");
+    }
+  }
+
+  // 3. Proceso de calibración
+  if (getCalibRequest()) {
+    runConsoleCalibration();
+  }
+
+  // 4. HUD en tiempo real
+  if (dashboardEnabled) {
+    static unsigned long lastPrint = 0;
+    if (millis() - lastPrint > 300) {
+      imprimirDashboard();
+      lastPrint = millis();
+    }
+  }
 }
+
 
 void ConsoleUI::interpretarComando(char c) {
   switch (c) {
@@ -143,7 +162,7 @@ void ConsoleUI::interpretarComando(char c) {
       break;
 
     case 'b':
-      if (actuators->isAcousticOn()) actuators->getAcousticInjector().test();
+     actuators->getAcousticInjector().test();
       break;
 
     case 'n':
@@ -166,6 +185,8 @@ void ConsoleUI::interpretarComando(char c) {
 }
 
 void ConsoleUI::imprimirDashboard() {
+  if (!fsm || !sensors || !actuators) return;  // seguridad
+
   float tpsV = sensors->getTPS().readVolts();
   float mapV = sensors->getMAP().readVolts();
   uint8_t dac = actuators->getAcousticInjector().getCurrentDAC();
@@ -191,6 +212,8 @@ void ConsoleUI::imprimirDashboard() {
   float tpsMaxV = tpsMax * 3.3f / 4095.0f;
   float mapMinV = mapMin * 3.3f / 4095.0f;
   float mapMaxV = mapMax * 3.3f / 4095.0f;
+
+  // HUD en vivo: actualiza siempre en la misma línea
   Serial.printf(
     "\r[%s|%lus] TPS=%.2fV(%.2f–%.2fV) | MAP=%.2fV(%.2f–%.2fV) | DAC=%3u | T:%c | I:%c     ",
     stName, elapsed,
@@ -201,6 +224,7 @@ void ConsoleUI::imprimirDashboard() {
     injOn ? '1' : '0'
   );
 
+  // Solo cuando cambia el estado, imprimir detalles debajo
   if (st != lastState) {
     lastState = st;
     Serial.println("\n\n=== TURBO SYSTEM DASHBOARD ===");
