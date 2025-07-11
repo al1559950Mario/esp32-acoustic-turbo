@@ -7,6 +7,8 @@ class AcousticInjector {
 public:
   static constexpr uint8_t TABLE_SIZE = 16;
   static constexpr uint32_t SAMPLE_RATE = 64000;  // 64 kHz para alta fidelidad
+  // Paso de rampa para suavizar cambios en el nivel (_level).
+  // Modificar este valor para hacer la transición más lenta (valor menor) o más rápida (valor mayor).
   static constexpr float RAMP_STEP = 0.01f;
 
   void begin(uint8_t dacPin, uint8_t relayPin);
