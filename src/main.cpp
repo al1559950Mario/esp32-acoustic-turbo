@@ -42,6 +42,8 @@ void setup() {
   bleUI.setFSM(&fsm);
   bleUI.attachSensors(&sensors);
   bleUI.attachActuators(&actuators);
+  bleUI.imprimirDashboard();
+
 
   // Estado inicial
   calib.begin();
@@ -61,7 +63,7 @@ void loop() {
   bleUI.update();
   debugMgr.updateFromSerial(Serial);
 
-  if (serialUI.isSistemaActivo()) {
+  if (serialUI.isSistemaActivo() || bleUI.isSistemaActivo()) {
     float mapVacuum   = sensors.readVacuum_inHg();
     float tpsPorcent  = sensors.readTPSPercent();
 
