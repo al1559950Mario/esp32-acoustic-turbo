@@ -17,6 +17,9 @@ public:
   float readPorcent();                   // Porcentaje estimado (0.0–100.0%)
   float readVolts();           // Conversión directa a volts
   bool isValidReading();             // Verifica si la lectura está dentro de los límites seguros
+  uint16_t readRawISR();
+  float convertRawToPercent(uint16_t raw);
+
 private:
   uint8_t _pin;
 };

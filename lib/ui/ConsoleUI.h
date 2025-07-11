@@ -4,15 +4,16 @@
 #include "SensorManager.h"
 #include "TurboController.h"
 #include "AcousticInjector.h"
+#include "ActuatorManager.h"  // Necesario para el puntero actuators
 
 class ConsoleUI {
 public:
-  virtual void begin() = 0;  // La base no implementa esto, lo hacen las hijas
+  virtual void begin() = 0;
   virtual void update();
 
   virtual void setFSM(StateMachine* fsmRef);
   virtual void attachSensors(SensorManager* sensorManagerPtr);
-  virtual void attachActuators(TurboController* turboPtr, AcousticInjector* injectorPtr);
+  virtual void attachActuators(ActuatorManager* actuatorManagerPtr);  // ✅ Corregido
 
   virtual bool getCalibRequest();
   virtual void runConsoleCalibration();
@@ -25,8 +26,7 @@ protected:
   bool sistemaActivo = true;
   StateMachine*      fsm = nullptr;
   SensorManager*     sensors = nullptr;
-  TurboController*   turbo = nullptr;
-  AcousticInjector*  injector = nullptr;
+  ActuatorManager*   actuators = nullptr;   // ✅ Ahora sí está declarado correctamente
 
   bool dashboardEnabled = true;
   bool consoleCalibRequested = false;
@@ -36,7 +36,7 @@ protected:
   unsigned long lastTransitionMS = 0;
   SystemState lastState = SystemState::OFF;
 
-  // 🔧 Estas funciones deben ser implementadas por la clase hija (Serial, BLE, etc.)
+  // Métodos virtuales puros que deben implementarse en SerialUI o BLEUI
   virtual bool inputAvailable() = 0;
   virtual String readLine() = 0;
   virtual void print(const String& msg) = 0;

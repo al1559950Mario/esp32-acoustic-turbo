@@ -1,17 +1,12 @@
 #include "StateMachine.h"
 #include <Arduino.h>  // Para Serial
 
-void StateMachine::begin(bool hasCalibration,
-                         TurboController* turboRef,
-                         AcousticInjector* injectorRef) {
+void StateMachine::begin(bool hasCalibration, ActuatorManager* actuatorsPtr) {
   // Arrancamos en SIN_CALIBRAR si no hay calibración,
   // o en OFF si ya la tenemos.
-  current     = hasCalibration
-                ? SystemState::OFF
-                : SystemState::SIN_CALIBRAR;
-
-  turboPtr    = turboRef;
-  injectorPtr = injectorRef;
+  current = hasCalibration
+              ? SystemState::OFF
+              : SystemState::SIN_CALIBRAR;
 
   Serial.print(">> StateMachine iniciado en estado: ");
   Serial.println(static_cast<int>(current));
@@ -27,21 +22,16 @@ void StateMachine::update(float vacuumInHg,
                           bool bleCalibReq,
                           const DebugManager &dbg) {
 
-
   // Si estamos en DEBUG y el gestor forzó otro estado, respetar ese cambio
   if (current == SystemState::DEBUG) {
     return;
   }
-  
+
   if (current != SystemState::DEBUG) {
-      currentLevel = 0.9f * currentLevel + 0.1f * (tpsPct / 100.0f);
-      Serial.printf("Nivel acústico dinámico: %.2f\n", currentLevel);
-
+    currentLevel = 0.9f * currentLevel + 0.1f * (tpsPct / 100.0f);
+    //Serial.printf("Nivel acústico dinámico: %.2f\n", currentLevel);
   }
-  
 
-
-  
   switch (current) {
 
     case SystemState::OFF:
@@ -69,10 +59,10 @@ void StateMachine::update(float vacuumInHg,
       // Activar inyección acústica si hay suficiente vacío y carga
       if (readyForInjection(tpsPct, vacuumInHg)) {
         current = SystemState::INYECCION_ACUSTICA;
-        if (!injectorPtr->isActive()) {
-          injectorPtr->start(currentLevel);
+        if (!actuators->isAcousticOn()) {
+        
+          actuators->startAcoustic(currentLevel);
         }
-
         Serial.println("→ Transición: IDLE → INYECCION_ACUSTICA");
       }
       break;
@@ -81,13 +71,13 @@ void StateMachine::update(float vacuumInHg,
       // Escalar a TURBO si hay carga alta y casi sin vacío
       if (tpsPct >= TURBO_TPS_ON && vacuumInHg >= TURBO_VAC_ON) {
         current = SystemState::TURBO;
-        turboPtr->start();
+        actuators->startTurbo();
         Serial.println("→ Transición: INYECCION_ACUSTICA → TURBO");
       }
       // Volver a IDLE si se reduce carga o aumenta presión
       else if (tpsPct <= INJ_TPS_OFF || vacuumInHg > INJ_VAC_OFF) {
         current = SystemState::IDLE;
-        injectorPtr->stop();
+        actuators->stopAcoustic();
         Serial.println("→ Transición: INYECCION_ACUSTICA → IDLE");
       }
       break;
@@ -96,8 +86,8 @@ void StateMachine::update(float vacuumInHg,
       // Cuando el TPS baja, arrancamos fase de caída
       if (tpsPct < TURBO_TPS_OFF) {
         current = SystemState::DESCAYENDO;
-        injectorPtr->stop();
-        turboPtr->stop();
+        actuators->stopAcoustic();
+        actuators->stopTurbo();
         Serial.println("→ Transición: TURBO → DESCAYENDO");
       }
       break;
@@ -106,16 +96,15 @@ void StateMachine::update(float vacuumInHg,
       // Retomar inyección acústica si vuelve a haber vacío y carga
       if (readyForInjection(tpsPct, vacuumInHg)) {
         current = SystemState::INYECCION_ACUSTICA;
-        if (!injectorPtr->isActive()) {
-          injectorPtr->start(currentLevel);
+        if (!actuators->isAcousticOn()) {
+          actuators->startAcoustic(currentLevel);
         }
-
         Serial.println("→ Transición: DESCAYENDO → INYECCION_ACUSTICA");
       }
       // Volver a IDLE si se pierde carga o vacío
       else if (tpsPct <= INJ_TPS_OFF || vacuumInHg > INJ_VAC_OFF) {
         current = SystemState::IDLE;
-        injectorPtr->stop();
+        actuators->stopAcoustic();
         Serial.println("→ Transición: DESCAYENDO → IDLE");
       }
       break;
@@ -129,16 +118,16 @@ void StateMachine::update(float vacuumInHg,
 void StateMachine::handleActions() {
   // Solo la inyección acústica requiere ajuste continuo de nivel
   if (current == SystemState::INYECCION_ACUSTICA) {
-    injectorPtr->setLevel(currentLevel);
-    injectorPtr->update();
-    injectorPtr->applyPendingDAC();
+    actuators->setAcousticLevel(currentLevel);
+    actuators->update();
   }
+
   // Resto de estados no requieren acciones periódicas
-    // DEBUG: mostrar nivel actual cada cierto tiempo
+  // DEBUG: mostrar nivel actual cada cierto tiempo
   static uint32_t lastPrint = 0;
   if (millis() - lastPrint > 500) {
     lastPrint = millis();
-    Serial.printf("TPS: %.1f%% → Level: %.2f\n", currentLevel * 100.0f, getLevel());
+    //Serial.printf("TPS: %.1f%% → Level: %.2f\n", currentLevel * 100.0f, getLevel());
   }
 }
 
@@ -153,4 +142,3 @@ void StateMachine::debugForceState(SystemState nuevoEstado) {
 float StateMachine::getLevel() const {
   return currentLevel;
 }
-

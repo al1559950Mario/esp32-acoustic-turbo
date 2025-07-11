@@ -1,7 +1,6 @@
 #pragma once
 
-#include "TurboController.h"
-#include "AcousticInjector.h"
+#include "ActuatorManager.h"
 #include "DebugManager.h"
 
 /**
@@ -16,7 +15,8 @@ enum class SystemState {
   INYECCION_ACUSTICA,    ///< Inyección acústica activa
   TURBO,                 ///< Turbo encendido
   DESCAYENDO,            ///< Turbo descendiendo
-  DEBUG                  ///< Estado de debug (solo con forzar)
+  DEBUG,
+  UNKNOWN                  ///< Estado de debug (solo con forzar)
 };
 
 /**
@@ -35,9 +35,7 @@ public:
    * @param turboRef Puntero al controlador de turbo.
    * @param injectorRef Puntero al inyector acústico.
    */
-  void begin(bool hasCalibration,
-             TurboController* turboRef,
-             AcousticInjector* injectorRef);
+  void begin(bool hasCalibration, ActuatorManager* actuators);
 
   /**
    * Obtiene el estado actual.
@@ -76,8 +74,9 @@ public:
 
 private:
   SystemState        current{SystemState::OFF};   ///< Estado actual
-  TurboController*   turboPtr{nullptr};           ///< Controlador de turbo
-  AcousticInjector*  injectorPtr{nullptr};        ///< Manejador acústico
+  ActuatorManager* actuators = nullptr;
+
+  
   float currentLevel{0.0f};  ///< Nivel actual de inyección acústica calculado internamente
 
   bool readyForInjection(float tps, float vac) {

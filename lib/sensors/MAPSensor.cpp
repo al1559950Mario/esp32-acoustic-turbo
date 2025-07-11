@@ -1,5 +1,6 @@
 #include "MAPSensor.h"
 #include "CalibrationManager.h"
+#include "driver/adc.h"
 
 /**
  * Inicializa el pin analógico del sensor MAP.
@@ -51,4 +52,36 @@ float MAPSensor::readVacuum_inHg() {
 float MAPSensor::readVolts() const {
   uint16_t raw = analogRead(_pin);
   return (raw * 3.3f) / 4095.0f;
+}
+
+adc1_channel_t pinToADCChannel(uint8_t gpio) {
+  switch (gpio) {
+    case 36: return ADC1_CHANNEL_0;  // GPIO36 -> ADC1_CHANNEL_0
+    case 37: return ADC1_CHANNEL_1;  // GPIO37 -> ADC1_CHANNEL_1
+    case 38: return ADC1_CHANNEL_2;
+    case 39: return ADC1_CHANNEL_3;
+    case 32: return ADC1_CHANNEL_4;
+    case 33: return ADC1_CHANNEL_5;
+    case 34: return ADC1_CHANNEL_6;
+    case 35: return ADC1_CHANNEL_7;
+    default: return ADC1_CHANNEL_MAX; // Indica error o no válido
+  }
+}
+
+uint16_t MAPSensor::readRawISR() {
+  adc1_channel_t channel = pinToADCChannel(_pin);
+  if (channel == ADC1_CHANNEL_MAX) {
+    // pin inválido o no ADC
+    return 0; 
+  }
+  return adc1_get_raw(channel);
+}
+
+float MAPSensor::convertRawToHg(uint16_t raw) {
+  constexpr float vacMin = -18.0f; // máximo vacío
+  constexpr float vacMax = 0.0f;   // atmósfera
+
+  // Normaliza como si fuera readNormalized pero sin leer
+  float norm = raw / 4095.0f;
+  return vacMin + norm * (vacMax - vacMin);
 }
