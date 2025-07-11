@@ -162,7 +162,8 @@ void ConsoleUI::interpretarComando(char c) {
       break;
 
     case 'b':
-     actuators->getAcousticInjector().test();
+      actuators->startAcoustic(1.0f);
+      if (actuators->isAcousticOn()) actuators->getAcousticInjector().test();
       break;
 
     case 'n':

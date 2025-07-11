@@ -1,32 +1,17 @@
-// AcousticInjector.cpp
 #include "AcousticInjector.h"
 #include "driver/dac.h"
-#include "driver/timer.h"
 #include <math.h>
 
-volatile uint8_t dacPending = 128;
 AcousticInjector* AcousticInjector::_instance = nullptr;
 
-// ISR redireccionada para timer
-void IRAM_ATTR AcousticInjector::onTimer() {
-  if (!_instance) return;
-
-  //uint8_t raw = _instance->_sineTable[_instance->_index];
-  //int16_t delta = (int16_t)raw - 128;
-  //int16_t modulated = 128 + ((delta * _instance->_levelInt) >> 8);
-  //uint8_t output = constrain(modulated, 0, 255);
-
-  //dac_output_voltage(_instance->_dacChannel, output);
-  //_instance->_index = (_instance->_index + 1) % TABLE_SIZE;
-}
-
 const uint8_t AcousticInjector::_sineTable[AcousticInjector::TABLE_SIZE] = {
-  128,176,218,245,255,245,218,176,
-  128,80,38,11,1,11,38,80
+  128, 176, 218, 245, 255, 245, 218, 176,
+  128, 80, 38, 11, 1, 11, 38, 80
 };
 
 void AcousticInjector::begin(uint8_t dacPin, uint8_t relayPin) {
   _instance = this;
+
   _dacPin = dacPin;
   _relayPin = relayPin;
   pinMode(_relayPin, OUTPUT);
@@ -38,32 +23,33 @@ void AcousticInjector::begin(uint8_t dacPin, uint8_t relayPin) {
   _level = 0.0f;
   _targetLevel = 0.0f;
   _index = 0;
-  _levelInt = (uint8_t)(_level * 255.0f);
+  _levelInt = 0;
 
-  //hw_timer_t* timer = timerBegin(0, 80, true);
-  //timerAttachInterrupt(timer, &onTimer, true);
-  //timerAlarmWrite(timer, 1000000 / SAMPLE_RATE, true);
-  //timerAlarmEnable(timer);
+  _timer = timerBegin(2, 80, true); // Timer 2, 1 MHz
+  timerAttachInterrupt(_timer, &AcousticInjector::onTimer, true);
+  timerAlarmWrite(_timer, 1000000 / SAMPLE_RATE, true); // 64kHz
+  timerAlarmDisable(_timer);
 }
 
 void AcousticInjector::start(float level) {
   _targetLevel = constrain(level, 0.0f, 1.0f);
   _level = 0.0f;
-  _levelInt = (uint8_t)(_level * 255.0f);
+  _levelInt = 0;
   _index = 0;
 
   digitalWrite(_relayPin, HIGH);
   delay(10);
 
-  dacPending = _sineTable[_index];
-  applyPendingDAC();
+  timerAlarmEnable(_timer);
 }
 
 void AcousticInjector::stop() {
-  digitalWrite(_relayPin, LOW);
+  timerAlarmDisable(_timer);
   dac_output_voltage(_dacChannel, 128);
+  digitalWrite(_relayPin, LOW);
   _level = 0.0f;
   _targetLevel = 0.0f;
+  _levelInt = 0;
 }
 
 void AcousticInjector::setLevel(float level) {
@@ -75,15 +61,33 @@ void AcousticInjector::update() {
     _level = min(_level + RAMP_STEP, _targetLevel);
   else if (_level > _targetLevel)
     _level = max(_level - RAMP_STEP, _targetLevel);
+
   _levelInt = (uint8_t)(_level * 255.0f);
 }
 
-void AcousticInjector::applyPendingDAC() {
-  int16_t delta = (int16_t)dacPending - 128;
-  int16_t out = 128 + (int16_t)(delta * _level);
-  uint8_t final = constrain(out, 0, 255);
-  dac_output_voltage(_dacChannel, final);
-  _lastDACValue = final;
+void IRAM_ATTR AcousticInjector::onTimer() {
+  if (!_instance) return;
+
+  uint8_t raw = _instance->_sineTable[_instance->_index];
+  int16_t delta = (int16_t)raw - 128;
+  int16_t modulated = 128 + ((delta * _instance->_levelInt) >> 8);
+  uint8_t output = constrain(modulated, 0, 255);
+
+  dac_output_voltage(_instance->_dacChannel, output);
+  _instance->_lastDACValue = output;
+
+  _instance->_index = (_instance->_index + 1) % TABLE_SIZE;
+}
+
+void IRAM_ATTR AcousticInjector::applyPendingDAC() {
+  uint8_t raw = _sineTable[_index];
+  int16_t delta = (int16_t)raw - 128;
+  int16_t modulated = 128 + ((delta * _levelInt) >> 8);
+  uint8_t output = constrain(modulated, 0, 255);
+  dac_output_voltage(_dacChannel, output);
+  _lastDACValue = output;
+
+  _index = (_index + 1) % TABLE_SIZE;
 }
 
 uint8_t AcousticInjector::getCurrentDAC() const {
@@ -105,7 +109,6 @@ bool AcousticInjector::isRelayActive() const {
 
 void AcousticInjector::test() {
   Serial.println(F("🔊 Prueba acústica iniciada..."));
-
   testRelay(true);
   start(1.0f);
 
@@ -119,7 +122,6 @@ void AcousticInjector::test() {
 
   stop();
   testRelay(false);
-
   Serial.println(F("✅ Prueba finalizada."));
 }
 
@@ -145,4 +147,20 @@ void AcousticInjector::emitResonant(float level) {
 
   dac_output_voltage(_dacChannel, bias);
   Serial.println(F("✅ Señal por fase acumulada finalizada."));
+}
+
+void AcousticInjector::testSimple() {
+  Serial.println(F("🔊 Test simple iniciado"));
+  testRelay(true);
+  start(1.0f);
+
+  unsigned long startTime = millis();
+  while (millis() - startTime < 5000) {
+    update();
+    delay(20);
+  }
+
+  stop();
+  testRelay(false);
+  Serial.println(F("✅ Test simple finalizado"));
 }

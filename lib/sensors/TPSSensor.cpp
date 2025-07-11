@@ -1,5 +1,8 @@
 #include "TPSSensor.h"
 #include "CalibrationManager.h"
+#include "driver/adc.h"
+#include "ADCUtils.h"
+
 
 void TPSSensor::begin(uint8_t analogPin) {
   _pin = analogPin;
@@ -54,4 +57,23 @@ float TPSSensor::readVolts() {
 bool TPSSensor::isValidReading() {
   uint16_t raw = analogRead(_pin);
   return (raw >= 50 && raw <= 4045);
+}
+
+uint16_t TPSSensor::readRawISR() {
+  adc1_channel_t channel = pinToADCChannel(_pin);
+  if (channel == ADC1_CHANNEL_MAX) {
+    // pin inválido o no ADC
+    return 0; 
+  }
+  return adc1_get_raw(channel);
+}
+
+float TPSSensor::convertRawToPercent(uint16_t raw) {
+  uint16_t min = CalibrationManager::getInstance().getTPSMin();
+  uint16_t max = CalibrationManager::getInstance().getTPSMax();
+
+  if (max <= min || raw < min || raw > max) return 0.0f;
+
+  float norm = (float)(raw - min) / (max - min);
+  return constrain(norm, 0.0f, 1.0f) * 100.0f;
 }

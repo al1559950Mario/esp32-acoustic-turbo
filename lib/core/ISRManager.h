@@ -12,6 +12,7 @@ public:
 
   uint16_t getCachedMAPRaw();  
   uint16_t getCachedTPSRaw();
+  static ISRManager* getInstance();
 
   static void IRAM_ATTR onTimerISR();
 

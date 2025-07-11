@@ -14,6 +14,9 @@ public:
   float readNormalized();                    // Valor calibrado entre 0.0 y 1.0
   float readVacuum_inHg();                   // Vacío relativo en pulgadas de mercurio (–18 a 0 inHg)
   float readVolts() const;                   // Voltaje del sensor (útil para depuración)
+  uint16_t readRawISR();
+  float convertRawToHg(uint16_t raw);
+
 
 private:
   uint8_t _pin;

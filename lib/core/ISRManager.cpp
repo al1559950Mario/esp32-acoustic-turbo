@@ -2,6 +2,10 @@
 
 ISRManager* ISRManager::_instance = nullptr;
 
+ISRManager* ISRManager::getInstance() {
+  return _instance;
+}
+
 void ISRManager::begin(SensorManager* sensors, AcousticInjector* injector) {
   _instance = this;
   _sensors = sensors;
@@ -29,18 +33,12 @@ uint16_t ISRManager::getCachedTPSRaw() {
   return cachedTPSRaw;
 }
 
+
 void IRAM_ATTR ISRManager::onTimerISR() {
   if (!_instance || !_instance->_sensors) return;
 
-  // Acceso directo al sensor, sin usar funciones complejas
-  //MAPSensor& map = _instance->_sensors->getMAP();
-  //TPSSensor& tps = _instance->_sensors->getTPS();
-
-  //_instance->cachedMAPRaw = map.readRaw();  // Solo ADC
-  //_instance->cachedTPSRaw = tps.readRaw();
-
-  // DAC seguro si está en IRAM
-  //if (_instance->_injector && _instance->_injector->isActive()) {
-  //  _instance->_injector->applyPendingDAC();  // Solo si está marcada como IRAM_ATTR
-  //}
+  // Lectura rápida raw ADC en ISR, sin funciones pesadas
+  _instance->cachedMAPRaw = _instance->_sensors->getMAP().readRawISR();
+  _instance->cachedTPSRaw = _instance->_sensors->getTPS().readRawISR();
 }
+

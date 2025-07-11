@@ -22,6 +22,7 @@ public:
   bool isRelayActive() const;
   void test();  // Prueba rápida del sonido acústico
   void emitResonant(float level); // Señal por fase acumulada
+  void testSimple();
 
   static AcousticInjector* _instance;
 

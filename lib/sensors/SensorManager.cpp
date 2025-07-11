@@ -1,4 +1,6 @@
 #include "SensorManager.h"
+#include "ISRManager.h"
+ 
 
 void SensorManager::begin(uint8_t pinMAP, uint8_t pinTPS) {
   mapSensor.begin(pinMAP);
@@ -41,8 +43,12 @@ TPSSensor& SensorManager::getTPS() {
   return tpsSensor;
 }
 
-// 👇 Esta función es opcional si quieres actualizar valores cada ciclo
+
 void SensorManager::update() {
-  vacuum_inHg = mapSensor.readVacuum_inHg();
-  tpsPercent  = tpsSensor.readPorcent();
+  // Usa los valores rápidos leídos por el ISR
+  uint16_t rawMAP = ISRManager::getInstance()->getCachedMAPRaw();
+  uint16_t rawTPS = ISRManager::getInstance()->getCachedTPSRaw();
+
+  vacuum_inHg = mapSensor.convertRawToHg(rawMAP);
+  tpsPercent  = tpsSensor.convertRawToPercent(rawTPS);
 }
