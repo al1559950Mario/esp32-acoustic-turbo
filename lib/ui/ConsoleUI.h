@@ -22,7 +22,7 @@ public:
     return sistemaActivo; }
   virtual void imprimirDashboard();
   virtual int parseValor(const String& linea, const String& clave);
-
+  virtual bool isDeveloperMode() const;
 protected:
   bool sistemaActivo = true;
   StateMachine*      fsm = nullptr;
@@ -36,6 +36,8 @@ protected:
 
   unsigned long lastTransitionMS = 0;
   SystemState lastState = SystemState::OFF;
+
+  
 
   // Métodos virtuales puros que deben implementarse en SerialUI o BLEUI
   virtual bool inputAvailable() = 0;

@@ -64,8 +64,19 @@ void loop() {
   bleUI.update();
   debugMgr.updateFromSerial(Serial);
 
-  // Sistema activo si hay cliente conectado en serial USB o Bluetooth
   bool sistemaActivo = serialUI.isSistemaActivo() || bleUI.isSistemaActivo();
+
+  if (!serialUI.isDeveloperMode()) {
+    calib.loadDebugCalibration();  // Fuerza valores debug cada ciclo (opcional, o solo la primera vez)
+  } else {
+    static bool calibLoaded = false;
+    if (!calibLoaded) {
+      calibLoaded = calib.loadCalibration();
+      if (!calibLoaded) {
+        Serial.println(">> ATENCIÓN: calibración no cargada, requiere calibrar.");
+      }
+    }
+  }
 
   if (sistemaActivo) {
     float mapVacuum   = sensors.readVacuum_inHg();
@@ -80,8 +91,9 @@ void loop() {
     );
     fsm.handleActions();
   } else {
-    actuators.stopAll();  // Seguridad: apagar actuadores si no hay control activo
+    actuators.stopAll();
   }
 
   delay(20);
 }
+

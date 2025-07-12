@@ -302,6 +302,7 @@ int ConsoleUI::parseValor(const String& linea, const String& clave) {
   return valorStr.toInt();
 }
 
+
 void ConsoleUI::imprimirHelp() {
   Serial.println(F("\n📘 Comandos disponibles:"));
   Serial.println(F("  a  → Activar/Desactivar sistema completo (seguridad/falla)"));
@@ -321,4 +322,8 @@ void ConsoleUI::imprimirHelp() {
     Serial.println(F("  v  → Visualizar curva TPS-MAP (pendiente desarrollo)"));
     Serial.println(F("  z  → Activar/Desactivar modo simulación"));
   }
+}
+
+bool ConsoleUI::isDeveloperMode() const {
+  return developerMode;
 }
