@@ -24,28 +24,29 @@ CalibrationManager& calib = CalibrationManager::getInstance();
 DebugManager       debugMgr;
 
 void setup() {
-  Serial.begin(115200); delay(100);
+  Serial.begin(115200); 
+  delay(100);
   Serial.println(">> Iniciando sistema turbo-acústico");
 
+  // Inicializar sensores y actuadores
   sensors.begin(PIN_MAP, PIN_TPS);
   actuators.begin(PIN_RELAY_TURBO, PIN_DAC_ACOUSTIC, PIN_RELAY_ACOUSTIC);
 
-  // Iniciar UI Serial
+  // Iniciar UI Serial USB
   serialUI.begin();
   serialUI.setFSM(&fsm);
   serialUI.attachSensors(&sensors);
   serialUI.attachActuators(&actuators);
   serialUI.imprimirDashboard();
 
-  // Iniciar UI Bluetooth
+  // Iniciar UI Bluetooth Serial clásico
   bleUI.begin();
   bleUI.setFSM(&fsm);
   bleUI.attachSensors(&sensors);
   bleUI.attachActuators(&actuators);
   bleUI.imprimirDashboard();
 
-
-  // Estado inicial
+  // Inicializar calibración y FSM
   calib.begin();
   bool hasCalib = calib.loadCalibration();
   fsm.begin(hasCalib, &actuators);
@@ -63,7 +64,10 @@ void loop() {
   bleUI.update();
   debugMgr.updateFromSerial(Serial);
 
-  if (serialUI.isSistemaActivo() || bleUI.isSistemaActivo()) {
+  // Sistema activo si hay cliente conectado en serial USB o Bluetooth
+  bool sistemaActivo = serialUI.isSistemaActivo() || bleUI.isSistemaActivo();
+
+  if (sistemaActivo) {
     float mapVacuum   = sensors.readVacuum_inHg();
     float tpsPorcent  = sensors.readTPSPercent();
 
@@ -75,9 +79,8 @@ void loop() {
       debugMgr
     );
     fsm.handleActions();
-
   } else {
-    actuators.stopAll();  // Seguridad
+    actuators.stopAll();  // Seguridad: apagar actuadores si no hay control activo
   }
 
   delay(20);
