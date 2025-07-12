@@ -6,7 +6,7 @@ import msvcrt
 IDLE_RPM       = 800
 MAX_RPM        = 7000
 SHIFT_RPM      = 6200
-DT             = 0.1
+DT             = 0.4
 THROTTLE_STEP  = 0.09      # incremento de throttle por paso
 THROTTLE_DROP  = 0.2       # caída rápida tras cambio
 MAP_RISE_COEF  = 0.05
@@ -31,7 +31,7 @@ SERIAL_PORT    = "COM6"
 BAUDRATE       = 115200
 
 # --- Modo Debug: evita abrir puerto y muestra datos por consola ---
-DEBUG_MODE     = True
+DEBUG_MODE     = False
 
 # --- Inicialización ---
 throttle = 0.0
@@ -50,6 +50,8 @@ if DEBUG_MODE:
     print(">>> MODO DEBUG ACTIVADO: solo impresión en consola")
 else:
     ser = serial.Serial(SERIAL_PORT, BAUDRATE, timeout=0.1)
+    ser.setDTR(False)
+    ser.setRTS(False)
     time.sleep(1)
 
 def key_pressed():
@@ -143,7 +145,7 @@ try:
             ser.write(payload.encode('utf-8'))
 
         if not DEBUG_MODE and ser:
-            linea_respuesta = ser.readline().decode().strip()
+            linea_respuesta = ser.readline().decode('utf-8', errors='ignore').strip()
             if linea_respuesta:
                 print(f"\n<<< ESP32 responde: {linea_respuesta}")
 

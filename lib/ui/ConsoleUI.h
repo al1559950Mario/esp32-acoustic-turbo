@@ -18,7 +18,8 @@ public:
   virtual bool getCalibRequest();
   virtual void runConsoleCalibration();
   virtual void toggleSistema();
-  virtual bool isSistemaActivo() const { return sistemaActivo; }
+  virtual bool isSistemaActivo() const { 
+    return sistemaActivo; }
   virtual void imprimirDashboard();
   virtual int parseValor(const String& linea, const String& clave);
 

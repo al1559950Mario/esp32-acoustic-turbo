@@ -56,7 +56,7 @@ void ConsoleUI::update() {
       int idxMAP = linea.indexOf("map_raw:");
 
       if (idxTPS != -1 && idxMAP != -1) {
-        uint16_t tpsRaw = linea.substring(idxTPS + 8, linea.indexOf(",", idxTPS)).toInt();
+        uint16_t tpsRaw = linea.substring(idxTPS + 8, idxMAP - 1).toInt(); // -1 para excluir la coma
         uint16_t mapRaw = linea.substring(idxMAP + 8).toInt();
 
         sensors->getTPS().setSimulatedRaw(tpsRaw);
@@ -66,9 +66,15 @@ void ConsoleUI::update() {
       }
     } else if (linea.length() == 1) {
       interpretarComando(linea.charAt(0));
-    } else {
-      Serial.println("⚠️  Comando no reconocido o fuera de modo simulación.");
-    }
+    } else if (linea.startsWith("[") || linea.startsWith("Gear:") ||
+         linea.indexOf("RPM:") != -1 || linea.startsWith("ets ") ||
+         linea.startsWith("rst:") || linea.startsWith("load:") ||
+         linea.startsWith("clk_drv:") || linea.startsWith("entry ")) {
+      // Es una línea de log del ESP o del simulador: ignorar
+      } else {
+        Serial.println("⚠️  Comando no reconocido.");
+      }
+
   }
 
   // 3. Proceso de calibración
@@ -88,34 +94,61 @@ void ConsoleUI::update() {
 
 
 void ConsoleUI::interpretarComando(char c) {
+  // Comandos solo en modo desarrollador
+  auto devOnly = [&]() {
+    if (!developerMode) {
+      Serial.println("⚠️  Comando exclusivo del modo desarrollador.");
+      return false;
+    }
+    return true;
+  };
+
   switch (c) {
-    case 'm':
-      imprimirHelp();
+    case 'a':  // Toggle sistema ON/OFF
+      toggleSistema();
       break;
 
-    case 's':
-      dashboardEnabled = !dashboardEnabled;
-      Serial.printf(">> Dashboard en tiempo real %s.\n", dashboardEnabled ? "ACTIVADO" : "DESACTIVADO");
+    case 'b':  // Iniciar inyección acústica (100%)
+      if (!developerMode) {
+        Serial.println("⚠️ Comando exclusivo del modo desarrollador.");
+        break;
+      }
+      actuators->startAcoustic(1.0f);
+      if (actuators->isAcousticOn())
+        actuators->getAcousticInjector().test();
       break;
 
-    case 'c':
+    case 'c':  // Solicitar calibración por consola
       consoleCalibRequested = true;
       Serial.println(">> Solicitud de calibración registrada.");
       break;
 
-    case 'd':
+    case 'd':  // Activar modo desarrollador
       developerMode = true;
       Serial.println(">> Modo desarrollador ACTIVADO.");
       break;
 
-    case 'x':
-      if (fsm) {
-        fsm->debugForceState(SystemState::IDLE);
-        Serial.println(">> Paro manual: regresando a IDLE.");
+    case 'i':  // Toggle relé inyector acústico (dev mode)
+      if (!devOnly()) break;
+      if (actuators->getAcousticInjector().isActive()) {
+        bool estadoActual = actuators->getAcousticInjector().isRelayActive();
+        actuators->getAcousticInjector().testRelay(!estadoActual);
+        Serial.printf(">> Relé %s.\n", !estadoActual ? "activado" : "desactivado");
+      } else {
+        Serial.println("⚠️ Inyector no disponible.");
       }
       break;
 
-    case 'r':
+    case 'm':  // Mostrar ayuda
+      imprimirHelp();
+      break;
+
+    case 'n':  // Detener inyección acústica
+      if (actuators->isAcousticOn())
+        actuators->stopAcoustic();
+      break;
+
+    case 'r':  // Borrar calibración y poner FSM en estado sin calibrar
       CalibrationManager::getInstance().clearCalibration();
       if (fsm) {
         fsm->debugForceState(SystemState::SIN_CALIBRAR);
@@ -125,57 +158,59 @@ void ConsoleUI::interpretarComando(char c) {
       }
       break;
 
-    case 'i': case 't': case 'u': case 'v':
-      if (!developerMode) {
-        Serial.println("⚠️  Comando exclusivo del modo desarrollador.");
-        return;
-      }
-      switch (c) {
-        case 'i': 
-          if (actuators->getAcousticInjector().isActive()) {
-            bool estadoActual = actuators->getAcousticInjector().isRelayActive();
-            actuators->getAcousticInjector().testRelay(!estadoActual);
-            Serial.printf(">> Relé %s.\n", !estadoActual ? "activado" : "desactivado");
-          } else {
-            Serial.println("⚠️ Inyector no disponible.");
-          }
-          break;
-        case 't': 
-          if (actuators->getTurboController().isActive()) {
-            if (actuators->getTurboController().isActive()) {
-              actuators->stopTurbo();
-              Serial.println(">> Turbo desactivado.");
-            } else {
-              actuators->startTurbo();
-              Serial.println(">> Turbo activado.");
-            }
-          } else {
-            Serial.println("⚠️ Turbo no disponible.");
-          }
-          break;
-        case 'v': Serial.println(">> [visualización de curva] …"); break;
+    case 's':  // Toggle dashboard en tiempo real
+      dashboardEnabled = !dashboardEnabled;
+      Serial.printf(">> Dashboard en tiempo real %s.\n", dashboardEnabled ? "ACTIVADO" : "DESACTIVADO");
+      break;
+
+    case 't':  // Toggle turbo (dev mode)
+      if (!devOnly()) break;
+      if (actuators->getTurboController().isActive()) {
+        if (actuators->getTurboController().isActive()) {
+          actuators->stopTurbo();
+          Serial.println(">> Turbo desactivado.");
+        } else {
+          actuators->startTurbo();
+          Serial.println(">> Turbo activado.");
+        }
+      } else {
+        Serial.println("⚠️ Turbo no disponible.");
       }
       break;
 
-    case 'a':
-      toggleSistema();
+    case 'u':  // Placeholder para otro comando dev
+      if (!devOnly()) break;
+      // Implementar acción para 'u' si aplica
       break;
 
-    case 'b':
-      actuators->startAcoustic(1.0f);
-      if (actuators->isAcousticOn()) actuators->getAcousticInjector().test();
+    case 'v':  // Visualización curva (dev mode)
+      if (!devOnly()) break;
+      Serial.println(">> [visualización de curva] …");
       break;
 
-    case 'n':
-      if (actuators->isAcousticOn()) actuators->stopAcoustic();
-      break;
-
-    case 'z':
-      if (!developerMode) {
-        Serial.println("⚠️  Comando exclusivo del modo desarrollador.");
-        return;
+    case 'x':  // Forzar estado IDLE en FSM
+      if (fsm) {
+        fsm->debugForceState(SystemState::IDLE);
+        Serial.println(">> Paro manual: regresando a IDLE.");
       }
+      break;
+
+    case 'z':  // Toggle modo simulación (dev mode)
+      if (!devOnly()) break;
+
       simulacionActiva = !simulacionActiva;
+
+      sensors->getTPS().setSimulatedRaw(0);
+      sensors->getMAP().setSimulatedRaw(0);
+
+      if (simulacionActiva) {
+        sensors->getTPS().enableSimulation();
+        sensors->getMAP().enableSimulation();
+      } else {
+        sensors->getTPS().disableSimulation();
+        sensors->getMAP().disableSimulation();
+      }
+
       Serial.printf(">> Modo simulación %s.\n", simulacionActiva ? "ACTIVADO" : "DESACTIVADO");
       break;
 
@@ -270,19 +305,20 @@ int ConsoleUI::parseValor(const String& linea, const String& clave) {
 void ConsoleUI::imprimirHelp() {
   Serial.println(F("\n📘 Comandos disponibles:"));
   Serial.println(F("  a  → Activar/Desactivar sistema completo (seguridad/falla)"));
-  Serial.println(F("  s  → Activar/Desactivar dashboard del sistema"));
   Serial.println(F("  c  → Ejecutar rutina de calibración de sensores"));
-  Serial.println(F("  r  → Borrar calibración actual (solo clear)"));
+  Serial.println(F("  m  → Mostrar menú de comandos"));
+  Serial.println(F("  r  → Borrar calibración actual"));
+  Serial.println(F("  s  → Activar/Desactivar dashboard del sistema"));
   Serial.println(F("  x  → Paro manual, volver a IDLE"));
   Serial.println(F("  d  → Activar modo desarrollador"));
-  Serial.println(F("  m  → Mostrar menu de comandos"));
 
   if (developerMode) {
     Serial.println(F("\n🧪 Modo desarrollador activo:"));
-    Serial.println(F("  i  → Activar rele INYECCION_ACUSTICA"));
-    Serial.println(F("  t  → Activar rele TURBO"));
-    Serial.println(F("  v  → Visualizar curva TPS-MAP(Pendiente desarrollar)"));
     Serial.println(F("  b  → Probar sonido acústico"));
+    Serial.println(F("  i  → Activar relé INYECCIÓN_ACÚSTICA"));
+    Serial.println(F("  t  → Activar relé TURBO"));
+    Serial.println(F("  u  → (Comando dev pendiente)"));
+    Serial.println(F("  v  → Visualizar curva TPS-MAP (pendiente desarrollo)"));
+    Serial.println(F("  z  → Activar/Desactivar modo simulación"));
   }
-
 }

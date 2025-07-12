@@ -19,7 +19,8 @@ public:
   bool isValidReading();             // Verifica si la lectura está dentro de los límites seguros
   uint16_t readRawISR();
   float convertRawToPercent(uint16_t raw);
-
+  void enableSimulation() { modoSimulacion = true; }
+  void disableSimulation() { modoSimulacion = false; }
 private:
   uint8_t _pin;
 };
