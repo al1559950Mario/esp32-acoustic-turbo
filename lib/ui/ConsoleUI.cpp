@@ -40,16 +40,14 @@ bool ConsoleUI::getCalibRequest() {
 void ConsoleUI::update() {
   if (!fsm) return;
 
-  // 1. Transición de estado
   if (fsm->getState() != lastState) {
     lastTransitionMS = millis();
     lastState = fsm->getState();
   }
 
-  // 2. Lectura y procesamiento serial (comando o simulación)
-  if (Serial.available()) {
-    String linea = Serial.readStringUntil('\n');
-    linea.trim();  // elimina espacios o saltos extras
+  if (inputAvailable()) {
+    String linea = readLine();
+    linea.trim();
 
     if (simulacionActiva && linea.startsWith("tps_raw:")) {
       int idxTPS = linea.indexOf("tps_raw:");
@@ -62,21 +60,17 @@ void ConsoleUI::update() {
         sensors->getTPS().setSimulatedRaw(tpsRaw);
         sensors->getMAP().setSimulatedRaw(mapRaw);
 
-        Serial.println("Recibido tps=" + String(tpsRaw) + " map=" + String(mapRaw));
+        println("Recibido tps=" + String(tpsRaw) + " map=" + String(mapRaw));
       }
     } else if (linea.length() == 1) {
       interpretarComando(linea.charAt(0));
     } else {
-      Serial.println("⚠️  Comando no reconocido o fuera de modo simulación.");
+      println("⚠️  Comando no reconocido o fuera de modo simulación.");
     }
   }
 
-  // 3. Proceso de calibración
-  if (getCalibRequest()) {
-    runConsoleCalibration();
-  }
+  if (getCalibRequest()) runConsoleCalibration();
 
-  // 4. HUD en tiempo real
   if (dashboardEnabled) {
     static unsigned long lastPrint = 0;
     if (millis() - lastPrint > 300) {

@@ -21,6 +21,11 @@ public:
   virtual bool isSistemaActivo() const { return sistemaActivo; }
   virtual void imprimirDashboard();
   virtual int parseValor(const String& linea, const String& clave);
+  void setMirror(ConsoleUI* mirrorUI) { this->mirror = mirrorUI; }
+  virtual void print(const String& msg) = 0;
+  virtual void println(const String& msg) = 0;
+  virtual void printf(const char* fmt, ...) = 0;
+
 
 protected:
   bool sistemaActivo = true;
@@ -39,10 +44,9 @@ protected:
   // Métodos virtuales puros que deben implementarse en SerialUI o BLEUI
   virtual bool inputAvailable() = 0;
   virtual String readLine() = 0;
-  virtual void print(const String& msg) = 0;
-  virtual void println(const String& msg) = 0;
-  virtual void printf(const char* fmt, ...) = 0;
 
   virtual void interpretarComando(char c);
   virtual void imprimirHelp();
+  ConsoleUI* mirror = nullptr;  // UI secundaria para eco
+
 };

@@ -25,10 +25,12 @@ String BLEConsoleUI::readLine() {
 
 void BLEConsoleUI::print(const String& msg) {
   SerialBT.print(msg);
+  if (mirror) mirror->print(msg);
 }
 
 void BLEConsoleUI::println(const String& msg) {
   SerialBT.println(msg);
+  if (mirror) mirror->println(msg);
 }
 
 void BLEConsoleUI::printf(const char* fmt, ...) {
@@ -38,4 +40,6 @@ void BLEConsoleUI::printf(const char* fmt, ...) {
   vsnprintf(buf, sizeof(buf), fmt, args);
   va_end(args);
   SerialBT.print(buf);
+  if (mirror) mirror->print(buf);
 }
+

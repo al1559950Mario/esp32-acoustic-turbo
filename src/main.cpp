@@ -44,6 +44,10 @@ void setup() {
   bleUI.attachActuators(&actuators);
   bleUI.imprimirDashboard();
 
+  serialUI.setMirror(&bleUI);
+  bleUI.setMirror(&serialUI);
+
+
 
   // Estado inicial
   calib.begin();
