@@ -6,58 +6,56 @@ import msvcrt
 IDLE_RPM       = 800
 MAX_RPM        = 7000
 SHIFT_RPM      = 6200
-DT             = 0.1
-THROTTLE_STEP  = 0.09      # incremento de throttle por paso
-THROTTLE_DROP  = 0.2       # caída rápida tras cambio
+DT             = 0.4
+THROTTLE_STEP  = 0.09
+THROTTLE_DROP  = 0.2
 MAP_RISE_COEF  = 0.05
-MAP_REBOTE_COEF = 0.2      # más agresivo al recuperar presión
+MAP_REBOTE_COEF = 0.2
 RPM_RISE_COEF  = 0.1
 
-# Voltajes TPS: suelto = 2.25 V; fondo = 0.5 V
 TPS_V_OPEN     = 2.25
 TPS_V_CLOSED   = 0.5
 
-# Voltajes MAP: vacío (~-15 inHg) = 3.05 V; atmosférico = 3.26 V
-# Al soltar pedal, se simula vacío más fuerte (~-18 inHg) = 2.95 V
 MAP_V_IDLE     = 3.05
 MAP_V_MAX      = 3.26
 MAP_V_REBOTE   = 2.95
 
-# Relaciones de caja (simplificado)
 GEAR_RATIOS    = [3.8, 2.2, 1.5, 1.0, 0.8]
 
-# Puerto serial (ajusta si usas modo real)
 SERIAL_PORT    = "COM6"
 BAUDRATE       = 115200
 
-# --- Modo Debug: evita abrir puerto y muestra datos por consola ---
-DEBUG_MODE     = True
+DEBUG_MODE     = False
 
-# --- Inicialización ---
 throttle = 0.0
 rpm      = IDLE_RPM
 map_v    = MAP_V_IDLE
 gear     = 0
-idle_phase    = True
+idle_phase = True
 throttle_rebote = False
 idle_start = time.time()
 
 def volt_to_adc(volts):
     return int((volts / 3.3) * 4095)
 
-if DEBUG_MODE:
-    ser = None
-    print(">>> MODO DEBUG ACTIVADO: solo impresión en consola")
-else:
-    ser = serial.Serial(SERIAL_PORT, BAUDRATE, timeout=0.1)
-    time.sleep(1)
+def enviar_comando(ser, cmd):
+    ser.write((cmd + '\n').encode('utf-8'))
+    time.sleep(0.1)
+    while ser.in_waiting:
+        respuesta = ser.readline().decode('utf-8', errors='ignore').strip()
+        if respuesta:
+            print(f"\n<<< ESP32 responde: {respuesta}")
 
 def key_pressed():
     if msvcrt.kbhit():
         ch = msvcrt.getch()
-        if ch == b'\xe0':      # tecla especial
+        if ch == b'\xe0':  # tecla especial (flechas, etc)
             ch2 = msvcrt.getch()
-            return ch2
+            return ch + ch2  # Retornamos bytes doble para flechas
+        else:
+            # Retornamos letra minúscula si es alfabeto
+            if ch.isalpha():
+                return ch.decode('utf-8').lower()
     return None
 
 def describir_tps(volts):
@@ -77,13 +75,22 @@ def describir_map(volts):
         return "Atmósfera"
 
 print(">>> Controles: [↑] Acelera | [↓] Frena | [→] Sube marcha | [←] Baja marcha")
+print("Presiona letra para enviar comando al ESP32 (ej. 'z' para simulación)")
 print("Iniciando simulación de carrera...")
+
+if DEBUG_MODE:
+    ser = None
+    print(">>> MODO DEBUG ACTIVADO: solo impresión en consola")
+else:
+    ser = serial.Serial(SERIAL_PORT, BAUDRATE, timeout=0.1)
+    ser.setDTR(False)
+    ser.setRTS(False)
+    time.sleep(1)
 
 try:
     while gear < len(GEAR_RATIOS):
         elapsed = time.time() - idle_start
 
-        # 🟢 1) IDLE al encender
         if idle_phase and elapsed < 5.0:
             rpm = IDLE_RPM
             throttle = 0.0
@@ -91,12 +98,10 @@ try:
         else:
             idle_phase = False
 
-            # 🔼 2) Aceleración
             target_rpm = IDLE_RPM + throttle * (MAX_RPM - IDLE_RPM)
             rpm += (target_rpm - rpm) * RPM_RISE_COEF
 
             if throttle_rebote:
-                # MAP responde a caída brusca en TPS
                 target_map = MAP_V_REBOTE
                 map_v += (target_map - map_v) * MAP_REBOTE_COEF
                 if abs(map_v - target_map) < 0.005:
@@ -105,57 +110,55 @@ try:
                 target_map = MAP_V_IDLE + throttle * (MAP_V_MAX - MAP_V_IDLE)
                 map_v += (target_map - map_v) * MAP_RISE_COEF
 
-        # 🎮 3) Leer teclado
         key = key_pressed()
-        if key == b'H':  # Flecha ↑ (acelera)
-            throttle = min(1.0, throttle + THROTTLE_STEP)
-        elif key == b'P':  # Flecha ↓ (frena)
-            throttle = max(0.0, throttle - THROTTLE_STEP)
-        elif key == b'M':  # Flecha →
-            if gear < len(GEAR_RATIOS) - 1:
-                prev_ratio = GEAR_RATIOS[gear]
-                gear += 1
-                next_ratio = GEAR_RATIOS[gear]
-                rpm *= (next_ratio / prev_ratio)
-                throttle *= THROTTLE_DROP
-                throttle_rebote = True
-                print(f"\n>>> CAMBIO A MARCHA {gear+1}, RPM ajustado a {rpm:.0f}")
-        elif key == b'K':  # Flecha ←
-            if gear > 0:
-                prev_ratio = GEAR_RATIOS[gear]
-                gear -= 1
-                next_ratio = GEAR_RATIOS[gear]
-                rpm *= (next_ratio / prev_ratio)
-                throttle *= THROTTLE_DROP
-                throttle_rebote = True
-                print(f"\n<<< RETROCEDE A MARCHA {gear+1}, RPM ajustado a {rpm:.0f}")
+        if key:
+            if isinstance(key, bytes):
+                # Detectamos flechas con código de bytes
+                if key == b'\xe0H':  # Flecha arriba
+                    throttle = min(1.0, throttle + THROTTLE_STEP)
+                elif key == b'\xe0P':  # Flecha abajo
+                    throttle = max(0.0, throttle - THROTTLE_STEP)
+                elif key == b'\xe0M':  # Flecha derecha
+                    if gear < len(GEAR_RATIOS) - 1:
+                        prev_ratio = GEAR_RATIOS[gear]
+                        gear += 1
+                        next_ratio = GEAR_RATIOS[gear]
+                        rpm *= (next_ratio / prev_ratio)
+                        throttle *= THROTTLE_DROP
+                        throttle_rebote = True
+                        print(f"\n>>> CAMBIO A MARCHA {gear+1}, RPM ajustado a {rpm:.0f}")
+                elif key == b'\xe0K':  # Flecha izquierda
+                    if gear > 0:
+                        prev_ratio = GEAR_RATIOS[gear]
+                        gear -= 1
+                        next_ratio = GEAR_RATIOS[gear]
+                        rpm *= (next_ratio / prev_ratio)
+                        throttle *= THROTTLE_DROP
+                        throttle_rebote = True
+                        print(f"\n<<< RETROCEDE A MARCHA {gear+1}, RPM ajustado a {rpm:.0f}")
+            else:
+                # Si es letra, enviamos comando al ESP32
+                print(f"\n>>> Enviando comando: '{key}'")
+                if not DEBUG_MODE and ser:
+                    enviar_comando(ser, key)
 
-        # 🧮 4) Calcular valores simulados
+        # Valores simulados
         tps_v = TPS_V_OPEN + (TPS_V_CLOSED - TPS_V_OPEN) * throttle
         tps_adc = volt_to_adc(tps_v)
         map_adc = volt_to_adc(map_v)
 
-        # 📨 5) Construir y enviar payload por serial
-        payload = f"tps_raw:{tps_adc},map_raw:{map_adc}\n"
-
-        # 5) Enviar por serial SI está habilitado
         if not DEBUG_MODE and ser:
+            payload = f"tps_raw:{tps_adc},map_raw:{map_adc}\n"
             ser.write(payload.encode('utf-8'))
 
-        if not DEBUG_MODE and ser:
-            linea_respuesta = ser.readline().decode().strip()
-            if linea_respuesta:
-                print(f"\n<<< ESP32 responde: {linea_respuesta}")
+            if ser.in_waiting:
+                linea_respuesta = ser.readline().decode('utf-8', errors='ignore').strip()
+                if linea_respuesta:
+                    print(f"\n<<< ESP32 responde: {linea_respuesta}")
 
-
-        # 🧠 6) Interpretación semántica
-        tps_estado = describir_tps(tps_v)
-        map_estado = describir_map(map_v)
-
-        # 📺 7) HUD en consola sin parpadeo
         hud = (
             f"\r[{elapsed:5.2f}s] Gear:{gear+1} | RPM:{rpm:5.0f} | Throttle:{throttle:.2f} | "
-            f"TPS:{tps_v:5.3f}V ({tps_estado}) | MAP:{map_v:5.3f}V ({map_estado})   "
+            f"TPS:{tps_v:5.3f}V ({describir_tps(tps_v)}) | MAP:{map_v:5.3f}V ({describir_map(map_v)})   "
         )
         print(hud, end='', flush=True)
 

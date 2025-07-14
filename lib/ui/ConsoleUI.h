@@ -18,7 +18,8 @@ public:
   virtual bool getCalibRequest();
   virtual void runConsoleCalibration();
   virtual void toggleSistema();
-  virtual bool isSistemaActivo() const { return sistemaActivo; }
+  virtual bool isSistemaActivo() const { 
+    return sistemaActivo; }
   virtual void imprimirDashboard();
   virtual int parseValor(const String& linea, const String& clave);
   void setMirror(ConsoleUI* mirrorUI) { this->mirror = mirrorUI; }
@@ -27,6 +28,7 @@ public:
   virtual void printf(const char* fmt, ...) = 0;
 
 
+  virtual bool isDeveloperMode() const;
 protected:
   bool sistemaActivo = true;
   StateMachine*      fsm = nullptr;
@@ -40,6 +42,8 @@ protected:
 
   unsigned long lastTransitionMS = 0;
   SystemState lastState = SystemState::OFF;
+
+  
 
   // Métodos virtuales puros que deben implementarse en SerialUI o BLEUI
   virtual bool inputAvailable() = 0;

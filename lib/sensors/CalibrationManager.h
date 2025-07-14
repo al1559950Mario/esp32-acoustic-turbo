@@ -15,7 +15,13 @@ public:
   static CalibrationManager& getInstance();
 
   void begin();
+
+  // Nueva función para activar modo debug hardcodeado
+  void enableDebugMode(bool enable) { debugMode = enable; }
+
   bool loadCalibration();
+  void loadDebugCalibration();
+
   void clearCalibration();
 
   bool saveCalibration();         // guarda mapMin, mapMax, tpsMin, tpsMax
@@ -33,6 +39,8 @@ private:
 
   uint16_t mapMin = 0, mapMax = 0;
   uint16_t tpsMin = 0, tpsMax = 0;
+
+  bool debugMode = false;  // Modo debug hardcodeado
 
   void saveStep(CalibStep step, uint16_t value);
 };

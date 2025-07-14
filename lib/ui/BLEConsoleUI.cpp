@@ -1,18 +1,46 @@
 #include "BLEConsoleUI.h"
 #include <stdarg.h>
+#include <Arduino.h>
+
+BLEConsoleUI::BLEConsoleUI() {}
+
+BLEConsoleUI::~BLEConsoleUI() {
+  SerialBT.end();
+}
 
 void BLEConsoleUI::begin() {
-  if (!SerialBT.begin("TurboAcustico")) {
+  if (!SerialBT.begin("TurboAcusticoV1", false)) {  // false = modo esclavo
     Serial.println("❌ Error al iniciar Bluetooth");
     return;
   }
-  SerialBT.setPin("0000");
-  SerialBT.println("✅ Bluetooth iniciado como \"TurboAcustico\"");
-  imprimirHelp();
+  SerialBT.println("✅ Bluetooth iniciado como \"TurboAcusticoV1\"");
+  imprimirHelp();  // si tienes ese método en ConsoleUI
 }
 
 void BLEConsoleUI::update() {
-  ConsoleUI::update();
+  // Detecta cambio de estado de conexión y muestra mensaje solo al cambiar
+  bool clienteActual = SerialBT.hasClient();
+
+  if (clienteActual && !clientePrevio) {
+    Serial.println("Cliente Bluetooth conectado");
+    SerialBT.println("Conexión establecida.");
+  } else if (!clienteActual && clientePrevio) {
+    Serial.println("Cliente Bluetooth desconectado");
+  }
+  clientePrevio = clienteActual;
+
+  // Si hay cliente, lee y procesa datos
+  if (clienteActual) {
+    while (SerialBT.available()) {
+      char c = SerialBT.read();
+      Serial.write(c);   // muestra en monitor serie USB
+      SerialBT.write(c); // eco para el cliente Bluetooth
+
+      // Aquí puedes procesar el caracter 'c' para comandos o control
+    }
+  }
+
+  ConsoleUI::update();  // Si quieres mantener lógica base
 }
 
 bool BLEConsoleUI::inputAvailable() {
@@ -43,3 +71,6 @@ void BLEConsoleUI::printf(const char* fmt, ...) {
   if (mirror) mirror->print(buf);
 }
 
+bool BLEConsoleUI::isSistemaActivo() {
+  return SerialBT.hasClient();
+}
