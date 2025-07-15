@@ -46,7 +46,12 @@ void setup() {
   bleUI.attachActuators(&actuators);
   bleUI.imprimirDashboard();
 
-  // Inicializar calibración y FSM
+  serialUI.setMirror(&bleUI);
+  bleUI.setMirror(&serialUI);
+
+
+
+  // Estado inicial
   calib.begin();
   bool hasCalib = calib.loadCalibration();
   fsm.begin(hasCalib, &actuators);

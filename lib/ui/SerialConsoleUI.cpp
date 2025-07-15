@@ -22,10 +22,12 @@ String SerialConsoleUI::readLine() {
 
 void SerialConsoleUI::print(const String& msg) {
   Serial.print(msg);
+  if (mirror) mirror->print(msg);
 }
 
 void SerialConsoleUI::println(const String& msg) {
   Serial.println(msg);
+  if (mirror) mirror->println(msg);
 }
 
 void SerialConsoleUI::printf(const char* fmt, ...) {
@@ -35,4 +37,5 @@ void SerialConsoleUI::printf(const char* fmt, ...) {
   vsnprintf(buf, sizeof(buf), fmt, args);
   va_end(args);
   Serial.print(buf);
+  if (mirror) mirror->print(buf);
 }
