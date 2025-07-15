@@ -67,7 +67,7 @@ void loop() {
   bool sistemaActivo = serialUI.isSistemaActivo() || bleUI.isSistemaActivo();
 
   if (!serialUI.isDeveloperMode()) {
-    calib.loadDebugCalibration();  // Fuerza valores debug cada ciclo (opcional, o solo la primera vez)
+    //calib.loadDebugCalibration();  // Fuerza valores debug cada ciclo (opcional, o solo la primera vez)
   } else {
     static bool calibLoaded = false;
     if (!calibLoaded) {
