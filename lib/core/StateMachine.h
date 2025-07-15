@@ -45,13 +45,13 @@ public:
 
   /**
    * Realiza la lógica de transición de estados.
-   * @param vacuumInHg Lectura de vacío MAP en inHg (valor negativo o 0).
+   * @param mapLoadPercent Porcentaje de carga MAP normalizado (0% = vacío máximo, 100% = presión atmosférica)
    * @param tpsPct Lectura de TPS en porcentaje [0–100].
    * @param consoleCalibReq true si hubo petición de calibración por consola.
    * @param bleCalibReq true si hubo petición de calibración por BLE.
    * @param dbg Objeto DebugManager que puede forzar estado DEBUG.
    */
-  void update(float vacuumInHg,
+  void update(float mapLoadPercent,
               float tpsPct,
               bool consoleCalibReq,
               bool bleCalibReq,
@@ -79,18 +79,24 @@ private:
   
   float currentLevel{0.0f};  ///< Nivel actual de inyección acústica calculado internamente
 
-  bool readyForInjection(float tps, float vac) {
-    return tps >= INJ_TPS_ON && vac <= INJ_VAC_ON;
+  bool StateMachine::readyForInjection(float tps, float mapLoad) {
+    return tps >= INJ_TPS_ON && mapLoad >= INJ_MAP_ON;
   }
 
 
-  // Umbrales de transición en unidades reales (ajusta según aplicación/calibración)
-  static constexpr float MAP_WAKEUP_INHG   = -1.0f;   ///< inHg mínimos para pasar OFF→IDLE (casi sin vacío)
-  static constexpr float INJ_TPS_ON        = 10.0f;   ///< % TPS para iniciar inyección acústica
-  static constexpr float INJ_VAC_ON        = -12.0f;  ///< inHg para iniciar inyección acústica (vacío moderado)
-  static constexpr float INJ_TPS_OFF       = 8.0f;    ///< % TPS para detener inyección acústica
-  static constexpr float INJ_VAC_OFF       = -9.0f;   ///< inHg para detener inyección acústica
-  static constexpr float TURBO_TPS_ON      = 40.0f;   ///< % TPS para arrancar turbo
-  static constexpr float TURBO_VAC_ON      = -4.0f;   ///< inHg para arrancar turbo (presión alta, casi sin vacío)
-  static constexpr float TURBO_TPS_OFF     = 30.0f;   ///< % TPS para apagar turbo
+
+// Umbrales de transición en porcentaje (basado en % MAP y % TPS)
+// 0%  = máximo vacío (ralentí)
+// 100% = atmósfera (motor apagado o acelerado sin carga)
+// >100% = sobrepresión (turbo cargando)
+
+static constexpr float MAP_WAKEUP_PERCENT     = 5.0f;     ///< % MAP para pasar OFF → IDLE (mínima presión)
+static constexpr float INJ_TPS_ON         = 10.0f;    ///< % TPS para iniciar inyección acústica
+static constexpr float INJ_MAP_ON         = 40.0f;    ///< % MAP para iniciar inyección acústica
+static constexpr float INJ_TPS_OFF        = 8.0f;     ///< % TPS para detener inyección acústica
+static constexpr float INJ_MAP_OFF        = 30.0f;    ///< % MAP para detener inyección acústica
+static constexpr float TURBO_TPS_ON       = 45.0f;    ///< % TPS para arrancar turbo
+static constexpr float TURBO_MAP_ON       = 75.0f;   ///< % MAP para arrancar turbo (presión positiva)
+static constexpr float TURBO_TPS_OFF      = 30.0f;    ///< % TPS para apagar turbo
+
 };

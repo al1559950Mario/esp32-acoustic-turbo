@@ -84,11 +84,11 @@ void loop() {
   }
 
   if (sistemaActivo) {
-    float mapVacuum   = sensors.readVacuum_inHg();
+    float mapLoad   = sensors.readMAPLoadPercent();
     float tpsPorcent  = sensors.readTPSPercent();
 
     fsm.update(
-      mapVacuum,
+      mapLoad,
       tpsPorcent,
       serialUI.getCalibRequest(),
       bleUI.getCalibRequest(),

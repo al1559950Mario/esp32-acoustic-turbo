@@ -63,3 +63,14 @@ float MAPSensor::convertRawToHg(uint16_t raw) {
   float norm = (float)raw / 4095.0f;
   return vacMin + norm * (vacMax - vacMin);
 }
+
+float MAPSensor::readMAPLoadPercent() {
+  uint16_t raw = readRaw();
+  uint16_t min = CalibrationManager::getInstance().getMAPMin();  // vacío máximo (ralentí)
+  uint16_t max = CalibrationManager::getInstance().getMAPMax();  // atmósfera
+
+  if (max <= min) return 0.0f;
+
+  float percent = 100.0f * (float)(raw - min) / (float)(max - min);
+  return percent;  // intencionalmente sin constrain
+}

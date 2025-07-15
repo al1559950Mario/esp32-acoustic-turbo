@@ -16,7 +16,7 @@ SystemState StateMachine::getState() const {
   return current;
 }
 
-void StateMachine::update(float vacuumInHg,
+void StateMachine::update(float mapLoadPercent,
                           float tpsPct,
                           bool consoleCalibReq,
                           bool bleCalibReq,
@@ -36,7 +36,7 @@ void StateMachine::update(float vacuumInHg,
 
     case SystemState::OFF:
       // Pasa a IDLE cuando hay al menos algo de vacío
-      if (vacuumInHg < MAP_WAKEUP_INHG) { // Recuerda: inHg negativo = más vacío
+      if (mapLoadPercent < MAP_WAKEUP_PERCENT) { 
         current = SystemState::IDLE;
         Serial.println("→ Transición: OFF → IDLE");
       }
@@ -57,7 +57,7 @@ void StateMachine::update(float vacuumInHg,
 
     case SystemState::IDLE:
       // Activar inyección acústica si hay suficiente vacío y carga
-      if (readyForInjection(tpsPct, vacuumInHg)) {
+      if (readyForInjection(tpsPct, mapLoadPercent)) {
         current = SystemState::INYECCION_ACUSTICA;
         if (!actuators->isAcousticOn()) {
         
@@ -69,13 +69,14 @@ void StateMachine::update(float vacuumInHg,
 
     case SystemState::INYECCION_ACUSTICA:
       // Escalar a TURBO si hay carga alta y casi sin vacío
-      if (tpsPct >= TURBO_TPS_ON && vacuumInHg >= TURBO_VAC_ON) {
+      if (tpsPct >= TURBO_TPS_ON && mapLoadPercent >= TURBO_MAP_ON)
+       {
         current = SystemState::TURBO;
         actuators->startTurbo();
         Serial.println("→ Transición: INYECCION_ACUSTICA → TURBO");
       }
       // Volver a IDLE si se reduce carga o aumenta presión
-      else if (tpsPct <= INJ_TPS_OFF || vacuumInHg > INJ_VAC_OFF) {
+      else if (tpsPct <= INJ_TPS_OFF || mapLoadPercent <= INJ_MAP_OFF) {
         current = SystemState::IDLE;
         actuators->stopAcoustic();
         Serial.println("→ Transición: INYECCION_ACUSTICA → IDLE");
@@ -94,7 +95,7 @@ void StateMachine::update(float vacuumInHg,
 
     case SystemState::DESCAYENDO:
       // Retomar inyección acústica si vuelve a haber vacío y carga
-      if (readyForInjection(tpsPct, vacuumInHg)) {
+      if (readyForInjection(tpsPct, mapLoadPercent)) {
         current = SystemState::INYECCION_ACUSTICA;
         if (!actuators->isAcousticOn()) {
           actuators->startAcoustic(currentLevel);
@@ -102,7 +103,7 @@ void StateMachine::update(float vacuumInHg,
         Serial.println("→ Transición: DESCAYENDO → INYECCION_ACUSTICA");
       }
       // Volver a IDLE si se pierde carga o vacío
-      else if (tpsPct <= INJ_TPS_OFF || vacuumInHg > INJ_VAC_OFF) {
+      else if (tpsPct <= INJ_TPS_OFF || mapLoadPercent <= INJ_MAP_OFF) {
         current = SystemState::IDLE;
         actuators->stopAcoustic();
         Serial.println("→ Transición: DESCAYENDO → IDLE");
