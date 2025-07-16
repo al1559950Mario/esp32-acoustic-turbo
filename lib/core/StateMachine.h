@@ -2,6 +2,8 @@
 
 #include "ActuatorManager.h"
 #include "DebugManager.h"
+#include "ThresholdManager.h"
+
 
 /**
  * @enum SystemState
@@ -35,7 +37,7 @@ public:
    * @param turboRef Puntero al controlador de turbo.
    * @param injectorRef Puntero al inyector acústico.
    */
-  void begin(bool hasCalibration, ActuatorManager* actuators);
+  void begin(bool hasCalibration, ActuatorManager* actuators, ThresholdManager* thresholdManagerPtr);
 
   /**
    * Obtiene el estado actual.
@@ -69,34 +71,18 @@ public:
    */
   void debugForceState(SystemState nuevoEstado);
   float getLevel() const;
-
+  bool readyForInjection(float, float);
 
 
 private:
+  Thresholds thresholds;                         ///< Copia local de los umbrales actuales
+  ThresholdManager* thresholdManager = nullptr;  ///< Puntero al gestor de umbrales
   SystemState        current{SystemState::OFF};   ///< Estado actual
   ActuatorManager* actuators = nullptr;
+
 
   
   float currentLevel{0.0f};  ///< Nivel actual de inyección acústica calculado internamente
 
-  bool StateMachine::readyForInjection(float tps, float mapLoad) {
-    return tps >= INJ_TPS_ON && mapLoad >= INJ_MAP_ON;
-  }
-
-
-
-// Umbrales de transición en porcentaje (basado en % MAP y % TPS)
-// 0%  = máximo vacío (ralentí)
-// 100% = atmósfera (motor apagado o acelerado sin carga)
-// >100% = sobrepresión (turbo cargando)
-
-static constexpr float MAP_WAKEUP_PERCENT     = 5.0f;     ///< % MAP para pasar OFF → IDLE (mínima presión)
-static constexpr float INJ_TPS_ON         = 10.0f;    ///< % TPS para iniciar inyección acústica
-static constexpr float INJ_MAP_ON         = 40.0f;    ///< % MAP para iniciar inyección acústica
-static constexpr float INJ_TPS_OFF        = 8.0f;     ///< % TPS para detener inyección acústica
-static constexpr float INJ_MAP_OFF        = 30.0f;    ///< % MAP para detener inyección acústica
-static constexpr float TURBO_TPS_ON       = 45.0f;    ///< % TPS para arrancar turbo
-static constexpr float TURBO_MAP_ON       = 75.0f;   ///< % MAP para arrancar turbo (presión positiva)
-static constexpr float TURBO_TPS_OFF      = 30.0f;    ///< % TPS para apagar turbo
 
 };

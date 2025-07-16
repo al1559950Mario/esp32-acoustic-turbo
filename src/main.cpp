@@ -6,6 +6,9 @@
 #include "SensorManager.h"
 #include "SerialConsoleUI.h"
 #include "BLEConsoleUI.h"
+#include "ThresholdManager.h"
+
+
 
 // PIN-OUT
 constexpr uint8_t PIN_MAP             = 35;
@@ -22,6 +25,7 @@ SerialConsoleUI    serialUI;
 BLEConsoleUI       bleUI;
 CalibrationManager& calib = CalibrationManager::getInstance();
 DebugManager       debugMgr;
+ThresholdManager* thresholdManagerPtr;
 
 void setup() {
   Serial.begin(115200); 
@@ -54,7 +58,7 @@ void setup() {
   // Estado inicial
   calib.begin();
   bool hasCalib = calib.loadCalibration();
-  fsm.begin(hasCalib, &actuators);
+  fsm.begin(hasCalib, &actuators, thresholdManagerPtr);
 
   actuators.stopAll();
 
