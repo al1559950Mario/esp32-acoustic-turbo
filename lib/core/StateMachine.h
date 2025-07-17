@@ -57,6 +57,7 @@ public:
               float tpsPct,
               bool consoleCalibReq,
               bool bleCalibReq,
+              bool hasCalibration,
               const DebugManager& dbg);
 
   /**

@@ -31,9 +31,9 @@ bool CalibrationManager::loadCalibration() {
   prefs.end();
 
   bool valid = mapMax > mapMin && tpsMax > tpsMin;
-  Serial.printf(">> Calibración cargada: MAP[%u–%u], TPS[%u–%u] %s\n",
-                mapMin, mapMax, tpsMin, tpsMax,
-                valid ? "(OK)" : "(inválido)");
+  //Serial.printf(">> Calibración cargada: MAP[%u–%u], TPS[%u–%u] %s\n",
+  //              mapMin, mapMax, tpsMin, tpsMax,
+  //              valid ? "(OK)" : "(inválido)");
   return valid;
 }
 

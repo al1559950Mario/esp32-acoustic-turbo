@@ -24,6 +24,7 @@ void StateMachine::update(float mapLoadPercent,
                           float tpsPct,
                           bool consoleCalibReq,
                           bool bleCalibReq,
+                          bool hasCalibration,
                           const DebugManager &dbg) {
 
   if (current == SystemState::DEBUG) {
@@ -50,11 +51,17 @@ void StateMachine::update(float mapLoadPercent,
       if (consoleCalibReq || bleCalibReq) {
         current = SystemState::CALIBRATION;
         Serial.println("→ Transición: SIN_CALIBRAR → CALIBRATION");
+      } else if (hasCalibration) {
+        current = SystemState::OFF;
+        Serial.println("→ Transición: SIN_CALIBRAR → OFF (calibración detectada)");
       }
       break;
 
     case SystemState::CALIBRATION:
-      // Calibración externa, espera acción manual
+      if (hasCalibration) {
+        current = SystemState::OFF;
+        Serial.println("→ Transición: CALIBRATION → OFF");
+      }
       break;
 
     case SystemState::IDLE:
@@ -106,6 +113,11 @@ void StateMachine::update(float mapLoadPercent,
 
     case SystemState::DEBUG:
       break;
+    case SystemState::UNKNOWN:
+      Serial.println(">> Estado UNKNOWN detectado, reseteando a OFF");
+      current = SystemState::OFF;
+      break;
+
   }
 }
 

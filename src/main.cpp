@@ -96,6 +96,7 @@ void loop() {
       tpsPorcent,
       serialUI.getCalibRequest(),
       bleUI.getCalibRequest(),
+      calib.loadCalibration(), 
       debugMgr
     );
     fsm.handleActions();
