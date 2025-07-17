@@ -16,6 +16,7 @@ public:
   float readMAPVolts();
   float readTPSVolts();
   bool isTPSValid();
+  float readMAPLoadPercent();
 
   MAPSensor& getMAP();
   TPSSensor& getTPS();
@@ -24,6 +25,8 @@ public:
 private:
   MAPSensor mapSensor;
   TPSSensor tpsSensor;
+  float mapLoadPercent = 0.0f;  //
+
 
   float vacuum_inHg = 0;
   float tpsPercent  = 0;

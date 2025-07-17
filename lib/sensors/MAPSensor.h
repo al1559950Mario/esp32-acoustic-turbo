@@ -15,6 +15,7 @@ public:
   float convertRawToHg(uint16_t raw);
   void enableSimulation() { modoSimulacion = true; }
   void disableSimulation() { modoSimulacion = false; }
+  float readMAPLoadPercent();
 
 private:
   uint8_t _pin;

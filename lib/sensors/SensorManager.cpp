@@ -43,6 +43,10 @@ TPSSensor& SensorManager::getTPS() {
   return tpsSensor;
 }
 
+float SensorManager::readMAPLoadPercent() {
+  return mapLoadPercent;
+}
+
 
 void SensorManager::update() {
   // Usa los valores rápidos leídos por el ISR
@@ -51,4 +55,6 @@ void SensorManager::update() {
 
   vacuum_inHg = mapSensor.convertRawToHg(rawMAP);
   tpsPercent  = tpsSensor.convertRawToPercent(rawTPS);
+  mapLoadPercent = mapSensor.readMAPLoadPercent(); 
+
 }
