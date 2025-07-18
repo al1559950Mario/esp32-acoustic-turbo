@@ -55,7 +55,7 @@ public:
    */
   void update(float mapLoadPercent,
               float tpsPct,
-              bool consoleCalibReq,
+              bool serialCalibReq,
               bool bleCalibReq,
               bool hasCalibration,
               const DebugManager& dbg);

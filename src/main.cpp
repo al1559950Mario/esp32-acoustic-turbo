@@ -72,20 +72,19 @@ void loop() {
   serialUI.update();
   bleUI.update();
   debugMgr.updateFromSerial(Serial);
+  bool serialCalibReq = serialUI.getCalibRequest();  
+  bool bleCalibReq = bleUI.getCalibRequest();         
 
   bool sistemaActivo = serialUI.isSistemaActivo() || bleUI.isSistemaActivo();
+  static bool hasTriedLoad = false;
+  static bool hasCalibration = false;
 
-  if (!serialUI.isDeveloperMode()) {
-    //calib.loadDebugCalibration();  // Fuerza valores debug cada ciclo (opcional, o solo la primera vez)
-  } else {
-    static bool calibLoaded = false;
-    if (!calibLoaded) {
-      calibLoaded = calib.loadCalibration();
-      if (!calibLoaded) {
-        Serial.println(">> ATENCIÓN: calibración no cargada, requiere calibrar.");
-      }
-    }
+
+  if (!hasTriedLoad) {
+    hasCalibration = calib.loadCalibration();
+    hasTriedLoad = true;
   }
+
 
   if (sistemaActivo) {
     float mapLoad   = sensors.readMAPLoadPercent();
@@ -96,7 +95,7 @@ void loop() {
       tpsPorcent,
       serialUI.getCalibRequest(),
       bleUI.getCalibRequest(),
-      calib.loadCalibration(), 
+      hasCalibration, 
       debugMgr
     );
     fsm.handleActions();

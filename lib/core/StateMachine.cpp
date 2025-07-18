@@ -22,7 +22,7 @@ SystemState StateMachine::getState() const {
 
 void StateMachine::update(float mapLoadPercent,
                           float tpsPct,
-                          bool consoleCalibReq,
+                          bool serialCalibReq,
                           bool bleCalibReq,
                           bool hasCalibration,
                           const DebugManager &dbg) {
@@ -48,7 +48,7 @@ void StateMachine::update(float mapLoadPercent,
       break;
 
     case SystemState::SIN_CALIBRAR:
-      if (consoleCalibReq || bleCalibReq) {
+      if (serialCalibReq || bleCalibReq) {
         current = SystemState::CALIBRATION;
         Serial.println("→ Transición: SIN_CALIBRAR → CALIBRATION");
       } else if (hasCalibration) {
