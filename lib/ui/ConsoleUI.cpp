@@ -276,6 +276,7 @@ void ConsoleUI::runConsoleCalibration() {
   calib.runTPSCalibration(sensors->getTPS());
   calib.runMAPCalibration(sensors->getMAP());
   calib.saveCalibration();
+  calib.loadCalibration(); 
   Serial.println(">> Calibración completada.");
 }
 

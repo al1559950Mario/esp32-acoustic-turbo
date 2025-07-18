@@ -51,13 +51,14 @@ public:
    * @param tpsPct Lectura de TPS en porcentaje [0–100].
    * @param consoleCalibReq true si hubo petición de calibración por consola.
    * @param bleCalibReq true si hubo petición de calibración por BLE.
+   * @param calibLoaded true si la calibracion fue exitosa y hay valores validos para el sistema.
    * @param dbg Objeto DebugManager que puede forzar estado DEBUG.
    */
   void update(float mapLoadPercent,
               float tpsPct,
               bool consoleCalibReq,
               bool bleCalibReq,
-              bool hasCalibration,
+              bool calibLoaded,
               const DebugManager& dbg);
 
   /**

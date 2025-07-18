@@ -26,6 +26,8 @@ BLEConsoleUI       bleUI;
 CalibrationManager& calib = CalibrationManager::getInstance();
 DebugManager       debugMgr;
 ThresholdManager* thresholdManagerPtr;
+bool calibLoaded = false;
+
 
 void setup() {
   Serial.begin(115200); 
@@ -57,12 +59,12 @@ void setup() {
 
   // Estado inicial
   calib.begin();
-  bool hasCalib = calib.loadCalibration();
-  fsm.begin(hasCalib, &actuators, thresholdManagerPtr);
+  bool calibLoaded = calib.loadCalibration();
+  fsm.begin(calibLoaded, &actuators, thresholdManagerPtr);
 
   actuators.stopAll();
 
-  if (!hasCalib)
+  if (!calibLoaded)
     Serial.println("  Estado inicial: SIN_CALIBRAR (necesita calibración)");
   else
     Serial.println("  Estado inicial: OFF (calibración cargada)");
@@ -74,11 +76,10 @@ void loop() {
   debugMgr.updateFromSerial(Serial);
 
   bool sistemaActivo = serialUI.isSistemaActivo() || bleUI.isSistemaActivo();
-
   if (!serialUI.isDeveloperMode()) {
     //calib.loadDebugCalibration();  // Fuerza valores debug cada ciclo (opcional, o solo la primera vez)
   } else {
-    static bool calibLoaded = false;
+    //Comprobar calibracion en cada ciclo para evitar que se ejecute siempre.
     if (!calibLoaded) {
       calibLoaded = calib.loadCalibration();
       if (!calibLoaded) {
@@ -96,9 +97,10 @@ void loop() {
       tpsPorcent,
       serialUI.getCalibRequest(),
       bleUI.getCalibRequest(),
-      calib.loadCalibration(), 
+      calibLoaded, 
       debugMgr
     );
+    
     fsm.handleActions();
   } else {
     actuators.stopAll();
