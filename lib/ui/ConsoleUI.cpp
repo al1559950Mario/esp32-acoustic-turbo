@@ -273,8 +273,8 @@ void ConsoleUI::runConsoleCalibration() {
   Serial.println(">> Iniciando calibración…");
   auto& calib = CalibrationManager::getInstance();
   calib.clearCalibration();
-  calib.runTPSCalibration(sensors->getTPS(), simulacionActiva);
-  calib.runMAPCalibration(sensors->getMAP(), simulacionActiva);
+  calib.runTPSCalibration(*sensors, simulacionActiva);
+  calib.runMAPCalibration(*sensors, simulacionActiva);
   calib.saveCalibration();
   calib.loadCalibration(); 
   Serial.println(">> Calibración completada.");

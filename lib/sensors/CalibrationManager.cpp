@@ -132,7 +132,7 @@ void CalibrationManager::runMAPCalibration(SensorManager& sensors, bool simulaci
     voltsMax = sensors.representVoltsFromRaw(candidateMax);
 
 
-    Serial.printf("\r    Volts=%4u | candidatoMax=%4u", volts, voltsMax);
+    Serial.printf("\r    Volts=%.2f | candidatoMax=%.2f", volts, voltsMax);
     delay(200);
 
     if (!simulacionActiva && Serial.available()) {
@@ -162,7 +162,7 @@ void CalibrationManager::runMAPCalibration(SensorManager& sensors, bool simulaci
 
   uint16_t candidateMin = UINT16_MAX;
   raw = 0;
-  float volts = 0;
+  volts = 0;
   float voltsMin = 0;
   startTime = millis();
 
@@ -247,7 +247,7 @@ void CalibrationManager::runTPSCalibration(SensorManager& sensors, bool simulaci
 
   uint16_t candidateMax = 0;
   raw = 0;
-  float volts = 0;
+  volts = 0;
   float voltsMax = 0;
   startTime = millis();
 
