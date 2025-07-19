@@ -25,8 +25,8 @@ public:
   void clearCalibration();
 
   bool saveCalibration();         // guarda mapMin, mapMax, tpsMin, tpsMax
-  void runMAPCalibration(MAPSensor& sensor);
-  void runTPSCalibration(TPSSensor& sensor);
+  void runMAPCalibration(MAPSensor& sensor, bool simulacionActiva);
+  void runTPSCalibration(TPSSensor& sensor, bool simulacionActiva);
 
   uint16_t getMAPMin() const;
   uint16_t getMAPMax() const;

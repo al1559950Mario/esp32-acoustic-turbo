@@ -109,7 +109,7 @@ bool waitForEnter() {
 }
 
 // Captura en tiempo real el máximo y mínimo de MAP
-void CalibrationManager::runMAPCalibration(MAPSensor& sensor) {
+void CalibrationManager::runMAPCalibration(MAPSensor& sensor, bool simulacionActiva) {
   Serial.println(F("\n=== Calibración MAP (Max then Min) ==="));
   delay(500);
 
@@ -130,7 +130,7 @@ void CalibrationManager::runMAPCalibration(MAPSensor& sensor) {
     Serial.printf("\r    raw=%4u | candidatoMax=%4u", raw, candidateMax);
     delay(200);
 
-    if (Serial.available()) {
+    if (!simulacionActiva && Serial.available()) {
       String input = Serial.readStringUntil('\n');
       input.trim();
       if (input.length() == 0) break;
@@ -165,7 +165,7 @@ void CalibrationManager::runMAPCalibration(MAPSensor& sensor) {
     Serial.printf("\r    raw=%4u | candidatoMin=%4u", raw, candidateMin);
     delay(200);
 
-    if (Serial.available()) {
+    if (!simulacionActiva && Serial.available()) {
       String input = Serial.readStringUntil('\n');
       input.trim();
       if (input.length() == 0) break;
@@ -185,7 +185,7 @@ void CalibrationManager::runMAPCalibration(MAPSensor& sensor) {
 }
 
 // Captura en tiempo real TPS_MIN y TPS_MAX
-void CalibrationManager::runTPSCalibration(TPSSensor& sensor) {
+void CalibrationManager::runTPSCalibration(TPSSensor& sensor, bool simulacionActiva) {
   Serial.println(F("\n=== Calibración TPS (Min then Max) ==="));
   delay(500);
 
@@ -206,7 +206,7 @@ void CalibrationManager::runTPSCalibration(TPSSensor& sensor) {
     Serial.printf("\r    raw=%4u | candidatoMin=%4u", raw, candidateMin);
     delay(200);
 
-    if (Serial.available()) {
+    if (!simulacionActiva && Serial.available()) {
       String input = Serial.readStringUntil('\n');
       input.trim();
       if (input.length() == 0) break;
@@ -240,7 +240,7 @@ void CalibrationManager::runTPSCalibration(TPSSensor& sensor) {
     Serial.printf("\r    raw=%4u | candidatoMax=%4u", raw, candidateMax);
     delay(200);
 
-    if (Serial.available()) {
+    if (!simulacionActiva && Serial.available()) {
       String input = Serial.readStringUntil('\n');
       input.trim();
       if (input.length() == 0) break;
