@@ -47,6 +47,10 @@ float SensorManager::readMAPLoadPercent() {
   return mapLoadPercent;
 }
 
+float SensorManager::representVoltsFromRaw(uint16_t raw) const {
+  return (raw * 3.3f) / 4095.0f;
+}
+
 
 void SensorManager::update() {
   // Usa los valores rápidos leídos por el ISR
@@ -58,3 +62,4 @@ void SensorManager::update() {
   mapLoadPercent = mapSensor.readMAPLoadPercent(); 
 
 }
+

@@ -1,6 +1,5 @@
 #pragma once
-#include "MAPSensor.h"
-#include "TPSSensor.h"
+#include "SensorManager.h"
 #include <Preferences.h>
 
 enum class CalibStep {
@@ -25,8 +24,8 @@ public:
   void clearCalibration();
 
   bool saveCalibration();         // guarda mapMin, mapMax, tpsMin, tpsMax
-  void runMAPCalibration(MAPSensor& sensor, bool simulacionActiva);
-  void runTPSCalibration(TPSSensor& sensor, bool simulacionActiva);
+  void runMAPCalibration(SensorManager& sensorManager, bool simulacionActiva);
+  void runTPSCalibration(SensorManager& sensorManager, bool simulacionActiva);
 
   uint16_t getMAPMin() const;
   uint16_t getMAPMax() const;
