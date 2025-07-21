@@ -2,8 +2,6 @@
 #include <Arduino.h>
 #include "StateMachine.h"
 #include "SensorManager.h"
-#include "TurboController.h"
-#include "AcousticInjector.h"
 #include "ActuatorManager.h"  // Necesario para el puntero actuators
 
 class ConsoleUI {
@@ -13,7 +11,7 @@ public:
 
   virtual void setFSM(StateMachine* fsmRef);
   virtual void attachSensors(SensorManager* sensorManagerPtr);
-  virtual void attachActuators(ActuatorManager* actuatorManagerPtr);  // ✅ Corregido
+  virtual void attachActuators(ActuatorManager* actuatorManagerPtr);
 
   virtual bool getCalibRequest();
   virtual void runConsoleCalibration();
@@ -33,7 +31,7 @@ protected:
   bool sistemaActivo = true;
   StateMachine*      fsm = nullptr;
   SensorManager*     sensors = nullptr;
-  ActuatorManager*   actuators = nullptr;   // ✅ Ahora sí está declarado correctamente
+  ActuatorManager*   actuators = nullptr;  
 
   bool dashboardEnabled = true;
   bool consoleCalibRequested = false;

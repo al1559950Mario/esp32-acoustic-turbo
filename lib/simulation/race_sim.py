@@ -6,7 +6,7 @@ import msvcrt
 IDLE_RPM       = 800
 MAX_RPM        = 7000
 SHIFT_RPM      = 6200
-DT             = 0.4
+DT             = 0.3
 THROTTLE_STEP  = 0.09
 THROTTLE_DROP  = 0.2
 MAP_RISE_COEF  = 0.05
@@ -22,7 +22,7 @@ MAP_V_REBOTE   = 2.95
 
 GEAR_RATIOS    = [3.8, 2.2, 1.5, 1.0, 0.8]
 
-SERIAL_PORT    = "COM6"
+SERIAL_PORT    = "COM7"
 BAUDRATE       = 115200
 
 DEBUG_MODE     = False
@@ -34,6 +34,8 @@ gear     = 0
 idle_phase = True
 throttle_rebote = False
 idle_start = time.time()
+
+modo_envio_constante = 0  # 0=normal, 1=tps_min, 2=tps_max, 3=map_min, 4=map_max
 
 def volt_to_adc(volts):
     return int((volts / 3.3) * 4095)
@@ -53,8 +55,8 @@ def key_pressed():
             ch2 = msvcrt.getch()
             return ch + ch2  # Retornamos bytes doble para flechas
         else:
-            # Retornamos letra minúscula si es alfabeto
-            if ch.isalpha():
+            # Retornamos letra minúscula si es alfabeto o números para este caso
+            if ch.isalpha() or ch.isdigit():
                 return ch.decode('utf-8').lower()
     return None
 
@@ -75,6 +77,8 @@ def describir_map(volts):
         return "Atmósfera"
 
 print(">>> Controles: [↑] Acelera | [↓] Frena | [→] Sube marcha | [←] Baja marcha")
+print("Botones 1-4: Envío constante de umbrales (tps_min, tps_max, map_min, map_max)")
+print("Botón 5: Regresar a modo normal")
 print("Presiona letra para enviar comando al ESP32 (ej. 'z' para simulación)")
 print("Iniciando simulación de carrera...")
 
@@ -137,15 +141,50 @@ try:
                         throttle_rebote = True
                         print(f"\n<<< RETROCEDE A MARCHA {gear+1}, RPM ajustado a {rpm:.0f}")
             else:
-                # Si es letra, enviamos comando al ESP32
-                print(f"\n>>> Enviando comando: '{key}'")
-                if not DEBUG_MODE and ser:
-                    enviar_comando(ser, key)
+                # Botones 1-5 para enviar valores constantes
+                if key == '1':
+                    modo_envio_constante = 1
+                    print("\n>>> Enviando TPS_MIN constante")
+                elif key == '2':
+                    modo_envio_constante = 2
+                    print("\n>>> Enviando TPS_MAX constante")
+                elif key == '3':
+                    modo_envio_constante = 3
+                    print("\n>>> Enviando MAP_MIN constante")
+                elif key == '4':
+                    modo_envio_constante = 4
+                    print("\n>>> Enviando MAP_MAX constante")
+                elif key == '5':
+                    modo_envio_constante = 0
+                    print("\n>>> Regresando a modo normal")
+                else:
+                    # Si es letra, enviamos comando al ESP32
+                    print(f"\n>>> Enviando comando: '{key}'")
+                    if not DEBUG_MODE and ser:
+                        enviar_comando(ser, key)
 
-        # Valores simulados
+        # Valores simulados para envío normal (modo_envio_constante == 0)
         tps_v = TPS_V_OPEN + (TPS_V_CLOSED - TPS_V_OPEN) * throttle
+        map_adc_valor = map_v  # lo uso para el envío
+
+        # Defino los valores fijos para los umbrales (volts)
+        TPS_MIN_V = TPS_V_CLOSED
+        TPS_MAX_V = TPS_V_OPEN
+        MAP_MIN_V = MAP_V_IDLE
+        MAP_MAX_V = MAP_V_MAX
+
+        # Decide qué valores enviar según el modo de envío constante
+        if modo_envio_constante == 1:  # TPS_MIN
+            tps_v = TPS_MIN_V
+        elif modo_envio_constante == 2:  # TPS_MAX
+            tps_v = TPS_MAX_V
+        if modo_envio_constante == 3:  # MAP_MIN
+            map_adc_valor = MAP_MIN_V
+        elif modo_envio_constante == 4:  # MAP_MAX
+            map_adc_valor = MAP_MAX_V
+
         tps_adc = volt_to_adc(tps_v)
-        map_adc = volt_to_adc(map_v)
+        map_adc = volt_to_adc(map_adc_valor)
 
         if not DEBUG_MODE and ser:
             payload = f"tps_raw:{tps_adc},map_raw:{map_adc}\n"
@@ -158,7 +197,7 @@ try:
 
         hud = (
             f"\r[{elapsed:5.2f}s] Gear:{gear+1} | RPM:{rpm:5.0f} | Throttle:{throttle:.2f} | "
-            f"TPS:{tps_v:5.3f}V ({describir_tps(tps_v)}) | MAP:{map_v:5.3f}V ({describir_map(map_v)})   "
+            f"TPS:{tps_v:5.3f}V ({describir_tps(tps_v)}) | MAP:{map_adc_valor:5.3f}V ({describir_map(map_adc_valor)})   "
         )
         print(hud, end='', flush=True)
 

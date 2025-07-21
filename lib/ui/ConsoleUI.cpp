@@ -48,6 +48,7 @@ void ConsoleUI::update() {
   if (inputAvailable()) {
     String linea = readLine();
     linea.trim();
+    Serial.printf("[DEBUG] simulacionActiva = %s\n", simulacionActiva ? "true" : "false");
 
     if (simulacionActiva && linea.startsWith("tps_raw:")) {
       int idxTPS = linea.indexOf("tps_raw:");
@@ -103,10 +104,7 @@ void ConsoleUI::interpretarComando(char c) {
       break;
 
     case 'b':  // Iniciar inyección acústica (100%)
-      if (!developerMode) {
-        Serial.println("⚠️ Comando exclusivo del modo desarrollador.");
-        break;
-      }
+      if (!devOnly()) break;
       actuators->startAcoustic(1.0f);
       if (actuators->isAcousticOn())
         actuators->getAcousticInjector().test();
@@ -120,6 +118,7 @@ void ConsoleUI::interpretarComando(char c) {
     case 'd':  // Activar modo desarrollador
       developerMode = true;
       Serial.println(">> Modo desarrollador ACTIVADO.");
+      imprimirHelp();
       break;
 
     case 'i':  // Toggle relé inyector acústico (dev mode)
@@ -143,6 +142,7 @@ void ConsoleUI::interpretarComando(char c) {
       break;
 
     case 'r':  // Borrar calibración y poner FSM en estado sin calibrar
+      if (!devOnly()) break;
       CalibrationManager::getInstance().clearCalibration();
       if (fsm) {
         fsm->debugForceState(SystemState::SIN_CALIBRAR);
@@ -183,6 +183,7 @@ void ConsoleUI::interpretarComando(char c) {
       break;
 
     case 'x':  // Forzar estado IDLE en FSM
+      if (!devOnly()) break;
       if (fsm) {
         fsm->debugForceState(SystemState::IDLE);
         Serial.println(">> Paro manual: regresando a IDLE.");
@@ -193,9 +194,6 @@ void ConsoleUI::interpretarComando(char c) {
       if (!devOnly()) break;
 
       simulacionActiva = !simulacionActiva;
-
-      sensors->getTPS().setSimulatedRaw(0);
-      sensors->getMAP().setSimulatedRaw(0);
 
       if (simulacionActiva) {
         sensors->getTPS().enableSimulation();
@@ -277,7 +275,7 @@ void ConsoleUI::runConsoleCalibration() {
   calib.runMAPCalibration(sensors->getMAP());
   calib.saveCalibration();
   calib.loadCalibration(); 
-  Serial.println(">> Calibración completada.");
+  Serial.println(">> Calibración completada. Favor de reiniciar para aplicar cambios.");
 }
 
 void ConsoleUI::toggleSistema() {
@@ -303,9 +301,7 @@ void ConsoleUI::imprimirHelp() {
   Serial.println(F("  a  → Activar/Desactivar sistema completo (seguridad/falla)"));
   Serial.println(F("  c  → Ejecutar rutina de calibración de sensores"));
   Serial.println(F("  m  → Mostrar menú de comandos"));
-  Serial.println(F("  r  → Borrar calibración actual"));
   Serial.println(F("  s  → Activar/Desactivar dashboard del sistema"));
-  Serial.println(F("  x  → Paro manual, volver a IDLE"));
   Serial.println(F("  d  → Activar modo desarrollador"));
 
   if (developerMode) {
@@ -314,7 +310,9 @@ void ConsoleUI::imprimirHelp() {
     Serial.println(F("  i  → Activar relé INYECCIÓN_ACÚSTICA"));
     Serial.println(F("  t  → Activar relé TURBO"));
     Serial.println(F("  u  → (Comando dev pendiente)"));
+    Serial.println(F("  x  → Paro manual, volver a IDLE"));
     Serial.println(F("  v  → Visualizar curva TPS-MAP (pendiente desarrollo)"));
+    Serial.println(F("  r  → Borrar calibración actual"));
     Serial.println(F("  z  → Activar/Desactivar modo simulación"));
   }
 }
