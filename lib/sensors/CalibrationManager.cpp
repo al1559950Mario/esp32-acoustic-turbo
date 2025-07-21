@@ -109,7 +109,7 @@ bool waitForEnter() {
 }
 
 // Captura en tiempo real el máximo y mínimo de MAP
-void CalibrationManager::runMAPCalibration(MAPSensor& sensor) {
+void CalibrationManager::runMAPCalibration(SensorManager& sensors, bool simulacionActiva) {
   Serial.println(F("\n=== Calibración MAP (Max then Min) ==="));
   delay(500);
 
@@ -123,14 +123,19 @@ void CalibrationManager::runMAPCalibration(MAPSensor& sensor) {
   uint16_t candidateMax = 0;
   uint16_t raw = 0;
   unsigned long startTime = millis();
-
+  float volts = 0;
+  float voltsMax = 0;
   while (true) {
-    raw = sensor.readRaw();
+    raw = sensors.readMAPRaw();
     candidateMax = max(candidateMax, raw);
-    Serial.printf("\r    raw=%4u | candidatoMax=%4u", raw, candidateMax);
+    volts = sensors.representVoltsFromRaw(raw);
+    voltsMax = sensors.representVoltsFromRaw(candidateMax);
+
+
+    Serial.printf("\r    Volts=%.2f | candidatoMax=%.2f", volts, voltsMax);
     delay(200);
 
-    if (Serial.available()) {
+    if (!simulacionActiva && Serial.available()) {
       String input = Serial.readStringUntil('\n');
       input.trim();
       if (input.length() == 0) break;
@@ -145,7 +150,7 @@ void CalibrationManager::runMAPCalibration(MAPSensor& sensor) {
 
   delay(250);
   mapMax = candidateMax;
-  Serial.printf("\n✔ mapMax = %u\n", mapMax);
+  Serial.printf("\n✔ mapMax = %.2f\n", voltsMax);
   saveStep(CalibStep::MAP_MAX, mapMax);
 
   // 2) Captura MAP_MIN (motor en ralentí)
@@ -157,15 +162,20 @@ void CalibrationManager::runMAPCalibration(MAPSensor& sensor) {
 
   uint16_t candidateMin = UINT16_MAX;
   raw = 0;
+  volts = 0;
+  float voltsMin = 0;
   startTime = millis();
 
   while (true) {
-    raw = sensor.readRaw();
+    raw = sensors.readMAPRaw();
     candidateMin = min(candidateMin, raw);
-    Serial.printf("\r    raw=%4u | candidatoMin=%4u", raw, candidateMin);
+    volts = sensors.representVoltsFromRaw(raw);
+    voltsMin = sensors.representVoltsFromRaw(candidateMin);
+
+    Serial.printf("\r    Volts=%.2f | candidatoMin=%.2f", volts, voltsMin);
     delay(200);
 
-    if (Serial.available()) {
+    if (!simulacionActiva && Serial.available()) {
       String input = Serial.readStringUntil('\n');
       input.trim();
       if (input.length() == 0) break;
@@ -180,12 +190,12 @@ void CalibrationManager::runMAPCalibration(MAPSensor& sensor) {
 
   delay(250);
   mapMin = candidateMin;
-  Serial.printf("\n✔ mapMin = %u\n", mapMin);
+  Serial.printf("\n✔ mapMin = %.2f\n", voltsMin);
   saveStep(CalibStep::MAP_MIN, mapMin);
 }
 
 // Captura en tiempo real TPS_MIN y TPS_MAX
-void CalibrationManager::runTPSCalibration(TPSSensor& sensor) {
+void CalibrationManager::runTPSCalibration(SensorManager& sensors, bool simulacionActiva) {
   Serial.println(F("\n=== Calibración TPS (Min then Max) ==="));
   delay(500);
 
@@ -198,15 +208,20 @@ void CalibrationManager::runTPSCalibration(TPSSensor& sensor) {
 
   uint16_t candidateMin = UINT16_MAX;
   uint16_t raw = 0;
+  float volts = 0;
+  float voltsMin = 0;
   unsigned long startTime = millis();
 
   while (true) {
-    raw = sensor.readRaw();
+    raw = sensors.readTPSRaw();
     candidateMin = min(candidateMin, raw);
-    Serial.printf("\r    raw=%4u | candidatoMin=%4u", raw, candidateMin);
+    volts = sensors.representVoltsFromRaw(raw);
+    voltsMin = sensors.representVoltsFromRaw(candidateMin);
+
+    Serial.printf("\r    Volts=%.2f | candidatoMin=%.2f", volts, voltsMin);
     delay(200);
 
-    if (Serial.available()) {
+    if (!simulacionActiva && Serial.available()) {
       String input = Serial.readStringUntil('\n');
       input.trim();
       if (input.length() == 0) break;
@@ -220,7 +235,7 @@ void CalibrationManager::runTPSCalibration(TPSSensor& sensor) {
   while (Serial.available()) Serial.read();
   delay(250);
   tpsMin = candidateMin;
-  Serial.printf("\n✔ tpsMin = %u\n", tpsMin);
+  Serial.printf("\n✔ tpsMin = %.2f\n", voltsMin);
   saveStep(CalibStep::TPS_MIN, tpsMin);
 
   // 2) TPS_MAX (pedal a fondo)
@@ -232,15 +247,19 @@ void CalibrationManager::runTPSCalibration(TPSSensor& sensor) {
 
   uint16_t candidateMax = 0;
   raw = 0;
+  volts = 0;
+  float voltsMax = 0;
   startTime = millis();
 
   while (true) {
-    raw = sensor.readRaw();
+    raw = sensors.readTPSRaw();
     candidateMax = max(candidateMax, raw);
-    Serial.printf("\r    raw=%4u | candidatoMax=%4u", raw, candidateMax);
+    volts = sensors.representVoltsFromRaw(raw);
+    voltsMax = sensors.representVoltsFromRaw(candidateMax);
+    Serial.printf("\r    Volts=%.2f | candidatoMax=%.2f", volts, voltsMax);
     delay(200);
 
-    if (Serial.available()) {
+    if (!simulacionActiva && Serial.available()) {
       String input = Serial.readStringUntil('\n');
       input.trim();
       if (input.length() == 0) break;
@@ -255,7 +274,7 @@ void CalibrationManager::runTPSCalibration(TPSSensor& sensor) {
 
   delay(250);
   tpsMax = candidateMax;
-  Serial.printf("\n✔ tpsMax = %u\n", tpsMax);
+  Serial.printf("\n✔ tpsMax = %.2f\n", voltsMax);
   saveStep(CalibStep::TPS_MAX, tpsMax);
 
   Serial.printf("\n✅ Calibración TPS completada: min=%u, max=%u\n\n", tpsMin, tpsMax);

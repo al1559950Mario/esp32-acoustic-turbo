@@ -17,6 +17,8 @@ public:
   float readTPSVolts();
   bool isTPSValid();
   float readMAPLoadPercent();
+  float representVoltsFromRaw(uint16_t raw) const;
+
 
   MAPSensor& getMAP();
   TPSSensor& getTPS();
