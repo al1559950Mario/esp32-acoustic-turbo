@@ -2,7 +2,7 @@
 #include <Arduino.h>
 #include "StateMachine.h"
 #include "SensorManager.h"
-#include "ActuatorManager.h"  // Necesario para el puntero actuators
+#include "ActuatorManager.h" 
 
 class ConsoleUI {
 public:

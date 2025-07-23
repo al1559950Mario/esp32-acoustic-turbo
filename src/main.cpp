@@ -4,8 +4,9 @@
 #include "DebugManager.h"
 #include "ActuatorManager.h"
 #include "SensorManager.h"
-#include "SerialConsoleUI.h"
-#include "BLEConsoleUI.h"
+#include "USBSerialConsoleUI.h"
+#include "BluetoothSerialConsoleUI.h"
+#include <BluetoothSerial.h>
 #include "ThresholdManager.h"
 
 
@@ -21,8 +22,10 @@ constexpr uint8_t PIN_DAC_ACOUSTIC    = 25;
 StateMachine       fsm;
 SensorManager      sensors;
 ActuatorManager    actuators;
-SerialConsoleUI    serialUI;
-BLEConsoleUI       bleUI;
+ConsoleUI* ui = nullptr;
+USBSerialConsoleUI usbConsoleUI;
+BluetoothSerialConsoleUI btConsoleUI;
+BluetoothSerial SerialBT;
 CalibrationManager& calib = CalibrationManager::getInstance();
 DebugManager       debugMgr;
 ThresholdManager* thresholdManagerPtr;
@@ -30,31 +33,29 @@ bool calibLoaded = false;
 
 
 void setup() {
-  Serial.begin(115200); 
-  delay(100);
-  Serial.println(">> Iniciando sistema turbo-acústico");
-
   // Inicializar sensores y actuadores
   sensors.begin(PIN_MAP, PIN_TPS);
   actuators.begin(PIN_RELAY_TURBO, PIN_DAC_ACOUSTIC, PIN_RELAY_ACOUSTIC);
 
   // Iniciar UI Serial USB
-  serialUI.begin();
-  serialUI.setFSM(&fsm);
-  serialUI.attachSensors(&sensors);
-  serialUI.attachActuators(&actuators);
-  serialUI.imprimirDashboard();
+  usbConsoleUI.begin();
+  usbConsoleUI.setFSM(&fsm);
+  usbConsoleUI.attachSensors(&sensors);
+  usbConsoleUI.attachActuators(&actuators);
+  usbConsoleUI.imprimirDashboard();
 
   // Iniciar UI Bluetooth Serial clásico
-  bleUI.begin();
-  bleUI.setFSM(&fsm);
-  bleUI.attachSensors(&sensors);
-  bleUI.attachActuators(&actuators);
-  bleUI.imprimirDashboard();
+  SerialBT.setPin("0000");  // Opcional
+  btConsoleUI.begin();
+  btConsoleUI.setFSM(&fsm);
+  btConsoleUI.attachSensors(&sensors);
+  btConsoleUI.attachActuators(&actuators);
+  btConsoleUI.imprimirDashboard();
 
-  serialUI.setMirror(&bleUI);
-  bleUI.setMirror(&serialUI);
+  usbConsoleUI.setMirror(&btConsoleUI);
+  btConsoleUI.setMirror(&usbConsoleUI);
 
+  ui = &usbConsoleUI;
 
 
   // Estado inicial
@@ -71,13 +72,26 @@ void setup() {
 }
 
 void loop() {
-  serialUI.update();
-  bleUI.update();
-  debugMgr.updateFromSerial(Serial);
-  bool serialCalibReq = serialUI.getCalibRequest();  
-  bool bleCalibReq = bleUI.getCalibRequest();         
+  static bool clientePrevio = false;
+  bool clienteActual = SerialBT.hasClient();
 
-  bool sistemaActivo = serialUI.isSistemaActivo() || bleUI.isSistemaActivo();
+  // Cambiar la UI activa si cambia el estado de conexión BT
+  if (clienteActual && !clientePrevio) {
+    Serial.println("→ Cliente Bluetooth conectado. Cambiando a BLE UI.");
+    ui = &btConsoleUI;
+  } else if (!clienteActual && clientePrevio) {
+    Serial.println("→ Cliente Bluetooth desconectado. Volviendo a Serial UI.");
+    ui = &usbConsoleUI;
+  }
+  clientePrevio = clienteActual;
+
+  // Solo una UI activa recibe update
+  ui->update();
+  debugMgr.updateFromSerial(Serial);
+  //bool serialCalibReq = usbConsoleUI.getCalibRequest();  
+  //bool bleCalibReq = btConsoleUI.getCalibRequest();         
+
+  bool sistemaActivo = usbConsoleUI.isSistemaActivo() || btConsoleUI.isSistemaActivo();
   static bool hasTriedLoad = false;
   static bool hasCalibration = false;
 
@@ -95,8 +109,8 @@ void loop() {
     fsm.update(
       mapLoad,
       tpsPorcent,
-      serialUI.getCalibRequest(),
-      bleUI.getCalibRequest(),
+      usbConsoleUI.getCalibRequest(),
+      btConsoleUI.getCalibRequest(),
       hasCalibration, 
       debugMgr
     );

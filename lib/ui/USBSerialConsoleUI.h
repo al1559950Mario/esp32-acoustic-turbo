@@ -1,7 +1,7 @@
 #pragma once
 #include "ConsoleUI.h"
 
-class SerialConsoleUI : public ConsoleUI {
+class USBSerialConsoleUI : public ConsoleUI {
 public:
   void begin() override;
   void update() override;

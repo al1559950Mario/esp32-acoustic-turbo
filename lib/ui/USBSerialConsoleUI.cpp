@@ -1,36 +1,36 @@
-#include "SerialConsoleUI.h"
+#include "USBSerialConsoleUI.h"
 #include <stdarg.h>
 
-void SerialConsoleUI::begin() {
+void USBSerialConsoleUI::begin() {
   Serial.begin(115200);
   while (!Serial);
   Serial.println("\n=== Consola Turbo-Acústica Iniciada ===");
   imprimirHelp();
 }
 
-void SerialConsoleUI::update() {
+void USBSerialConsoleUI::update() {
   ConsoleUI::update();
 }
 
-bool SerialConsoleUI::inputAvailable() {
+bool USBSerialConsoleUI::inputAvailable() {
   return Serial.available() > 0;
 }
 
-String SerialConsoleUI::readLine() {
+String USBSerialConsoleUI::readLine() {
   return Serial.readStringUntil('\n');
 }
 
-void SerialConsoleUI::print(const String& msg) {
+void USBSerialConsoleUI::print(const String& msg) {
   Serial.print(msg);
   if (mirror) mirror->print(msg);
 }
 
-void SerialConsoleUI::println(const String& msg) {
+void USBSerialConsoleUI::println(const String& msg) {
   Serial.println(msg);
   if (mirror) mirror->println(msg);
 }
 
-void SerialConsoleUI::printf(const char* fmt, ...) {
+void USBSerialConsoleUI::printf(const char* fmt, ...) {
   char buf[256];
   va_list args;
   va_start(args, fmt);

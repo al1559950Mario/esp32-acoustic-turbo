@@ -2,10 +2,10 @@
 #include "ConsoleUI.h"
 #include <BluetoothSerial.h>
 
-class BLEConsoleUI : public ConsoleUI {
+class BluetoothSerialConsoleUI : public ConsoleUI {
 public:
-  BLEConsoleUI();
-  ~BLEConsoleUI();
+  BluetoothSerialConsoleUI();
+  ~BluetoothSerialConsoleUI();
 
   void begin() override;
   void update() override;
