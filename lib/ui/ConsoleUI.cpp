@@ -201,10 +201,25 @@ void ConsoleUI::interpretarComando(char c) {
 
       this->printf(">> Modo simulación %s.\n", simulacionActiva ? "ACTIVADO" : "DESACTIVADO");
       break;
+    case 'k':  // Verificar valores de sensores
+      if (!devOnly()) break;
 
+      this->printf("== DEBUG Sensores ==\n");
+
+      this->printf("TPS: raw=%d, volts=%.2f, %%=%.1f%%\n",
+                  sensors->getTPS().readRaw(),
+                  sensors->getTPS().readVolts(),
+                  sensors->getTPS().readPorcent());
+
+      this->printf("MAP: raw=%d, volts=%.2f\n",
+                  sensors->getMAP().readRaw(),
+                  sensors->getMAP().readVolts());
+      break;
     default:
       this->print("❓ Comando no reconocido: ");
       this->println(String(c));
+
+
   }
 }
 

@@ -2,6 +2,7 @@
 #include "CalibrationManager.h"
 #include "driver/adc.h"
 #include "ADCUtils.h"  // si usas utilidades ADC específicas
+#include "ConsoleUI.h"
 
 void TPSSensor::begin(uint8_t analogPin) {
   _pin = analogPin;
@@ -10,6 +11,8 @@ void TPSSensor::begin(uint8_t analogPin) {
 
 uint16_t TPSSensor::readRaw() {
   if (modoSimulacion) {
+    Serial.println("[DEBUG] TPS en modo simulación");
+
     return rawSimulado;
   }
   if (_pin == 0xFF) {

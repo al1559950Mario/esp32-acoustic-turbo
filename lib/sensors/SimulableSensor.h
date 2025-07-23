@@ -8,6 +8,7 @@ protected:
 
 public:
   void setSimulatedRaw(uint16_t r) {
+    modoSimulacion = true;
     rawSimulado = r;
   }
 
