@@ -93,6 +93,7 @@ void ConsoleUI::interpretarComando(char c) {
     }
     return true;
   };
+  tiempoProximaImpresionHUD = millis() + 5000;
 
   switch (c) {
     case 'a':  // Toggle sistema ON/OFF
@@ -225,6 +226,9 @@ void ConsoleUI::interpretarComando(char c) {
 
 void ConsoleUI::imprimirDashboard() {
   if (!fsm || !sensors || !actuators) return;  // seguridad
+  if (millis() < tiempoProximaImpresionHUD) return;
+
+  this->println(""); // fuerza salto de línea previo
 
   float tpsV = sensors->getTPS().readVolts();
   float mapV = sensors->getMAP().readVolts();

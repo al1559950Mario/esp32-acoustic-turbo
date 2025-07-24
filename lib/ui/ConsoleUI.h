@@ -39,6 +39,8 @@ protected:
   bool simulacionActiva = false;
 
   unsigned long lastTransitionMS = 0;
+  unsigned long tiempoProximaImpresionHUD = 0;
+
   SystemState lastState = SystemState::OFF;
 
   
