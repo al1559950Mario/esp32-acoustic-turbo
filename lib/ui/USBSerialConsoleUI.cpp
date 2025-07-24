@@ -22,12 +22,14 @@ String USBSerialConsoleUI::readLine() {
 
 void USBSerialConsoleUI::print(const String& msg) {
   Serial.print(msg);
-  if (mirror) mirror->print(msg);
+  if (mirror && this == *ui) 
+    mirror->print(msg);
 }
 
 void USBSerialConsoleUI::println(const String& msg) {
   Serial.println(msg);
-  if (mirror) mirror->println(msg);
+    if (mirror && this == *ui) 
+      mirror->println(msg);
 }
 
 void USBSerialConsoleUI::printf(const char* fmt, ...) {
@@ -37,5 +39,6 @@ void USBSerialConsoleUI::printf(const char* fmt, ...) {
   vsnprintf(buf, sizeof(buf), fmt, args);
   va_end(args);
   Serial.print(buf);
-  if (mirror) mirror->print(buf);
+  if (mirror && this == *ui) 
+    mirror->print(buf);
 }

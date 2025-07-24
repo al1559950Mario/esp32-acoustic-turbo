@@ -18,7 +18,7 @@ void BluetoothSerialConsoleUI::begin() {
 }
 
 void BluetoothSerialConsoleUI::update() {
-  // Detecta cambio de estado de conexión y muestra mensaje solo al cambiar
+  // Detectar cambios de conexión para mostrar mensajes (puedes guardarlos en un flag para imprimir en update base)
   bool clienteActual = SerialBT.hasClient();
 
   if (clienteActual && !clientePrevio) {
@@ -29,19 +29,10 @@ void BluetoothSerialConsoleUI::update() {
   }
   clientePrevio = clienteActual;
 
-  // Si hay cliente, lee y procesa datos
-  if (clienteActual) {
-    while (SerialBT.available()) {
-      char c = SerialBT.read();
-      //Serial.write(c);   // muestra en monitor serie USB
-      SerialBT.write(c); // eco para el cliente Bluetooth
-
-      // Aquí puedes procesar el caracter 'c' para comandos o control
-    }
-  }
-
-  ConsoleUI::update();  // Si quieres mantener lógica base
+  // Solo llamar a la base para procesar comandos y línea completa
+  ConsoleUI::update();
 }
+
 
 bool BluetoothSerialConsoleUI::inputAvailable() {
   return SerialBT.available() > 0;
@@ -53,12 +44,14 @@ String BluetoothSerialConsoleUI::readLine() {
 
 void BluetoothSerialConsoleUI::print(const String& msg) {
   SerialBT.print(msg);
-  if (mirror) mirror->print(msg);
+    if (mirror && this == *ui) 
+      mirror->print(msg);
 }
 
 void BluetoothSerialConsoleUI::println(const String& msg) {
   SerialBT.println(msg);
-  if (mirror) mirror->println(msg);
+    if (mirror && this == *ui) 
+      mirror->println(msg);
 }
 
 void BluetoothSerialConsoleUI::printf(const char* fmt, ...) {
@@ -68,6 +61,8 @@ void BluetoothSerialConsoleUI::printf(const char* fmt, ...) {
   vsnprintf(buf, sizeof(buf), fmt, args);
   va_end(args);
   SerialBT.print(buf);
+  if (mirror && this == *ui) 
+    mirror->print(buf);
   if (mirror) mirror->print(buf);
 }
 

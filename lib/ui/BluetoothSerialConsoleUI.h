@@ -4,6 +4,8 @@
 
 class BluetoothSerialConsoleUI : public ConsoleUI {
 public:
+  BluetoothSerialConsoleUI(ConsoleUI** uiPtr) : ui(uiPtr) {}//
+
   BluetoothSerialConsoleUI();
   ~BluetoothSerialConsoleUI();
 
@@ -18,6 +20,7 @@ public:
   bool isSistemaActivo();  // Retorna true si hay cliente Bluetooth conectado
 
 private:
+  ConsoleUI** ui;  // puntero al puntero global ui
   BluetoothSerial SerialBT;
   bool clientePrevio = false;
 };

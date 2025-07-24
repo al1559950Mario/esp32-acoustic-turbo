@@ -23,8 +23,8 @@ StateMachine       fsm;
 SensorManager      sensors;
 ActuatorManager    actuators;
 ConsoleUI* ui = nullptr;
-USBSerialConsoleUI usbConsoleUI;
-BluetoothSerialConsoleUI btConsoleUI;
+USBSerialConsoleUI usbConsoleUI(&ui);
+BluetoothSerialConsoleUI btConsoleUI(&ui);
 BluetoothSerial SerialBT;
 CalibrationManager& calib = CalibrationManager::getInstance();
 DebugManager       debugMgr;
@@ -56,6 +56,9 @@ void setup() {
   btConsoleUI.setMirror(&usbConsoleUI);
 
   ui = &usbConsoleUI;
+
+  esp_log_level_set("*", ESP_LOG_WARN);  // Silencia todos los módulos, solo muestra WARN o superior
+
 
 
   // Estado inicial
