@@ -45,7 +45,7 @@ void setup() {
   usbConsoleUI.imprimirDashboard();
 
   // Iniciar UI Bluetooth Serial clásico
-  SerialBT.setPin("0000");  // Opcional
+  //SerialBT.setPin("0000");  // Opcional
   btConsoleUI.begin();
   btConsoleUI.setFSM(&fsm);
   btConsoleUI.attachSensors(&sensors);
