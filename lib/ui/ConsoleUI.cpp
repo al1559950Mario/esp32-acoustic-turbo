@@ -43,6 +43,8 @@ void ConsoleUI::update() {
 
   if (inputAvailable()) {
     String linea = readLine();
+    this->println("[DEBUG] Línea recibida cruda: " + linea);
+
     linea.trim();
     this->printf("[DEBUG] simulacionActiva = %s\n", simulacionActiva ? "true" : "false");
 

@@ -8,6 +8,8 @@ protected:
 
 public:
   void setSimulatedRaw(uint16_t r) {
+    Serial.printf("[DEBUG] setSimulatedRaw() desde %p cambia de %d a %d\n", this, rawSimulado, r);
+
     modoSimulacion = true;
     rawSimulado = r;
   }
