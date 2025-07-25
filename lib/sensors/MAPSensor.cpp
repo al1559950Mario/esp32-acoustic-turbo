@@ -11,6 +11,8 @@ uint16_t MAPSensor::readRaw() {
     return rawSimulado;
   }
   return analogRead(_pin);
+
+
 }
 
 float MAPSensor::readNormalized() {
@@ -31,6 +33,13 @@ float MAPSensor::readVacuum_inHg() {
 }
 
 float MAPSensor::readVolts() const {
+  if (modoSimulacion) {
+    //Serial.println("[MAP] Leyendo valor simulado");
+    //Serial.printf("[MAP] Leyendo valor simulado: %u raw -> %.2f V\n", rawSimulado, (rawSimulado * 3.3f) / 4095.0f);
+
+
+    return (rawSimulado * 3.3f) / 4095.0f;
+  }
   uint16_t raw = analogRead(_pin);
   return (raw * 3.3f) / 4095.0f;
 }

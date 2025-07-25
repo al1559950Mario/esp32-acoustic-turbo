@@ -6,7 +6,7 @@ import msvcrt
 IDLE_RPM       = 800
 MAX_RPM        = 7000
 SHIFT_RPM      = 6200
-DT             = 0.3
+DT             = 0.1
 THROTTLE_STEP  = 0.09
 THROTTLE_DROP  = 0.2
 MAP_RISE_COEF  = 0.05
@@ -144,16 +144,16 @@ try:
                 # Botones 1-5 para enviar valores constantes
                 if key == '1':
                     modo_envio_constante = 1
-                    print("\n>>> Enviando TPS_MIN constante")
+                    print("\n>>>\n TPS_MIN\n")
                 elif key == '2':
                     modo_envio_constante = 2
-                    print("\n>>> Enviando TPS_MAX constante")
+                    print("\n>>>\n TPS_MAX \n")
                 elif key == '3':
                     modo_envio_constante = 3
-                    print("\n>>> Enviando MAP_MIN constante")
+                    print("\n>>>\n  MAP_MIN \n")
                 elif key == '4':
                     modo_envio_constante = 4
-                    print("\n>>> Enviando MAP_MAX constante")
+                    print("\n>>>\n  MAP_MAX \n")
                 elif key == '5':
                     modo_envio_constante = 0
                     print("\n>>> Regresando a modo normal")
@@ -194,12 +194,14 @@ try:
                 linea_respuesta = ser.readline().decode('utf-8', errors='ignore').strip()
                 if linea_respuesta:
                     print(f"\n<<< ESP32 responde: {linea_respuesta}")
+                    #time.sleep(0.01)  # Espera 550 ms tras recibir algo
+
 
         hud = (
             f"\r[{elapsed:5.2f}s] Gear:{gear+1} | RPM:{rpm:5.0f} | Throttle:{throttle:.2f} | "
             f"TPS:{tps_v:5.3f}V ({describir_tps(tps_v)}) | MAP:{map_adc_valor:5.3f}V ({describir_map(map_adc_valor)})   "
         )
-        print(hud, end='', flush=True)
+        #print(hud, end='', flush=True)
 
         time.sleep(DT)
 

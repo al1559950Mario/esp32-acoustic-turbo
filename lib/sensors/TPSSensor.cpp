@@ -44,8 +44,8 @@ float TPSSensor::readPorcent() {
 
 float TPSSensor::readVolts() {
   if (modoSimulacion) {
-    Serial.println("[TPS] Leyendo valor simulado");
-    Serial.printf("[TPS] Leyendo valor simulado: %u raw -> %.2f V\n", rawSimulado, (rawSimulado * 3.3f) / 4095.0f);
+    //Serial.println("[TPS] Leyendo valor simulado");
+    //Serial.printf("[TPS] Leyendo valor simulado: %u raw -> %.2f V\n", rawSimulado, (rawSimulado * 3.3f) / 4095.0f);
 
 
     return (rawSimulado * 3.3f) / 4095.0f;

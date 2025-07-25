@@ -43,10 +43,10 @@ void ConsoleUI::update() {
 
   if (inputAvailable()) {
     String linea = readLine();
-    this->println("[DEBUG] Línea recibida cruda: " + linea);
+    //this->println("[DEBUG] Línea recibida cruda: " + linea);
 
     linea.trim();
-    this->printf("[DEBUG] simulacionActiva = %s\n", simulacionActiva ? "true" : "false");
+    //this->printf("[DEBUG] simulacionActiva = %s\n", simulacionActiva ? "true" : "false");
 
     if (simulacionActiva && linea.startsWith("tps_raw:")) {
       int idxTPS = linea.indexOf("tps_raw:");
@@ -59,7 +59,7 @@ void ConsoleUI::update() {
         sensors->getTPS().setSimulatedRaw(tpsRaw);
         sensors->getMAP().setSimulatedRaw(mapRaw);
 
-        this->println("Recibido tps=" + String(tpsRaw) + " map=" + String(mapRaw));
+        //this->println("Recibido tps=" + String(tpsRaw) + " map=" + String(mapRaw));
       }
     } else if (linea.length() == 1) {
       interpretarComando(linea.charAt(0));
