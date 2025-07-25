@@ -73,6 +73,17 @@ float MAPSensor::convertRawToHg(uint16_t raw) {
   return vacMin + norm * (vacMax - vacMin);
 }
 
+float MAPSensor::convertRawToPercent(uint16_t raw) {
+  uint16_t min = CalibrationManager::getInstance().getMAPMin();
+  uint16_t max = CalibrationManager::getInstance().getMAPMax();
+
+  if (max <= min || raw < min || raw > max) return 0.0f;
+
+  float norm = (float)(raw - min) / (max - min);
+  return constrain(norm, 0.0f, 1.0f) * 100.0f;
+}
+
+
 float MAPSensor::readMAPLoadPercent() {
   uint16_t raw = readRaw();
   uint16_t min = CalibrationManager::getInstance().getMAPMin();  // vacío máximo (ralentí)

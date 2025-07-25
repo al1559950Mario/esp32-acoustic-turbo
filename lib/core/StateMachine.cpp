@@ -21,7 +21,7 @@ SystemState StateMachine::getState() const {
 }
 
 void StateMachine::update(float mapLoadPercent,
-                          float tpsPct,
+                          float tpsLoadPercent,
                           bool serialCalibReq,
                           bool bleCalibReq,
                           bool calibLoaded,
@@ -36,7 +36,7 @@ void StateMachine::update(float mapLoadPercent,
     thresholds = thresholdManager->getThresholds();
   }
 
-  currentLevel = 0.9f * currentLevel + 0.1f * (tpsPct / 100.0f);
+  currentLevel = 0.9f * currentLevel + 0.1f * (tpsLoadPercent / 100.0f);
 
   switch (current) {
 
@@ -65,7 +65,7 @@ void StateMachine::update(float mapLoadPercent,
       break;
 
     case SystemState::IDLE:
-      if (readyForInjection(tpsPct, mapLoadPercent)) {
+      if (readyForInjection(tpsLoadPercent, mapLoadPercent)) {
         current = SystemState::INYECCION_ACUSTICA;
         if (!actuators->isAcousticOn()) {
           actuators->startAcoustic(currentLevel);
@@ -75,12 +75,12 @@ void StateMachine::update(float mapLoadPercent,
       break;
 
     case SystemState::INYECCION_ACUSTICA:
-      if (tpsPct >= thresholds.TURBO_TPS_ON && mapLoadPercent >= thresholds.TURBO_MAP_ON) {
+      if (tpsLoadPercent >= thresholds.TURBO_TPS_ON && mapLoadPercent >= thresholds.TURBO_MAP_ON) {
         current = SystemState::TURBO;
         actuators->startTurbo();
         Serial.println("→ Transición: INYECCION_ACUSTICA → TURBO");
       }
-      else if (tpsPct <= thresholds.INJ_TPS_OFF || mapLoadPercent <= thresholds.INJ_MAP_OFF) {
+      else if (tpsLoadPercent <= thresholds.INJ_TPS_OFF || mapLoadPercent <= thresholds.INJ_MAP_OFF) {
         current = SystemState::IDLE;
         actuators->stopAcoustic();
         Serial.println("→ Transición: INYECCION_ACUSTICA → IDLE");
@@ -88,7 +88,7 @@ void StateMachine::update(float mapLoadPercent,
       break;
 
     case SystemState::TURBO:
-      if (tpsPct < thresholds.TURBO_TPS_OFF) {
+      if (tpsLoadPercent < thresholds.TURBO_TPS_OFF) {
         current = SystemState::DESCAYENDO;
         actuators->stopAcoustic();
         actuators->stopTurbo();
@@ -97,14 +97,14 @@ void StateMachine::update(float mapLoadPercent,
       break;
 
     case SystemState::DESCAYENDO:
-      if (readyForInjection(tpsPct, mapLoadPercent)) {
+      if (readyForInjection(tpsLoadPercent, mapLoadPercent)) {
         current = SystemState::INYECCION_ACUSTICA;
         if (!actuators->isAcousticOn()) {
           actuators->startAcoustic(currentLevel);
         }
         Serial.println("→ Transición: DESCAYENDO → INYECCION_ACUSTICA");
       }
-      else if (tpsPct <= thresholds.INJ_TPS_OFF || mapLoadPercent <= thresholds.INJ_MAP_OFF) {
+      else if (tpsLoadPercent <= thresholds.INJ_TPS_OFF || mapLoadPercent <= thresholds.INJ_MAP_OFF) {
         current = SystemState::IDLE;
         actuators->stopAcoustic();
         Serial.println("→ Transición: DESCAYENDO → IDLE");

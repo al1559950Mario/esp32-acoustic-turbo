@@ -13,6 +13,7 @@ public:
   float readVolts() const;
   uint16_t readRawISR();
   float convertRawToHg(uint16_t raw);
+  float convertRawToPercent(uint16_t raw);
   void enableSimulation() { modoSimulacion = true; }
   void disableSimulation() { modoSimulacion = false; }
   float readMAPLoadPercent();

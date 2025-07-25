@@ -57,9 +57,19 @@ void SensorManager::update() {
   uint16_t rawMAP = ISRManager::getInstance()->getCachedMAPRaw();
   uint16_t rawTPS = ISRManager::getInstance()->getCachedTPSRaw();
 
-  vacuum_inHg = mapSensor.convertRawToHg(rawMAP);
+  mapLoadPercent = mapSensor.convertRawToPercent(rawMAP);
+  //mapLoadPercent = mapSensor.readMAPLoadPercent();
   tpsPercent  = tpsSensor.convertRawToPercent(rawTPS);
-  mapLoadPercent = mapSensor.readMAPLoadPercent(); 
-
 }
 
+void SensorManager::enableSimulacion() {
+  simulacionActiva = true;
+  mapSensor.enableSimulation();  
+  tpsSensor.enableSimulation();
+}
+
+void SensorManager::disableSimulacion() {
+  simulacionActiva = false;
+  mapSensor.disableSimulation();
+  tpsSensor.disableSimulation();
+}

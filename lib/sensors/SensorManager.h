@@ -18,6 +18,9 @@ public:
   bool isTPSValid();
   float readMAPLoadPercent();
   float representVoltsFromRaw(uint16_t raw) const;
+  void enableSimulacion();
+  void disableSimulacion();
+  bool isSimulacionActiva() const { return simulacionActiva; }
 
 
   MAPSensor& getMAP();
@@ -28,6 +31,8 @@ private:
   MAPSensor mapSensor;
   TPSSensor tpsSensor;
   float mapLoadPercent = 0.0f;  //
+  bool simulacionActiva = false;
+
 
 
   float vacuum_inHg = 0;
