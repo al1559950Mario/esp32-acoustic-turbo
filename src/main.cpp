@@ -107,7 +107,7 @@ void loop() {
 
   if (sistemaActivo) {
     float mapLoad   = sensors.readMAPLoadPercent();
-    float tpsPorcent  = sensors.readTPSPercent();
+    float tpsPorcent  = sensors.readLoadTPSPercent();
 
     fsm.update(
       mapLoad,

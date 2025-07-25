@@ -11,8 +11,8 @@ float SensorManager::readVacuum_inHg() {
   return vacuum_inHg;
 }
 
-float SensorManager::readTPSPercent() {
-  return tpsPercent;
+float SensorManager::readLoadTPSPercent() {
+  return tpsLoadPercent;
 }
 
 uint16_t SensorManager::readMAPRaw() {
@@ -53,14 +53,19 @@ float SensorManager::representVoltsFromRaw(uint16_t raw) const {
 
 
 void SensorManager::update() {
-  // Usa los valores rápidos leídos por el ISR
-  uint16_t rawMAP = ISRManager::getInstance()->getCachedMAPRaw();
-  uint16_t rawTPS = ISRManager::getInstance()->getCachedTPSRaw();
+  // Determina si estás en simulación para cada sensor
+  uint16_t rawMAP = mapSensor.isSimulationActive()
+                      ? mapSensor.getSimulatedRaw()
+                      : ISRManager::getInstance()->getCachedMAPRaw();
+
+  uint16_t rawTPS = tpsSensor.isSimulationActive()
+                      ? tpsSensor.getSimulatedRaw()
+                      : ISRManager::getInstance()->getCachedTPSRaw();
 
   mapLoadPercent = mapSensor.convertRawToPercent(rawMAP);
-  //mapLoadPercent = mapSensor.readMAPLoadPercent();
-  tpsPercent  = tpsSensor.convertRawToPercent(rawTPS);
+  tpsLoadPercent = tpsSensor.convertRawToPercent(rawTPS);
 }
+
 
 void SensorManager::enableSimulacion() {
   simulacionActiva = true;

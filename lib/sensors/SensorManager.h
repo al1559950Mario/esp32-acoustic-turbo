@@ -10,7 +10,7 @@ public:
   void begin(uint8_t pinMAP, uint8_t pinTPS);
 
   float readVacuum_inHg();
-  float readTPSPercent();
+  float readLoadTPSPercent();
   uint16_t readMAPRaw();
   uint16_t readTPSRaw();
   float readMAPVolts();
@@ -36,5 +36,5 @@ private:
 
 
   float vacuum_inHg = 0;
-  float tpsPercent  = 0;
+  float tpsLoadPercent  = 0;
 };

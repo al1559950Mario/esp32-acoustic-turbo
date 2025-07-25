@@ -11,8 +11,6 @@ uint16_t MAPSensor::readRaw() {
     return rawSimulado;
   }
   return analogRead(_pin);
-
-
 }
 
 float MAPSensor::readNormalized() {
