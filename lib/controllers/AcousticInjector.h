@@ -25,6 +25,9 @@ public:
   void test();  // Prueba rápida del sonido acústico
   void emitResonant(float level); // Señal por fase acumulada
   void testSimple();
+  void updateWaveFrequency(float freqHz);  // Cambiar nombre para aclarar que es por onda completa
+  static float mapLoadToWaveFrequency(float mapLoadPercent);
+
 
   static AcousticInjector* _instance;
 

@@ -36,7 +36,7 @@ void StateMachine::update(float mapLoadPercent,
     thresholds = thresholdManager->getThresholds();
   }
 
-  currentLevel = 0.9f * currentLevel + 0.1f * (tpsLoadPercent / 100.0f);
+  currentLevel = tpsLoadPercent / 100.0f;
 
   switch (current) {
 

@@ -57,13 +57,12 @@ void AcousticInjector::setLevel(float level) {
 }
 
 void AcousticInjector::update() {
-  if (_level < _targetLevel)
-    _level = min(_level + RAMP_STEP, _targetLevel);
-  else if (_level > _targetLevel)
-    _level = max(_level - RAMP_STEP, _targetLevel);
+  const float alpha = 0.9f; // factor de suavizado, ajustable
+  _level = alpha * _level + (1.0f - alpha) * _targetLevel;
 
   _levelInt = (uint8_t)(_level * 255.0f);
 }
+
 
 void IRAM_ATTR AcousticInjector::onTimer() {
   if (!_instance) return;
@@ -163,4 +162,17 @@ void AcousticInjector::testSimple() {
   stop();
   testRelay(false);
   Serial.println(F("✅ Test simple finalizado"));
+}
+
+float AcousticInjector::mapLoadToWaveFrequency(float percent) {
+  constexpr float FREQ_MIN = 4200.0f;   // Baja carga
+  constexpr float FREQ_MAX = 6400.0f;   // Alta carga
+  percent = constrain(percent, 0.0f, 100.0f);
+  return FREQ_MIN + (percent / 100.0f) * (FREQ_MAX - FREQ_MIN);
+}
+
+void AcousticInjector::updateWaveFrequency(float freqHz) {
+  if (!_timer) return;
+  float periodPerSample = 1e6 / (freqHz * TABLE_SIZE);  // μs por muestra
+  timerAlarmWrite(_timer, static_cast<uint32_t>(periodPerSample), true);
 }
