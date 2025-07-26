@@ -3,6 +3,7 @@
 #include "ActuatorManager.h"
 #include "DebugManager.h"
 #include "ThresholdManager.h"
+#include "CalibrationManager.h"
 
 
 /**
@@ -75,12 +76,18 @@ public:
   float getLevel() const;
   bool readyForInjection(float, float);
 
+  CalibStep currentCalibStep = CalibStep::TPS_MIN;
+  unsigned long lastStepTime = 0;
+
+
 
 private:
   Thresholds thresholds;                         ///< Copia local de los umbrales actuales
   ThresholdManager* thresholdManager = nullptr;  ///< Puntero al gestor de umbrales
   SystemState        current{SystemState::OFF};   ///< Estado actual
   ActuatorManager* actuators = nullptr;
+  CalibrationManager* calibMgr= nullptr;
+  float              lastMapLoadPercent = 0.0f; ///< Guardar el último mapLoadPercent
 
 
   

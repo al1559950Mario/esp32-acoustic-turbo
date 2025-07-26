@@ -26,6 +26,8 @@ void StateMachine::update(float mapLoadPercent,
                           bool bleCalibReq,
                           bool calibLoaded,
                           const DebugManager &dbg) {
+  
+  lastMapLoadPercent = mapLoadPercent;
 
   if (current == SystemState::DEBUG) {
     return;
@@ -58,6 +60,8 @@ void StateMachine::update(float mapLoadPercent,
       break;
 
     case SystemState::CALIBRATION:
+      calibMgr->update();  // Avanza la calibración sin bloquear
+
       if (calibLoaded) {
         current = SystemState::OFF;
         Serial.println("→ Transición: CALIBRATION → OFF");
@@ -123,7 +127,7 @@ void StateMachine::update(float mapLoadPercent,
 
 void StateMachine::handleActions() {
   if (current == SystemState::INYECCION_ACUSTICA) {
-    actuators->setAcousticLevel(currentLevel);
+    actuators->setAcousticParameters(currentLevel, lastMapLoadPercent);
     actuators->update();
   }
 

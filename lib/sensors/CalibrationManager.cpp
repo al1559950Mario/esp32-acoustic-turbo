@@ -6,9 +6,13 @@ CalibrationManager& CalibrationManager::getInstance() {
   return inst;
 }
 
-void CalibrationManager::begin() {
+void CalibrationManager::begin(SensorManager* _sensors, bool sim) {
   prefs.begin("calib", false);
   prefs.end();
+  bool simulation = sim;
+  sensors = _sensors;
+  currentStep = CalibStep::TPS_MIN;
+
 }
 
 // Si no existen las 4 claves, pide calibración
@@ -280,6 +284,149 @@ void CalibrationManager::runTPSCalibration(SensorManager& sensors, bool simulaci
   Serial.printf("\n✅ Calibración TPS completada: min=%u, max=%u\n\n", tpsMin, tpsMax);
 }
 
+void CalibrationManager::runMAPMax(SensorManager& sensors, bool simulacionActiva) {
+  Serial.println(F("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"));
+  Serial.println(F(" [1] Motor apagado: capturando valor máximo"));
+  Serial.println(F("     >> Presiona ENTER cuando el valor en consola sea adecuado"));
+  Serial.println(F("     >> O espera 20 segundos para avanzar automáticamente"));
+  Serial.println(F("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"));
+
+  uint16_t candidateMax = 0;
+  unsigned long startTime = millis();
+  while (true) {
+    uint16_t raw = sensors.readMAPRaw();
+    candidateMax = max(candidateMax, raw);
+    float volts = sensors.representVoltsFromRaw(raw);
+    float voltsMax = sensors.representVoltsFromRaw(candidateMax);
+
+    Serial.printf("\r    Volts=%.2f | candidatoMax=%.2f", volts, voltsMax);
+    delay(200);
+
+    if (!simulacionActiva && Serial.available()) {
+      String input = Serial.readStringUntil('\n');
+      input.trim();
+      if (input.length() == 0) break;
+    }
+    if (millis() - startTime >= 20000) {
+      Serial.println("\n>> Tiempo agotado, avanzando automáticamente.");
+      break;
+    }
+  }
+  while (Serial.available()) Serial.read();  // limpia buffer
+
+  delay(250);
+  mapMax = candidateMax;
+  Serial.printf("\n✔ mapMax = %.2f\n", sensors.representVoltsFromRaw(mapMax));
+  saveStep(CalibStep::MAP_MAX, mapMax);
+}
+
+void CalibrationManager::runMAPMin(SensorManager& sensors, bool simulacionActiva) {
+  Serial.println(F("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"));
+  Serial.println(F(" [2] Motor en ralentí: capturando valor mínimo"));
+  Serial.println(F("     >> Presiona ENTER cuando el valor en consola sea adecuado"));
+  Serial.println(F("     >> O espera 20 segundos para avanzar automáticamente"));
+  Serial.println(F("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"));
+
+  uint16_t candidateMin = UINT16_MAX;
+  unsigned long startTime = millis();
+  while (true) {
+    uint16_t raw = sensors.readMAPRaw();
+    candidateMin = min(candidateMin, raw);
+    float volts = sensors.representVoltsFromRaw(raw);
+    float voltsMin = sensors.representVoltsFromRaw(candidateMin);
+
+    Serial.printf("\r    Volts=%.2f | candidatoMin=%.2f", volts, voltsMin);
+    delay(200);
+
+    if (!simulacionActiva && Serial.available()) {
+      String input = Serial.readStringUntil('\n');
+      input.trim();
+      if (input.length() == 0) break;
+    }
+    if (millis() - startTime >= 20000) {
+      Serial.println("\n>> Tiempo agotado, avanzando automáticamente.");
+      break;
+    }
+  }
+  while (Serial.available()) Serial.read();  // limpia buffer
+
+  delay(250);
+  mapMin = candidateMin;
+  Serial.printf("\n✔ mapMin = %.2f\n", sensors.representVoltsFromRaw(mapMin));
+  saveStep(CalibStep::MAP_MIN, mapMin);
+}
+
+void CalibrationManager::runTPSMin(SensorManager& sensors, bool simulacionActiva) {
+  Serial.println(F("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"));
+  Serial.println(F(" [3] Acelerador en reposo: capturando valor mínimo"));
+  Serial.println(F("     >> Presiona ENTER cuando el valor en consola sea adecuado"));
+  Serial.println(F("     >> O espera 20 segundos para avanzar automáticamente"));
+  Serial.println(F("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"));
+
+  uint16_t candidateMin = UINT16_MAX;
+  unsigned long startTime = millis();
+  while (true) {
+    uint16_t raw = sensors.readTPSRaw();
+    candidateMin = min(candidateMin, raw);
+    float volts = sensors.representVoltsFromRaw(raw);
+    float voltsMin = sensors.representVoltsFromRaw(candidateMin);
+
+    Serial.printf("\r    Volts=%.2f | candidatoMin=%.2f", volts, voltsMin);
+    delay(200);
+
+    if (!simulacionActiva && Serial.available()) {
+      String input = Serial.readStringUntil('\n');
+      input.trim();
+      if (input.length() == 0) break;
+    }
+    if (millis() - startTime >= 20000) {
+      Serial.println("\n>> Tiempo agotado, avanzando automáticamente.");
+      break;
+    }
+  }
+  while (Serial.available()) Serial.read();
+
+  delay(250);
+  tpsMin = candidateMin;
+  Serial.printf("\n✔ tpsMin = %.2f\n", sensors.representVoltsFromRaw(tpsMin));
+  saveStep(CalibStep::TPS_MIN, tpsMin);
+}
+
+void CalibrationManager::runTPSMax(SensorManager& sensors, bool simulacionActiva) {
+  Serial.println(F("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"));
+  Serial.println(F(" [4] Acelerador a fondo: capturando valor máximo"));
+  Serial.println(F("     >> Presiona ENTER cuando el valor en consola sea adecuado"));
+  Serial.println(F("     >> O espera 20 segundos para avanzar automáticamente"));
+  Serial.println(F("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"));
+
+  uint16_t candidateMax = 0;
+  unsigned long startTime = millis();
+  while (true) {
+    uint16_t raw = sensors.readTPSRaw();
+    candidateMax = max(candidateMax, raw);
+    float volts = sensors.representVoltsFromRaw(raw);
+    float voltsMax = sensors.representVoltsFromRaw(candidateMax);
+
+    Serial.printf("\r    Volts=%.2f | candidatoMax=%.2f", volts, voltsMax);
+    delay(200);
+
+    if (!simulacionActiva && Serial.available()) {
+      String input = Serial.readStringUntil('\n');
+      input.trim();
+      if (input.length() == 0) break;
+    }
+    if (millis() - startTime >= 20000) {
+      Serial.println("\n>> Tiempo agotado, avanzando automáticamente.");
+      break;
+    }
+  }
+  while (Serial.available()) Serial.read();
+
+  delay(250);
+  tpsMax = candidateMax;
+  Serial.printf("\n✔ tpsMax = %.2f\n", sensors.representVoltsFromRaw(tpsMax));
+  saveStep(CalibStep::TPS_MAX, tpsMax);
+}
 
 // Getters
 uint16_t CalibrationManager::getMAPMin() const { return mapMin; }
@@ -287,3 +434,27 @@ uint16_t CalibrationManager::getMAPMax() const { return mapMax; }
 uint16_t CalibrationManager::getTPSMin() const { return tpsMin; }
 uint16_t CalibrationManager::getTPSMax() const { return tpsMax; }
 
+void CalibrationManager::update() {
+  if (calibrationDone || sensors == nullptr) return;
+
+  switch (currentStep) {
+    case CalibStep::TPS_MIN:
+      runTPSMin(*sensors, simulation);
+      currentStep = CalibStep::TPS_MAX;
+      break;
+    case CalibStep::TPS_MAX:
+      runTPSMax(*sensors, simulation);
+      currentStep = CalibStep::MAP_MIN;
+      break;
+    case CalibStep::MAP_MIN:
+      runMAPMin(*sensors, simulation);
+      currentStep = CalibStep::MAP_MAX;
+      break;
+    case CalibStep::MAP_MAX:
+      runMAPMax(*sensors, simulation);
+      saveCalibration();
+      loadCalibration();
+      calibrationDone = true;
+      break;
+  }
+}

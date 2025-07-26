@@ -24,6 +24,7 @@ public:
   virtual void print(const String& msg) = 0;
   virtual void println(const String& msg) = 0;
   virtual void printf(const char* fmt, ...) = 0;
+  virtual bool isSimulation() const { return  simulationOnPython; };
 
 
   virtual bool isDeveloperMode() const;
@@ -36,7 +37,7 @@ protected:
   bool dashboardEnabled = true;
   bool consoleCalibRequested = false;
   bool developerMode = false;
-  bool simulacionActiva = false;
+  bool simulationOnPython = false;
 
   unsigned long lastTransitionMS = 0;
   unsigned long tiempoProximaImpresionHUD = 0;

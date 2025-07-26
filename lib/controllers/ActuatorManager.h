@@ -23,7 +23,7 @@ public:
   // Control Acoustic Injector
   void startAcoustic(float level);
   void stopAcoustic();
-  void setAcousticLevel(float level, float mapLoadPercent);
+  void setAcousticParameters(float level, float mapLoadPercent);
   bool isAcousticOn() const;
 
   TurboController& getTurboController();

@@ -2,6 +2,7 @@
 #include "SensorManager.h"
 #include <Preferences.h>
 
+
 enum class CalibStep {
   TPS_MIN,
   TPS_MAX,
@@ -9,11 +10,13 @@ enum class CalibStep {
   MAP_MAX
 };
 
+
 class CalibrationManager {
 public:
   static CalibrationManager& getInstance();
 
-  void begin();
+  void begin(SensorManager* sensors, bool sim);
+  void update();
 
   // Nueva función para activar modo debug hardcodeado
   void enableDebugMode(bool enable) { debugMode = enable; }
@@ -26,6 +29,10 @@ public:
   bool saveCalibration();         // guarda mapMin, mapMax, tpsMin, tpsMax
   void runMAPCalibration(SensorManager& sensorManager, bool simulacionActiva);
   void runTPSCalibration(SensorManager& sensorManager, bool simulacionActiva);
+  void runMAPMax(SensorManager& sensors, bool simulacionActiva);
+  void runMAPMin(SensorManager& sensors, bool simulacionActiva);
+  void runTPSMax(SensorManager& sensors, bool simulacionActiva);
+  void runTPSMin(SensorManager& sensors, bool simulacionActiva);
 
   uint16_t getMAPMin() const;
   uint16_t getMAPMax() const;
@@ -35,6 +42,12 @@ public:
 private:
   CalibrationManager() = default;
   Preferences prefs;
+  bool simulation = false;
+  bool calibrationDone = true;
+  SensorManager* sensors = nullptr;  // <-- Aquí se guarda el puntero recibido
+  CalibStep currentStep = CalibStep::TPS_MIN;
+
+
 
   uint16_t mapMin = 0, mapMax = 0;
   uint16_t tpsMin = 0, tpsMax = 0;

@@ -62,7 +62,7 @@ void setup() {
 
 
   // Estado inicial
-  calib.begin();
+  calib.begin(&sensors, ui->isSimulation());
   bool calibLoaded = calib.loadCalibration();
   fsm.begin(calibLoaded, &actuators, thresholdManagerPtr);
 
@@ -98,6 +98,7 @@ void loop() {
   static bool hasTriedLoad = false;
   static bool hasCalibration = false;
 
+  calib.update();
 
   if (!hasTriedLoad) {
     hasCalibration = calib.loadCalibration();

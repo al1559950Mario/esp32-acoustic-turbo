@@ -48,7 +48,7 @@ void ConsoleUI::update() {
     linea.trim();
     //this->printf("[DEBUG] simulacionActiva = %s\n", simulacionActiva ? "true" : "false");
 
-    if (simulacionActiva && linea.startsWith("tps_raw:")) {
+    if (simulationOnPython && linea.startsWith("tps_raw:")) {
       int idxTPS = linea.indexOf("tps_raw:");
       int idxMAP = linea.indexOf("map_raw:");
 
@@ -192,9 +192,9 @@ void ConsoleUI::interpretarComando(char c) {
     case 'z':  // Toggle modo simulación (dev mode)
       if (!devOnly()) break;
 
-      simulacionActiva = !simulacionActiva;
+      simulationOnPython = !simulationOnPython;
 
-      if (simulacionActiva) {
+      if (simulationOnPython) {
         sensors->getTPS().enableSimulation();
         sensors->getMAP().enableSimulation();
       } else {
@@ -202,7 +202,7 @@ void ConsoleUI::interpretarComando(char c) {
         sensors->getMAP().disableSimulation();
       }
 
-      this->printf(">> Modo simulación %s.\n", simulacionActiva ? "ACTIVADO" : "DESACTIVADO");
+      this->printf(">> Modo simulación %s.\n", simulationOnPython ? "ACTIVADO" : "DESACTIVADO");
       break;
     case 'k':  // Verificar valores de sensores
       if (!devOnly()) break;
@@ -288,8 +288,8 @@ void ConsoleUI::runConsoleCalibration() {
   this->println(">> Iniciando calibración…");
   auto& calib = CalibrationManager::getInstance();
   calib.clearCalibration();
-  calib.runTPSCalibration(*sensors, simulacionActiva);
-  calib.runMAPCalibration(*sensors, simulacionActiva);
+  calib.runTPSCalibration(*sensors, simulationOnPython);
+  calib.runMAPCalibration(*sensors, simulationOnPython);
   calib.saveCalibration();
   calib.loadCalibration(); 
   this->println(">> Calibración completada. Favor de reiniciar para aplicar cambios.");

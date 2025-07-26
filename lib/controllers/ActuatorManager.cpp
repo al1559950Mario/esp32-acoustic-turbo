@@ -44,7 +44,7 @@ void ActuatorManager::stopAcoustic() {
   injector.stop();
 }
 
-void ActuatorManager::setAcousticLevel(float level, float mapLoadPercent) {
+void ActuatorManager::setAcousticParameters(float level, float mapLoadPercent) {
   float freq = AcousticInjector::mapLoadToWaveFrequency(mapLoadPercent);
   injector.updateWaveFrequency(freq);
   injector.setLevel(level);
