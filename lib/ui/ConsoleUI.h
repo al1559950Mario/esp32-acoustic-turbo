@@ -14,7 +14,6 @@ public:
   virtual void attachActuators(ActuatorManager* actuatorManagerPtr);
 
   virtual bool getCalibRequest();
-  virtual void runConsoleCalibration();
   virtual void toggleSistema();
   virtual bool isSistemaActivo() const { 
     return sistemaActivo; }

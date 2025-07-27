@@ -73,9 +73,6 @@ void ConsoleUI::update() {
       }
 
   }
-
-  if (getCalibRequest()) runConsoleCalibration();
-
   if (dashboardEnabled) {
     static unsigned long lastPrint = 0;
     if (millis() - lastPrint > 300) {
@@ -95,7 +92,7 @@ void ConsoleUI::interpretarComando(char c) {
     }
     return true;
   };
-  tiempoProximaImpresionHUD = millis() + 5000;
+  tiempoProximaImpresionHUD = millis() + 2500;
 
   switch (c) {
     case 'a':  // Toggle sistema ON/OFF
@@ -219,6 +216,7 @@ void ConsoleUI::interpretarComando(char c) {
                   sensors->getMAP().readVolts());
       break;
     default:
+      if (!simulationOnPython) break;
       this->print("❓ Comando no reconocido: ");
       this->println(String(c));
 
@@ -230,7 +228,7 @@ void ConsoleUI::imprimirDashboard() {
   if (!fsm || !sensors || !actuators) return;  // seguridad
   if (millis() < tiempoProximaImpresionHUD) return;
 
-  this->println(""); // fuerza salto de línea previo
+  //this->println(""); // fuerza salto de línea previo
 
   float tpsV = sensors->getTPS().readVolts();
   float mapV = sensors->getMAP().readVolts();
@@ -284,16 +282,6 @@ void ConsoleUI::imprimirDashboard() {
   }
 }
 
-void ConsoleUI::runConsoleCalibration() {
-  this->println(">> Iniciando calibración…");
-  auto& calib = CalibrationManager::getInstance();
-  calib.clearCalibration();
-  calib.runTPSCalibration(*sensors, simulationOnPython);
-  calib.runMAPCalibration(*sensors, simulationOnPython);
-  calib.saveCalibration();
-  calib.loadCalibration(); 
-  this->println(">> Calibración completada. Favor de reiniciar para aplicar cambios.");
-}
 
 void ConsoleUI::toggleSistema() {
   sistemaActivo = !sistemaActivo;

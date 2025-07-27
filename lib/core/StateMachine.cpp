@@ -60,7 +60,7 @@ void StateMachine::update(float mapLoadPercent,
       break;
 
     case SystemState::CALIBRATION:
-      calibMgr->update();  // Avanza la calibración sin bloquear
+      //calibMgr->update();  // Avanza la calibración sin bloquear
 
       if (calibLoaded) {
         current = SystemState::OFF;

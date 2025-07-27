@@ -11,8 +11,6 @@ void TPSSensor::begin(uint8_t analogPin) {
 
 uint16_t TPSSensor::readRaw() {
   if (modoSimulacion) {
-    Serial.println("[DEBUG] TPS en modo simulación");
-
     return rawSimulado;
   }
   if (_pin == 0xFF) {

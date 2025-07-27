@@ -15,8 +15,8 @@ class CalibrationManager {
 public:
   static CalibrationManager& getInstance();
 
-  void begin(SensorManager* sensors, bool sim);
-  void update();
+  void begin(SensorManager* sensors);
+  void update( bool sim);
 
   // Nueva función para activar modo debug hardcodeado
   void enableDebugMode(bool enable) { debugMode = enable; }
@@ -27,12 +27,8 @@ public:
   void clearCalibration();
 
   bool saveCalibration();         // guarda mapMin, mapMax, tpsMin, tpsMax
-  void runMAPCalibration(SensorManager& sensorManager, bool simulacionActiva);
-  void runTPSCalibration(SensorManager& sensorManager, bool simulacionActiva);
-  void runMAPMax(SensorManager& sensors, bool simulacionActiva);
-  void runMAPMin(SensorManager& sensors, bool simulacionActiva);
-  void runTPSMax(SensorManager& sensors, bool simulacionActiva);
-  void runTPSMin(SensorManager& sensors, bool simulacionActiva);
+  bool runAutoCalibration(SensorManager& sensors, bool simulacionActiva);
+
 
   uint16_t getMAPMin() const;
   uint16_t getMAPMax() const;
