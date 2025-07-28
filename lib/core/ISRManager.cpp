@@ -11,11 +11,16 @@ void ISRManager::begin(SensorManager* sensors, AcousticInjector* injector) {
   _sensors = sensors;
   _injector = injector;
 
-  _timer = timerBegin(1, 80, true); // 1 µs por tick
+  _timer = timerBegin(1, 80, true); // timer 1, prescaler 80 → 1us por tick
+  if (_timer == nullptr) {
+    return;
+  }
+
   timerAttachInterrupt(_timer, &ISRManager::onTimerISR, true);
-  timerAlarmWrite(_timer, 1000, true); // Cada 1 ms
+  timerAlarmWrite(_timer, 1000, true); // alarma cada 1000 us (1ms)
   timerAlarmDisable(_timer);
 }
+
 
 void ISRManager::start() {
   timerAlarmEnable(_timer);
@@ -35,10 +40,19 @@ uint16_t ISRManager::getCachedTPSRaw() {
 
 
 void IRAM_ATTR ISRManager::onTimerISR() {
-  if (!_instance || !_instance->_sensors) return;
+  if (!_instance) return;
+  if (!_instance->_sensors) return;
+
+  auto& mapSensor = _instance->_sensors->getMAP();
+  auto& tpsSensor = _instance->_sensors->getTPS();
+
+  // Si las referencias no apuntan a objetos válidos, evita leer
+  if (&mapSensor == nullptr) return; 
+  if (&tpsSensor == nullptr) return;
 
   // Lectura rápida raw ADC en ISR, sin funciones pesadas
-  _instance->cachedMAPRaw = _instance->_sensors->getMAP().readRawISR();
-  _instance->cachedTPSRaw = _instance->_sensors->getTPS().readRawISR();
+  _instance->cachedMAPRaw = mapSensor.readRawISR();
+  _instance->cachedTPSRaw = tpsSensor.readRawISR();
 }
+
 

@@ -53,18 +53,29 @@ float SensorManager::representVoltsFromRaw(uint16_t raw) const {
 
 
 void SensorManager::update() {
-  // Determina si estás en simulación para cada sensor
-  uint16_t rawMAP = mapSensor.isSimulationActive()
-                      ? mapSensor.getSimulatedRaw()
-                      : ISRManager::getInstance()->getCachedMAPRaw();
+  Serial.println("[DEBUG] SensorManager::update() llamada");
 
-  uint16_t rawTPS = tpsSensor.isSimulationActive()
-                      ? tpsSensor.getSimulatedRaw()
-                      : ISRManager::getInstance()->getCachedTPSRaw();
+  // Verifica si está activa la simulación MAP
+  bool sim = isSimulation();
 
-  mapLoadPercent = mapSensor.convertRawToPercent(rawMAP);
-  tpsLoadPercent = tpsSensor.convertRawToPercent(rawTPS);
+  Serial.print("[DEBUG] Simulación TPS activa: ");
+  Serial.println(sim ? "Sí" : "No");
+
+ // uint16_t rawMAP = sim
+  //                    ? mapSensor.getSimulatedRaw()
+    //                  : ISRManager::getInstance()->getCachedMAPRaw();
+
+ // uint16_t rawTPS = sim
+   //                   ? tpsSensor.getSimulatedRaw()
+     //                 : ISRManager::getInstance()->getCachedTPSRaw();
+
+  //Serial.print("[DEBUG] rawMAP: "); Serial.println(rawMAP);
+  //Serial.print("[DEBUG] rawTPS: "); Serial.println(rawTPS);
+
+  //mapLoadPercent = mapSensor.convertRawToPercent(rawMAP);
+  //tpsLoadPercent = tpsSensor.convertRawToPercent(rawTPS);
 }
+
 
 
 void SensorManager::enableSimulacion() {
@@ -77,4 +88,8 @@ void SensorManager::disableSimulacion() {
   simulacionActiva = false;
   mapSensor.disableSimulation();
   tpsSensor.disableSimulation();
+}
+
+bool SensorManager::isSimulation() {
+  return simulacionActiva;
 }

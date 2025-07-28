@@ -21,7 +21,7 @@ public:
   void enableSimulacion();
   void disableSimulacion();
   bool isSimulacionActiva() const { return simulacionActiva; }
-
+  bool isSimulation();
 
   MAPSensor& getMAP();
   TPSSensor& getTPS();

@@ -28,7 +28,7 @@ void StateMachine::update(float mapLoadPercent,
                           const DebugManager &dbg) {
   
   lastMapLoadPercent = mapLoadPercent;
-
+  Serial.println(String(mapLoadPercent) + " % MapLoad");
   if (current == SystemState::DEBUG) {
     return;
   }
@@ -44,6 +44,7 @@ void StateMachine::update(float mapLoadPercent,
 
     case SystemState::OFF:
       if (mapLoadPercent < thresholds.MAP_WAKEUP_PERCENT) {
+
         current = SystemState::IDLE;
         Serial.println("→ Transición: OFF → IDLE");
       }

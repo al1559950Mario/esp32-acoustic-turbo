@@ -8,6 +8,8 @@
 #include "BluetoothSerialConsoleUI.h"
 #include <BluetoothSerial.h>
 #include "ThresholdManager.h"
+#include "ISRManager.h"
+
 
 
 
@@ -30,12 +32,18 @@ CalibrationManager& calib = CalibrationManager::getInstance();
 DebugManager       debugMgr;
 ThresholdManager* thresholdManagerPtr;
 bool calibLoaded = false;
+ISRManager isrManager;
+
 
 
 void setup() {
   // Inicializar sensores y actuadores
   sensors.begin(PIN_MAP, PIN_TPS);
   actuators.begin(PIN_RELAY_TURBO, PIN_DAC_ACOUSTIC, PIN_RELAY_ACOUSTIC);
+  isrManager.begin(&sensors, &actuators.getAcousticInjector());
+  isrManager.start();
+
+
 
   // Iniciar UI Serial USB
   usbConsoleUI.begin();
@@ -111,6 +119,12 @@ void loop() {
 
 
   if (sistemaActivo) {
+    static bool updatedOnce = false;
+    if (!updatedOnce) {
+      sensors.update();  // al menos una vez antes de leer percent
+      updatedOnce = true;
+    }
+
     float mapLoad   = sensors.readMAPLoadPercent();
     float tpsPorcent  = sensors.readLoadTPSPercent();
 
