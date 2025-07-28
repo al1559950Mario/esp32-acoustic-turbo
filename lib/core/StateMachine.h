@@ -16,7 +16,7 @@ enum class SystemState {
   CALIBRATION,           ///< Modo calibración activa
   IDLE,                  ///< Esperando subida de carga
   INYECCION_ACUSTICA,    ///< Inyección acústica activa
-  TURBO,                 ///< Turbo encendido
+  VORTEX,                 ///< Turbo encendido
   DESCAYENDO,            ///< Turbo descendiendo
   DEBUG,
   UNKNOWN                  ///< Estado de debug (solo con forzar)

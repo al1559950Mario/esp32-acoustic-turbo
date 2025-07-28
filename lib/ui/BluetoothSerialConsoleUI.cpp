@@ -9,11 +9,11 @@ BluetoothSerialConsoleUI::~BluetoothSerialConsoleUI() {
 }
 
 void BluetoothSerialConsoleUI::begin() {
-  if (!SerialBT.begin("TurboAcusticoV1", false)) {  // false = modo esclavo
+  if (!SerialBT.begin("VortexAcusticoV1", false)) {  // false = modo esclavo
     Serial.println("❌ Error al iniciar Bluetooth");
     return;
   }
-  SerialBT.println("✅ Bluetooth iniciado como \"TurboAcusticoV1\"");
+  SerialBT.println("✅ Bluetooth iniciado como \"VortexAcusticoV1\"");
   imprimirHelp();  // si tienes ese método en ConsoleUI
 }
 

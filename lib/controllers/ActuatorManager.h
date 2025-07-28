@@ -1,6 +1,6 @@
 #pragma once
 
-#include "TurboController.h"
+#include "VortexController.h"
 #include "AcousticInjector.h"
 
 class ActuatorManager {
@@ -14,11 +14,11 @@ public:
   void update();
 
   void stopAll();
-  // Control Turbo
-  void startTurbo();
-  void stopTurbo();
+  // Control Vortex
+  void startVortex();
+  void stopVortex();
   bool isTurboOn() const;
-  void setTurboLevel(float level);
+  void setVortexLevel(float level);
 
   // Control Acoustic Injector
   void startAcoustic(float level);
@@ -26,10 +26,10 @@ public:
   void setAcousticParameters(float level, float mapLoadPercent);
   bool isAcousticOn() const;
 
-  TurboController& getTurboController();
+  VortexController& getVortexController();
   AcousticInjector& getAcousticInjector();
 
 private:
-  TurboController turbo;
+  VortexController vortex;
   AcousticInjector injector;
 };

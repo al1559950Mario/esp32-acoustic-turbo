@@ -1,11 +1,11 @@
 #include "ActuatorManager.h"
 
 void ActuatorManager::begin(uint8_t turboRelayPin, uint8_t acousticDacPin, uint8_t acousticRelayPin) {
-  turbo.begin(turboRelayPin);
+  vortex.begin(turboRelayPin);
   injector.begin(acousticDacPin, acousticRelayPin);
 
   // Apagar ambos al inicio
-  turbo.stop();
+  vortex.stop();
   injector.stop();
 }
 
@@ -15,25 +15,25 @@ void ActuatorManager::update() {
   // Aquí podrías añadir lógica para turbo si la necesitas en update (ahora no tiene)
 }
 
-void ActuatorManager::startTurbo() {
-  turbo.start();
+void ActuatorManager::startVortex() {
+  vortex.start();
 }
 
 void ActuatorManager::stopAll() {
-  turbo.stop();
+  vortex.stop();
   injector.stop();
 }
 
-void ActuatorManager::stopTurbo() {
-  turbo.stop();
+void ActuatorManager::stopVortex() {
+  vortex.stop();
 }
 
-void ActuatorManager::setTurboLevel(float level) {
-  turbo.updatePowerLevel(level);
+void ActuatorManager::setVortexLevel(float level) {
+  vortex.updatePowerLevel(level);
 }
 
 bool ActuatorManager::isTurboOn() const {
-  return turbo.isOn();
+  return vortex.isOn();
 }
 
 void ActuatorManager::startAcoustic(float level) {
@@ -55,8 +55,8 @@ bool ActuatorManager::isAcousticOn() const {
   return injector.isActive();
 }
 
-TurboController& ActuatorManager::getTurboController() {
-  return turbo;
+VortexController& ActuatorManager::getVortexController() {
+  return vortex;
 }
 
 AcousticInjector& ActuatorManager::getAcousticInjector() {

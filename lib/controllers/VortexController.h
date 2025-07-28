@@ -3,10 +3,10 @@
 #include <Arduino.h>
 
 /**
- * TurboController
+ * VortexController
  * Controla el relé del turbo, incluye lógica con histéresis y monitoreo de estado.
  */
-class TurboController {
+class VortexController {
 public:
   /**
    * begin()
@@ -23,7 +23,7 @@ public:
    */
   /**
    * updatePowerLevel()
-   * Preparado para controlar el turbo con nivel escalable [0.0 – 1.0]
+   * Preparado para controlar el vortex con nivel escalable [0.0 – 1.0]
    * @param level: Potencia relativa del turbo, normalizada
    */
   void updatePowerLevel(float level);

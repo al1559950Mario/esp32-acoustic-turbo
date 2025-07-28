@@ -10,9 +10,9 @@ struct Thresholds {
     float INJ_MAP_ON;
     float INJ_TPS_OFF;
     float INJ_MAP_OFF;
-    float TURBO_TPS_ON;
-    float TURBO_MAP_ON;
-    float TURBO_TPS_OFF;
+    float VORTEX_TPS_ON;
+    float VORTEX_MAP_ON;
+    float VORTEX_TPS_OFF;
 };
 
 class ThresholdManager {

@@ -46,7 +46,7 @@ float DebugManager::getValue(DebugTarget target) const {
 }
 
 bool DebugManager::turboOverride() const {
-  return hasOverride(DebugTarget::TURBO);
+  return hasOverride(DebugTarget::VORTEX);
 }
 
 bool DebugManager::acousticOverride() const {
@@ -65,7 +65,7 @@ void DebugManager::updateFromSerial(Stream& serial) {
 
   setIfPresent(line, "tps:", DebugTarget::TPS);
   setIfPresent(line, "map:", DebugTarget::MAP);
-  setIfPresent(line, "turbo:", DebugTarget::TURBO);
+  setIfPresent(line, "vortex:", DebugTarget::VORTEX);
   setIfPresent(line, "iny:", DebugTarget::INYECTOR);
 }
 
@@ -82,7 +82,7 @@ void DebugManager::setIfPresent(const String& line,
   String valStr = line.substring(valStart, valEnd);
   float valor   = valStr.toFloat();
 
-  if (target == DebugTarget::TURBO || target == DebugTarget::INYECTOR) {
+  if (target == DebugTarget::VORTEX || target == DebugTarget::INYECTOR) {
     if (valor <= 0.0f)
       disableOverride(target);
     else

@@ -80,10 +80,10 @@ void StateMachine::update(float mapLoadPercent,
       break;
 
     case SystemState::INYECCION_ACUSTICA:
-      if (tpsLoadPercent >= thresholds.TURBO_TPS_ON && mapLoadPercent >= thresholds.TURBO_MAP_ON) {
-        current = SystemState::TURBO;
-        actuators->startTurbo();
-        Serial.println("→ Transición: INYECCION_ACUSTICA → TURBO");
+      if (tpsLoadPercent >= thresholds.VORTEX_TPS_ON && mapLoadPercent >= thresholds.VORTEX_MAP_ON) {
+        current = SystemState::VORTEX;
+        actuators->startVortex();
+        Serial.println("→ Transición: INYECCION_ACUSTICA → VORTEX");
       }
       else if (tpsLoadPercent <= thresholds.INJ_TPS_OFF || mapLoadPercent <= thresholds.INJ_MAP_OFF) {
         current = SystemState::IDLE;
@@ -92,12 +92,12 @@ void StateMachine::update(float mapLoadPercent,
       }
       break;
 
-    case SystemState::TURBO:
-      if (tpsLoadPercent < thresholds.TURBO_TPS_OFF) {
+    case SystemState::VORTEX:
+      if (tpsLoadPercent < thresholds.VORTEX_TPS_OFF) {
         current = SystemState::DESCAYENDO;
         actuators->stopAcoustic();
-        actuators->stopTurbo();
-        Serial.println("→ Transición: TURBO → DESCAYENDO");
+        actuators->stopVortex();
+        Serial.println("→ Transición: VORTEX → DESCAYENDO");
       }
       break;
 

@@ -19,9 +19,9 @@ Thresholds ThresholdManager::getThresholds() const {
     t.INJ_MAP_ON        = thresholds.at("INJ_MAP_ON");
     t.INJ_TPS_OFF       = thresholds.at("INJ_TPS_OFF");
     t.INJ_MAP_OFF       = thresholds.at("INJ_MAP_OFF");
-    t.TURBO_TPS_ON      = thresholds.at("TURBO_TPS_ON");
-    t.TURBO_MAP_ON      = thresholds.at("TURBO_MAP_ON");
-    t.TURBO_TPS_OFF     = thresholds.at("TURBO_TPS_OFF");
+    t.VORTEX_TPS_ON      = thresholds.at("VORTEX_TPS_ON");
+    t.VORTEX_MAP_ON      = thresholds.at("VORTEX_MAP_ON");
+    t.VORTEX_TPS_OFF     = thresholds.at("VORTEX_TPS_OFF");
     return t;
 }
 
@@ -65,12 +65,12 @@ void ThresholdManager::loadDefaults() {
     thresholds["INJ_TPS_OFF"]        = 8.0f;    // % TPS para apagar
     thresholds["INJ_MAP_OFF"]        = 30.0f;   // % MAP para apagar
 
-    // Umbrales para activar el turbo
-    thresholds["TURBO_TPS_ON"]       = 45.0f;   // % TPS para activar
-    thresholds["TURBO_MAP_ON"]       = 75.0f;   // % MAP para activar (presión alta)
+    // Umbrales para activar el vortex
+    thresholds["VORTEX_TPS_ON"]       = 45.0f;   // % TPS para activar
+    thresholds["VORTEX_MAP_ON"]       = 75.0f;   // % MAP para activar (presión alta)
 
-    // Umbral para apagar el turbo
-    thresholds["TURBO_TPS_OFF"]      = 30.0f;   // % TPS para apagar turbo
+    // Umbral para apagar el vortex
+    thresholds["VORTEX_TPS_OFF"]      = 30.0f;   // % TPS para apagar vortex
 }
 
 

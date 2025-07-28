@@ -9,7 +9,7 @@
 enum class DebugTarget {
   TPS,       // Sensor de acelerador (voltaje o porcentaje)
   MAP,       // Presión absoluta del múltiple
-  TURBO,     // Activación manual del turbo
+  VORTEX,     // Activación manual del turbo
   INYECTOR   // Activación manual del inyector acústico con nivel variable
 };
 

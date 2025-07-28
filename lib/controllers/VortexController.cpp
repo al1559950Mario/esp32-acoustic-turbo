@@ -1,13 +1,13 @@
 #include "TurboController.h"
 
-void TurboController::begin(uint8_t pinRelay) {
+void VortexController::begin(uint8_t pinRelay) {
   relayPin = pinRelay;
   pinMode(relayPin, OUTPUT);
   digitalWrite(relayPin, LOW);  // Asegura que el turbo arranque apagado
   active = false;
 }
 
-void TurboController::start() {
+void VortexController::start() {
   if (!active) {
     digitalWrite(relayPin, HIGH);  // Activa el relé
     active = true;
@@ -15,7 +15,7 @@ void TurboController::start() {
   }
 }
 
-void TurboController::stop() {
+void VortexController::stop() {
   if (active) {
     digitalWrite(relayPin, LOW);  // Desactiva el relé
     active = false;
@@ -23,17 +23,17 @@ void TurboController::stop() {
   }
 }
 
-bool TurboController::isOn() const {
+bool VortexController::isOn() const {
   return active;
 }
 
-void TurboController::updatePowerLevel(float level) {
+void VortexController::updatePowerLevel(float level) {
   if (!active) return;
 
   // 🚧 Futuro: aplicar PWM, DAC o lógica de control variable
   // Por ahora no hace nada
 }
 
-bool TurboController::isActive() const {
+bool VortexController::isActive() const {
   return active;  // ← o lo que estés usando para rastrear el estado actual
 }

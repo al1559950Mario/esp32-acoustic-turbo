@@ -155,12 +155,12 @@ void ConsoleUI::interpretarComando(char c) {
 
     case 't':  // Toggle turbo (dev mode)
       if (!devOnly()) break;
-      if (actuators->getTurboController().isActive()) {
-        if (actuators->getTurboController().isActive()) {
-          actuators->stopTurbo();
+      if (actuators->getVortexController().isActive()) {
+        if (actuators->getVortexController().isActive()) {
+          actuators->stopVortex();
           this->println(">> Turbo desactivado.");
         } else {
-          actuators->startTurbo();
+          actuators->startVortex();
           this->println(">> Turbo activado.");
         }
       } else {
@@ -233,7 +233,7 @@ void ConsoleUI::imprimirDashboard() {
   float tpsV = sensors->getTPS().readVolts();
   float mapV = sensors->getMAP().readVolts();
   uint8_t dac = actuators->getAcousticInjector().getCurrentDAC();
-  bool turboOn = actuators->isTurboOn();
+  bool vortexOn = actuators->isTurboOn();
   bool injOn = actuators->isAcousticOn();
 
   SystemState st = fsm->getState();
@@ -263,19 +263,19 @@ void ConsoleUI::imprimirDashboard() {
     tpsV, tpsMinV, tpsMaxV,
     mapV, mapMinV, mapMaxV,
     dac,
-    turboOn ? '1' : '0',
+    vortexOn ? '1' : '0',
     injOn ? '1' : '0'
   );
 
   // Solo cuando cambia el estado, imprimir detalles debajo
   if (st != lastState) {
     lastState = st;
-    this->println("\n\n=== TURBO SYSTEM DASHBOARD ===");
+    this->println("\n\n=== VORTEX SYSTEM DASHBOARD ===");
     this->printf("Estado motor:      %s\n", stName);
     this->printf("TPS Voltage:       %.3f V (raw %u–%u)\n", tpsV, tpsMin, tpsMax);
     this->printf("MAP Voltage:       %.3f V (raw %u–%u)\n", mapV, mapMin, mapMax);
     this->printf("DAC Output:        %u (PWM)\n", dac);
-    this->printf("Turbo:             %s\n", turboOn ? "ON" : "OFF");
+    this->printf("Vortex:             %s\n", vortexOn ? "ON" : "OFF");
     this->printf("Inyector sónico:   %s\n", injOn ? "ON" : "OFF");
     this->printf("Último cambio:     hace %lu s\n", elapsed);
     this->println("==============================\n");

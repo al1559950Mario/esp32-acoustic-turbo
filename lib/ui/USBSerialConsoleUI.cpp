@@ -4,7 +4,7 @@
 void USBSerialConsoleUI::begin() {
   Serial.begin(115200);
   while (!Serial);
-  Serial.println("\n=== Consola Turbo-Acústica Iniciada ===");
+  Serial.println("\n=== Consola Vortex-Acústico Iniciada ===");
   imprimirHelp();
 }
 
