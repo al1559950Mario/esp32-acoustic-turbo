@@ -119,14 +119,9 @@ void loop() {
 
 
   if (sistemaActivo) {
-    static bool updatedOnce = false;
-    if (!updatedOnce) {
-      sensors.update();  // al menos una vez antes de leer percent
-      updatedOnce = true;
-    }
-
-    float mapLoad   = sensors.readMAPLoadPercent();
-    float tpsPorcent  = sensors.readLoadTPSPercent();
+    sensors.update();  // <-- actualiza siempre
+    float mapLoad = sensors.readMAPLoadPercent();
+    float tpsPorcent = sensors.readLoadTPSPercent();
 
     fsm.update(
       mapLoad,

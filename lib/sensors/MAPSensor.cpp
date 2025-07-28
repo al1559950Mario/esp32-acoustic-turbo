@@ -4,7 +4,14 @@
 void MAPSensor::begin(uint8_t analogPin) {
   _pin = analogPin;
   pinMode(_pin, INPUT);
+
+  adc1_channel_t channel = pinToADCChannel(_pin);
+  if (channel != ADC1_CHANNEL_MAX) {
+    adc1_config_width(ADC_WIDTH_BIT_12);  // Resolución a 12 bits (0-4095)
+    adc1_config_channel_atten(channel, ADC_ATTEN_DB_11);  // Atenuación para 3.3V
+  }
 }
+
 
 uint16_t MAPSensor::readRaw() {
   if (modoSimulacion) {

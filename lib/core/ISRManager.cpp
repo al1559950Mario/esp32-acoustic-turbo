@@ -40,15 +40,11 @@ uint16_t ISRManager::getCachedTPSRaw() {
 
 
 void IRAM_ATTR ISRManager::onTimerISR() {
-  if (!_instance) return;
-  if (!_instance->_sensors) return;
+  if (!_instance || !_instance->_sensors) return;
+
 
   auto& mapSensor = _instance->_sensors->getMAP();
   auto& tpsSensor = _instance->_sensors->getTPS();
-
-  // Si las referencias no apuntan a objetos válidos, evita leer
-  if (&mapSensor == nullptr) return; 
-  if (&tpsSensor == nullptr) return;
 
   // Lectura rápida raw ADC en ISR, sin funciones pesadas
   _instance->cachedMAPRaw = mapSensor.readRawISR();

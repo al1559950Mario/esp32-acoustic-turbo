@@ -61,19 +61,19 @@ void SensorManager::update() {
   Serial.print("[DEBUG] Simulación TPS activa: ");
   Serial.println(sim ? "Sí" : "No");
 
- // uint16_t rawMAP = sim
-  //                    ? mapSensor.getSimulatedRaw()
-    //                  : ISRManager::getInstance()->getCachedMAPRaw();
+  uint16_t rawMAP = sim
+                      ? mapSensor.getSimulatedRaw()
+                      : ISRManager::getInstance()->getCachedMAPRaw();
 
- // uint16_t rawTPS = sim
-   //                   ? tpsSensor.getSimulatedRaw()
-     //                 : ISRManager::getInstance()->getCachedTPSRaw();
+  uint16_t rawTPS = sim
+                      ? tpsSensor.getSimulatedRaw()
+                      : ISRManager::getInstance()->getCachedTPSRaw();
 
-  //Serial.print("[DEBUG] rawMAP: "); Serial.println(rawMAP);
-  //Serial.print("[DEBUG] rawTPS: "); Serial.println(rawTPS);
+  Serial.print("[DEBUG] rawMAP: "); Serial.println(rawMAP);
+  Serial.print("[DEBUG] rawTPS: "); Serial.println(rawTPS);
 
-  //mapLoadPercent = mapSensor.convertRawToPercent(rawMAP);
-  //tpsLoadPercent = tpsSensor.convertRawToPercent(rawTPS);
+  mapLoadPercent = mapSensor.convertRawToPercent(rawMAP);
+  tpsLoadPercent = tpsSensor.convertRawToPercent(rawTPS);
 }
 
 
