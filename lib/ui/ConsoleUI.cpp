@@ -192,8 +192,8 @@ void ConsoleUI::interpretarComando(char c) {
       simulationOnPython = !simulationOnPython;
 
       if (simulationOnPython) {
-        sensors->getTPS().enableSimulation();
-        sensors->getMAP().enableSimulation();
+        //sensors->getTPS().enableSimulation();
+        //sensors->getMAP().enableSimulation();
       } else {
         sensors->getTPS().disableSimulation();
         sensors->getMAP().disableSimulation();

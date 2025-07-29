@@ -17,7 +17,7 @@ void ISRManager::begin(SensorManager* sensors, AcousticInjector* injector) {
   }
 
   timerAttachInterrupt(_timer, &ISRManager::onTimerISR, true);
-  timerAlarmWrite(_timer, 1000, true); // alarma cada 1000 us (1ms)
+  timerAlarmWrite(_timer, 5000, true); // alarma cada 1000 us (1ms)
   timerAlarmDisable(_timer);
 }
 
@@ -47,8 +47,10 @@ void IRAM_ATTR ISRManager::onTimerISR() {
   auto& tpsSensor = _instance->_sensors->getTPS();
 
   // Lectura rápida raw ADC en ISR, sin funciones pesadas
-  _instance->cachedMAPRaw = mapSensor.readRawISR();
-  _instance->cachedTPSRaw = tpsSensor.readRawISR();
+  tpsSensor.updateCacheFromISR();
+  mapSensor.updateCacheFromISR();
+  
+  
 }
 
 

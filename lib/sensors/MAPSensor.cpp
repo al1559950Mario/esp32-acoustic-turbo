@@ -1,23 +1,47 @@
 #include "MAPSensor.h"
 #include "CalibrationManager.h"
+#include "driver/adc.h"
+#include "ADCUtils.h"
 
 void MAPSensor::begin(uint8_t analogPin) {
   _pin = analogPin;
+  cachedRaw = 0;
   pinMode(_pin, INPUT);
 
   adc1_channel_t channel = pinToADCChannel(_pin);
+  if (channel == ADC1_CHANNEL_MAX) {
+    Serial.println("Error: GPIO inválido para ADC1.");
+    return;
+  }
+
   if (channel != ADC1_CHANNEL_MAX) {
-    adc1_config_width(ADC_WIDTH_BIT_12);  // Resolución a 12 bits (0-4095)
-    adc1_config_channel_atten(channel, ADC_ATTEN_DB_11);  // Atenuación para 3.3V
+    adc1_config_width(ADC_WIDTH_BIT_12);
+    adc1_config_channel_atten(channel, ADC_ATTEN_DB_11);
   }
 }
 
-
 uint16_t MAPSensor::readRaw() {
-  if (modoSimulacion) {
-    return rawSimulado;
+  if (modoSimulacion) return rawSimulado;
+  if (_pin == 0xFF) {
+    Serial.println("ERROR: MAPSensor pin no inicializado!");
+    return 0;
   }
-  return analogRead(_pin);
+  return cachedRaw;
+}
+
+void MAPSensor::updateCacheFromISR() {
+  adc1_channel_t channel = pinToADCChannel(_pin);
+  if (channel != ADC1_CHANNEL_MAX) {
+    cachedRaw = adc1_get_raw(channel);
+  }
+}
+
+uint16_t MAPSensor::readRawISR() {
+  adc1_channel_t channel = pinToADCChannel(_pin);
+  if (channel == ADC1_CHANNEL_MAX) {
+    return 0;
+  }
+  return adc1_get_raw(channel);
 }
 
 float MAPSensor::readNormalized() {
@@ -38,37 +62,9 @@ float MAPSensor::readVacuum_inHg() {
 }
 
 float MAPSensor::readVolts() const {
-  if (modoSimulacion) {
-    //Serial.println("[MAP] Leyendo valor simulado");
-    //Serial.printf("[MAP] Leyendo valor simulado: %u raw -> %.2f V\n", rawSimulado, (rawSimulado * 3.3f) / 4095.0f);
-
-
-    return (rawSimulado * 3.3f) / 4095.0f;
-  }
+  if (modoSimulacion) return (rawSimulado * 3.3f) / 4095.0f;
   uint16_t raw = analogRead(_pin);
   return (raw * 3.3f) / 4095.0f;
-}
-
-adc1_channel_t MAPSensor::pinToADCChannel(uint8_t gpio) {
-  switch (gpio) {
-    case 36: return ADC1_CHANNEL_0;
-    case 37: return ADC1_CHANNEL_1;
-    case 38: return ADC1_CHANNEL_2;
-    case 39: return ADC1_CHANNEL_3;
-    case 32: return ADC1_CHANNEL_4;
-    case 33: return ADC1_CHANNEL_5;
-    case 34: return ADC1_CHANNEL_6;
-    case 35: return ADC1_CHANNEL_7;
-    default: return ADC1_CHANNEL_MAX;
-  }
-}
-
-uint16_t MAPSensor::readRawISR() {
-  adc1_channel_t channel = pinToADCChannel(_pin);
-  if (channel == ADC1_CHANNEL_MAX) {
-    return 0;
-  }
-  return adc1_get_raw(channel);
 }
 
 float MAPSensor::convertRawToHg(uint16_t raw) {
@@ -99,15 +95,15 @@ float MAPSensor::convertRawToPercent(uint16_t raw) {
   return percent;
 }
 
-
-
 float MAPSensor::readMAPLoadPercent() {
   uint16_t raw = readRaw();
-  uint16_t min = CalibrationManager::getInstance().getMAPMin();  // vacío máximo (ralentí)
-  uint16_t max = CalibrationManager::getInstance().getMAPMax();  // atmósfera
+  uint16_t min = CalibrationManager::getInstance().getMAPMin();
+  uint16_t max = CalibrationManager::getInstance().getMAPMax();
 
   if (max <= min) return 0.0f;
 
   float percent = 100.0f * (float)(raw - min) / (float)(max - min);
-  return percent;  // intencionalmente sin constrain
+  return percent;
 }
+
+ 

@@ -55,7 +55,6 @@ float SensorManager::representVoltsFromRaw(uint16_t raw) const {
 void SensorManager::update() {
   Serial.println("[DEBUG] SensorManager::update() llamada");
 
-  // Verifica si está activa la simulación MAP
   bool sim = isSimulation();
 
   Serial.print("[DEBUG] Simulación TPS activa: ");
@@ -63,11 +62,11 @@ void SensorManager::update() {
 
   uint16_t rawMAP = sim
                       ? mapSensor.getSimulatedRaw()
-                      : ISRManager::getInstance()->getCachedMAPRaw();
+                      : mapSensor.readRaw();  // lectura directa
 
   uint16_t rawTPS = sim
                       ? tpsSensor.getSimulatedRaw()
-                      : ISRManager::getInstance()->getCachedTPSRaw();
+                      : tpsSensor.readRaw();  // lectura directa
 
   Serial.print("[DEBUG] rawMAP: "); Serial.println(rawMAP);
   Serial.print("[DEBUG] rawTPS: "); Serial.println(rawTPS);
@@ -80,8 +79,8 @@ void SensorManager::update() {
 
 void SensorManager::enableSimulacion() {
   simulacionActiva = true;
-  mapSensor.enableSimulation();  
-  tpsSensor.enableSimulation();
+  //mapSensor.enableSimulation();  
+  //tpsSensor.enableSimulation();
 }
 
 void SensorManager::disableSimulacion() {

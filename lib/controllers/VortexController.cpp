@@ -1,4 +1,4 @@
-#include "TurboController.h"
+#include "VortexController.h"
 
 void VortexController::begin(uint8_t pinRelay) {
   relayPin = pinRelay;
