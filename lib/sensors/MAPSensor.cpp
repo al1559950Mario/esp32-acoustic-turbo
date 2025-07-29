@@ -26,22 +26,9 @@ uint16_t MAPSensor::readRaw() {
     Serial.println("ERROR: MAPSensor pin no inicializado!");
     return 0;
   }
+  cachedRaw = analogRead(_pin);
+
   return cachedRaw;
-}
-
-void MAPSensor::updateCacheFromISR() {
-  adc1_channel_t channel = pinToADCChannel(_pin);
-  if (channel != ADC1_CHANNEL_MAX) {
-    cachedRaw = adc1_get_raw(channel);
-  }
-}
-
-uint16_t MAPSensor::readRawISR() {
-  adc1_channel_t channel = pinToADCChannel(_pin);
-  if (channel == ADC1_CHANNEL_MAX) {
-    return 0;
-  }
-  return adc1_get_raw(channel);
 }
 
 float MAPSensor::readNormalized() {

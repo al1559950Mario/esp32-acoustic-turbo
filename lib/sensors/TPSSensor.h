@@ -16,9 +16,6 @@ public:
   float readPorcent();
   float readVolts();
   bool isValidReading();
-  uint16_t readRawISR();        // Solo para uso interno por ISR (lee ADC directamente)
-  void updateCacheFromISR();    // Actualiza cachedRaw desde ISR
-
   float convertRawToPercent(uint16_t raw);
 
   void enableSimulation() { modoSimulacion = true; }

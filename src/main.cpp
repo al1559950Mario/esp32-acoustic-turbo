@@ -8,8 +8,6 @@
 #include "BluetoothSerialConsoleUI.h"
 #include <BluetoothSerial.h>
 #include "ThresholdManager.h"
-#include "ISRManager.h"
-
 
 
 
@@ -32,17 +30,31 @@ CalibrationManager& calib = CalibrationManager::getInstance();
 DebugManager       debugMgr;
 ThresholdManager* thresholdManagerPtr;
 bool calibLoaded = false;
-ISRManager isrManager;
 
+void TaskSensorUpdate(void* param) {
+  SensorManager* sensorMgr = static_cast<SensorManager*>(param);
+  for (;;) {
+    sensorMgr->update();                    // Mantén este método como está
+    vTaskDelay(pdMS_TO_TICKS(10));          // Ejecuta cada 10 ms
+  }
+}
 
 
 void setup() {
+
   // Inicializar sensores y actuadores
   sensors.begin(PIN_MAP, PIN_TPS);
   actuators.begin(PIN_RELAY_TURBO, PIN_DAC_ACOUSTIC, PIN_RELAY_ACOUSTIC);
-  isrManager.begin(&sensors, &actuators.getAcousticInjector());
-  isrManager.start();
 
+  xTaskCreatePinnedToCore(
+    TaskSensorUpdate,
+    "SensorPolling",
+    2048,
+    &sensors,  // tu instancia global o singleton
+    1,         // prioridad baja
+    nullptr,
+    1          // core 1 si se usa Wifi o BT
+  );
 
 
   // Iniciar UI Serial USB
@@ -119,7 +131,6 @@ void loop() {
 
 
   if (sistemaActivo) {
-    //sensors.update();  // <-- actualiza siempre
     float mapLoad = sensors.readMAPLoadPercent();
     float tpsPorcent = sensors.readLoadTPSPercent();
 

@@ -1,5 +1,4 @@
 #include "SensorManager.h"
-#include "ISRManager.h"
  
 
 void SensorManager::begin(uint8_t pinMAP, uint8_t pinTPS) {
@@ -60,13 +59,9 @@ void SensorManager::update() {
   Serial.print("[DEBUG] Simulación TPS activa: ");
   Serial.println(sim ? "Sí" : "No");
 
-  uint16_t rawMAP = sim
-                      ? mapSensor.getSimulatedRaw()
-                      : mapSensor.readRaw();  // lectura directa
+  uint16_t rawMAP = mapSensor.readRaw();  // lectura directa
 
-  uint16_t rawTPS = sim
-                      ? tpsSensor.getSimulatedRaw()
-                      : tpsSensor.readRaw();  // lectura directa
+  uint16_t rawTPS = tpsSensor.readRaw();  // lectura directa
 
   Serial.print("[DEBUG] rawMAP: "); Serial.println(rawMAP);
   Serial.print("[DEBUG] rawTPS: "); Serial.println(rawTPS);

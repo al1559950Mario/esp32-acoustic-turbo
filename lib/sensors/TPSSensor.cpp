@@ -3,7 +3,6 @@
 #include "CalibrationManager.h"
 #include "driver/adc.h"
 #include "ADCUtils.h"  // si usas utilidades ADC específicas
-#include "ConsoleUI.h"
 
 void TPSSensor::begin(uint8_t analogPin) {
   _pin = analogPin;
@@ -28,17 +27,6 @@ uint16_t TPSSensor::readRaw() {
   // Devuelve lectura cacheada hecha desde ISR
   return cachedRaw;
 }
-
-// Esta función la llama el ISR para actualizar cachedRaw directamente
-void TPSSensor::updateCacheFromISR() {
-  adc1_channel_t channel = pinToADCChannel(_pin);
-  if (channel == ADC1_CHANNEL_MAX) {
-    return;
-  }
-  cachedRaw = adc1_get_raw(channel);
-}
-
-// El resto igual, con readRaw() que ya devuelve cachedRaw
 
 float TPSSensor::readNormalized() {
   uint16_t raw = readRaw();
@@ -74,14 +62,6 @@ bool TPSSensor::isValidReading() {
   return (raw >= 50 && raw <= 4045);
 }
 
-uint16_t TPSSensor::readRawISR() {
-  // Esto ya no es necesario si usamos updateCacheFromISR, pero puede quedar si quieres
-  adc1_channel_t channel = pinToADCChannel(_pin);
-  if (channel == ADC1_CHANNEL_MAX) {
-    return 0;
-  }
-  return adc1_get_raw(channel);
-}
 
 float TPSSensor::convertRawToPercent(uint16_t raw) {
   uint16_t min = CalibrationManager::getInstance().getTPSMin();
