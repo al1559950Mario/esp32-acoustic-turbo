@@ -24,9 +24,12 @@ uint16_t TPSSensor::readRaw() {
     Serial.println("ERROR: TPSSensor pin no inicializado!");
     return 0;
   }
-  // Devuelve lectura cacheada hecha desde ISR
+
+  cachedRaw = analogRead(_pin);  // <-- lectura directa
+
   return cachedRaw;
 }
+
 
 float TPSSensor::readNormalized() {
   uint16_t raw = readRaw();

@@ -32,7 +32,9 @@ private:
   TPSSensor tpsSensor;
   float mapLoadPercent = 0.0f;  //
   bool simulacionActiva = false;
-
+  float filteredTPS = 0;
+  float filteredMAP = 0;
+  const float alpha = 0.6;  // coeficiente del filtro
 
 
   float vacuum_inHg = 0;

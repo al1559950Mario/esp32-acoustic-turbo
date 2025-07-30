@@ -50,16 +50,18 @@ float SensorManager::representVoltsFromRaw(uint16_t raw) const {
   return (raw * 3.3f) / 4095.0f;
 }
 
-
 void SensorManager::update() {
   uint16_t rawMAP = mapSensor.readRaw();  // lectura directa
   uint16_t rawTPS = tpsSensor.readRaw();  // lectura directa
 
   mapLoadPercent = mapSensor.convertRawToPercent(rawMAP);
   tpsLoadPercent = tpsSensor.convertRawToPercent(rawTPS);;
+    // Filtro IIR aplicado a porcentaje
+  filteredMAP = alpha * mapLoadPercent + (1 - alpha) * filteredMAP;
+  filteredTPS = alpha * tpsLoadPercent + (1 - alpha) * filteredTPS;
+  mapLoadPercent = filteredMAP;
+  tpsLoadPercent = filteredTPS;
 }
-
-
 
 void SensorManager::enableSimulacion() {
   simulacionActiva = true;
