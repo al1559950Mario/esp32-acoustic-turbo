@@ -85,7 +85,9 @@ def thread_envio(ser):
     global throttle, map_v, modo_envio_constante, running
     while running:
         # Calcula el voltaje de TPS y MAP según modo
-        tps_v = TPS_V_CLOSED + (TPS_V_OPEN - TPS_V_CLOSED) * throttle
+        #tps_v = TPS_V_CLOSED + (TPS_V_OPEN - TPS_V_CLOSED) * throttle
+        tps_v = TPS_V_OPEN + (TPS_V_CLOSED - TPS_V_OPEN) * throttle
+
         map_adc_valor = map_v
 
         TPS_MIN_V = TPS_V_CLOSED

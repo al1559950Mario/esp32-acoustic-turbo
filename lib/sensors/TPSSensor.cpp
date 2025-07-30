@@ -35,7 +35,7 @@ float TPSSensor::readNormalized() {
 
   if (max <= min || raw < min || raw > max) return 0.0f;
 
-  return constrain((float)(raw - min) / (max - min), 0.0f, 1.0f);
+  return constrain(1.0f - (float)(raw - min) / (max - min), 0.0f, 1.0f);
 }
 
 float TPSSensor::readPorcent() {
