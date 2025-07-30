@@ -1,5 +1,5 @@
 #include "SensorManager.h"
- 
+
 
 void SensorManager::begin(uint8_t pinMAP, uint8_t pinTPS) {
   mapSensor.begin(pinMAP);
@@ -52,30 +52,17 @@ float SensorManager::representVoltsFromRaw(uint16_t raw) const {
 
 
 void SensorManager::update() {
-  Serial.println("[DEBUG] SensorManager::update() llamada");
-
-  bool sim = isSimulation();
-
-  Serial.print("[DEBUG] Simulación TPS activa: ");
-  Serial.println(sim ? "Sí" : "No");
-
   uint16_t rawMAP = mapSensor.readRaw();  // lectura directa
-
   uint16_t rawTPS = tpsSensor.readRaw();  // lectura directa
 
-  Serial.print("[DEBUG] rawMAP: "); Serial.println(rawMAP);
-  Serial.print("[DEBUG] rawTPS: "); Serial.println(rawTPS);
-
   mapLoadPercent = mapSensor.convertRawToPercent(rawMAP);
-  tpsLoadPercent = tpsSensor.convertRawToPercent(rawTPS);
+  tpsLoadPercent = tpsSensor.convertRawToPercent(rawTPS);;
 }
 
 
 
 void SensorManager::enableSimulacion() {
   simulacionActiva = true;
-  //mapSensor.enableSimulation();  
-  //tpsSensor.enableSimulation();
 }
 
 void SensorManager::disableSimulacion() {

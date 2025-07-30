@@ -225,16 +225,18 @@ void ConsoleUI::interpretarComando(char c) {
 }
 
 void ConsoleUI::imprimirDashboard() {
-  if (!fsm || !sensors || !actuators) return;  // seguridad
+  if (!fsm || !sensors || !actuators) return;
   if (millis() < tiempoProximaImpresionHUD) return;
-
-  //this->println(""); // fuerza salto de línea previo
 
   float tpsV = sensors->getTPS().readVolts();
   float mapV = sensors->getMAP().readVolts();
   uint8_t dac = actuators->getAcousticInjector().getCurrentDAC();
   bool vortexOn = actuators->isTurboOn();
   bool injOn = actuators->isAcousticOn();
+
+  // Obtener level y freq actuales
+  float level = actuators->getAcousticInjector().getLevel();
+  float freq = actuators->getAcousticInjector().getFrequency();
 
   SystemState st = fsm->getState();
   unsigned long elapsed = (millis() - lastTransitionMS) / 1000;
@@ -256,18 +258,20 @@ void ConsoleUI::imprimirDashboard() {
   float mapMinV = mapMin * 3.3f / 4095.0f;
   float mapMaxV = mapMax * 3.3f / 4095.0f;
 
-  // HUD en vivo: actualiza siempre en la misma línea
+  // HUD en vivo: actualización en línea
   this->printf(
-    "\r[%s|%lus] TPS=%.2fV(%.2f–%.2fV) | MAP=%.2fV(%.2f–%.2fV) | DAC=%3u | T:%c | I:%c     ",
+    "\r[%s|%lus] TPS=%.2fV(%.2f–%.2fV) | MAP=%.2fV(%.2f–%.2fV) | DAC=%3u | LVL=%.2f | FRQ=%.0fHz | Boost:%c | Beam:%c     ",
     stName, elapsed,
     tpsV, tpsMinV, tpsMaxV,
     mapV, mapMinV, mapMaxV,
     dac,
+    level,
+    freq,
     vortexOn ? '1' : '0',
     injOn ? '1' : '0'
   );
 
-  // Solo cuando cambia el estado, imprimir detalles debajo
+  // Detalle en nueva línea si cambió estado
   if (st != lastState) {
     lastState = st;
     this->println("\n\n=== VORTEX SYSTEM DASHBOARD ===");
@@ -275,6 +279,8 @@ void ConsoleUI::imprimirDashboard() {
     this->printf("TPS Voltage:       %.3f V (raw %u–%u)\n", tpsV, tpsMin, tpsMax);
     this->printf("MAP Voltage:       %.3f V (raw %u–%u)\n", mapV, mapMin, mapMax);
     this->printf("DAC Output:        %u (PWM)\n", dac);
+    this->printf("Nivel acústico:    %.2f\n", level);
+    this->printf("Frecuencia onda:   %.0f Hz\n", freq);
     this->printf("Vortex:             %s\n", vortexOn ? "ON" : "OFF");
     this->printf("Inyector sónico:   %s\n", injOn ? "ON" : "OFF");
     this->printf("Último cambio:     hace %lu s\n", elapsed);

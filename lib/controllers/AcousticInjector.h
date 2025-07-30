@@ -27,6 +27,8 @@ public:
   void testSimple();
   void updateWaveFrequency(float freqHz);  // Cambiar nombre para aclarar que es por onda completa
   static float mapLoadToWaveFrequency(float mapLoadPercent);
+  float getLevel() const { return _level; }
+  float getFrequency() const { return _currentFrequency; }
 
 
   static AcousticInjector* _instance;
@@ -41,6 +43,7 @@ private:
   dac_channel_t _dacChannel;
   hw_timer_t* _timer = nullptr;
   volatile uint8_t _levelInt = 0;  // nivel escalado 0-255 para ISR
+  float _currentFrequency = 0.0f;
 
 
   // Tabla seno 16 muestras para ISR rápido (0-255)

@@ -28,7 +28,6 @@ void StateMachine::update(float mapLoadPercent,
                           const DebugManager &dbg) {
   
   lastMapLoadPercent = mapLoadPercent;
-  Serial.println(String(mapLoadPercent) + " % MapLoad");
   if (current == SystemState::DEBUG) {
     return;
   }
@@ -85,7 +84,7 @@ void StateMachine::update(float mapLoadPercent,
         actuators->startVortex();
         Serial.println("→ Transición: INYECCION_ACUSTICA → VORTEX");
       }
-      else if (tpsLoadPercent <= thresholds.INJ_TPS_OFF || mapLoadPercent <= thresholds.INJ_MAP_OFF) {
+      else if (tpsLoadPercent <= thresholds.INJ_TPS_OFF) {
         current = SystemState::IDLE;
         actuators->stopAcoustic();
         Serial.println("→ Transición: INYECCION_ACUSTICA → IDLE");

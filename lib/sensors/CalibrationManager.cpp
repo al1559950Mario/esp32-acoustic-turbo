@@ -179,7 +179,6 @@ bool CalibrationManager::runAutoCalibration(SensorManager& sensors, bool simulac
     Serial.println(F("✔ Calibración completada y almacenada."));
     return true;
   }
-
   return false;
 }
 
@@ -194,12 +193,14 @@ void CalibrationManager::update(bool sim) {
     return;
   }
   simulation = sim;
-  if (sim && !calibrationDone) {
-    runAutoCalibration(*sensors, sim);
+
+  // Llamar runAutoCalibration y verificar si terminó
+  if (runAutoCalibration(*sensors, sim)) {
     calibrationDone = true;
     saveCalibration();
     loadCalibration();
-    return;
-  } 
+  }
 }
+
+
 

@@ -5,10 +5,13 @@
 static constexpr const char* NVS_NAMESPACE = "thresholds";
 
 bool ThresholdManager::begin() {
+    loadDefaults();  // Cargar llaves y valores por defecto primero
+
     if (!loadFromNVS()) {
-        loadDefaults();
+        // Si falló la carga, mantenemos los defaults y los guardamos
         return saveToNVS();
     }
+
     return true;
 }
 

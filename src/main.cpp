@@ -38,6 +38,27 @@ void TaskSensorUpdate(void* param) {
     vTaskDelay(pdMS_TO_TICKS(10));          // Ejecuta cada 10 ms
   }
 }
+void TaskConsoleUpdate(void* param) {
+  for (;;) {
+    static bool clientePrevio = false;
+    bool clienteActual = SerialBT.hasClient();
+
+    if (clienteActual && !clientePrevio) {
+      Serial.println("→ Cliente Bluetooth conectado. Cambiando a BLE UI.");
+      ui = &btConsoleUI;
+    } else if (!clienteActual && clientePrevio) {
+      Serial.println("→ Cliente Bluetooth desconectado. Volviendo a Serial UI.");
+      ui = &usbConsoleUI;
+    }
+    clientePrevio = clienteActual;
+
+    if (ui) ui->update();
+    debugMgr.updateFromSerial(Serial);
+    
+    vTaskDelay(pdMS_TO_TICKS(20));  // ajusta según necesidad
+  }
+}
+
 
 
 void setup() {
@@ -56,6 +77,15 @@ void setup() {
     1          // core 1 si se usa Wifi o BT
   );
 
+  xTaskCreatePinnedToCore(
+    TaskConsoleUpdate,
+    "ConsoleUpdate",
+    4096,     // más memoria si usas Bluetooth
+    nullptr,
+    1,        // misma prioridad que sensores
+    nullptr,
+    0         // Core 0, deja sensores en core 1
+  );
 
   // Iniciar UI Serial USB
   usbConsoleUI.begin();
@@ -84,6 +114,11 @@ void setup() {
   // Estado inicial
   calib.begin(&sensors);
   bool calibLoaded = calib.loadCalibration();
+  thresholdManagerPtr = new ThresholdManager();
+  if (!thresholdManagerPtr->begin()) {
+    Serial.println("❌ Error al iniciar ThresholdManager");
+  }
+
   fsm.begin(calibLoaded, &actuators, thresholdManagerPtr);
 
   actuators.stopAll();
@@ -95,24 +130,6 @@ void setup() {
 }
 
 void loop() {
-  static bool clientePrevio = false;
-  bool clienteActual = SerialBT.hasClient();
-
-  // Cambiar la UI activa si cambia el estado de conexión BT
-  if (clienteActual && !clientePrevio) {
-    Serial.println("→ Cliente Bluetooth conectado. Cambiando a BLE UI.");
-    ui = &btConsoleUI;
-  } else if (!clienteActual && clientePrevio) {
-    Serial.println("→ Cliente Bluetooth desconectado. Volviendo a Serial UI.");
-    ui = &usbConsoleUI;
-  }
-  clientePrevio = clienteActual;
-
-  // Solo una UI activa recibe update
-  ui->update();
-  debugMgr.updateFromSerial(Serial);
-  //bool serialCalibReq = usbConsoleUI.getCalibRequest();  
-  //bool bleCalibReq = btConsoleUI.getCalibRequest();         
 
   bool sistemaActivo = usbConsoleUI.isSistemaActivo() || btConsoleUI.isSistemaActivo();
   static bool hasTriedLoad = false;

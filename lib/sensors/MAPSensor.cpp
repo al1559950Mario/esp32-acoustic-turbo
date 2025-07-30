@@ -65,19 +65,19 @@ float MAPSensor::convertRawToPercent(uint16_t raw) {
   uint16_t min = CalibrationManager::getInstance().getMAPMin();
   uint16_t max = CalibrationManager::getInstance().getMAPMax();
 
-  Serial.print("[DEBUG] MAP Raw: "); Serial.println(raw);
-  Serial.print("[DEBUG] MAP Min: "); Serial.println(min);
-  Serial.print("[DEBUG] MAP Max: "); Serial.println(max);
+  //Serial.print("[DEBUG] MAP Raw: "); Serial.println(raw);
+  //Serial.print("[DEBUG] MAP Min: "); Serial.println(min);
+  //Serial.print("[DEBUG] MAP Max: "); Serial.println(max);
 
   if (max <= min || raw < min || raw > max) {
-    Serial.println("[DEBUG] MAP fuera de rango o calibración inválida. Retornando 0.0%");
+    //Serial.println("[DEBUG] MAP fuera de rango o calibración inválida. Retornando 0.0%");
     return 0.0f;
   }
 
   float norm = (float)(raw - min) / (max - min);
   float percent = constrain(norm, 0.0f, 1.0f) * 100.0f;
 
-  Serial.print("[DEBUG] MAP Load %: "); Serial.println(percent, 2);
+  //Serial.print("[DEBUG] MAP Load %: "); Serial.println(percent, 2);
 
   return percent;
 }

@@ -1,7 +1,7 @@
 #pragma once
-
 #include "MAPSensor.h"
 #include "TPSSensor.h"
+#include <Arduino.h>
 
 class SensorManager {
 public:

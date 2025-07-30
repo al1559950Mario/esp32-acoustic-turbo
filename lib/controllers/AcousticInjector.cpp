@@ -173,6 +173,7 @@ float AcousticInjector::mapLoadToWaveFrequency(float percent) {
 
 void AcousticInjector::updateWaveFrequency(float freqHz) {
   if (!_timer) return;
+  _currentFrequency = freqHz;
   float periodPerSample = 1e6 / (freqHz * TABLE_SIZE);  // μs por muestra
   timerAlarmWrite(_timer, static_cast<uint32_t>(periodPerSample), true);
 }
