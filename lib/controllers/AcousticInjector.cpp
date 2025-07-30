@@ -53,11 +53,14 @@ void AcousticInjector::stop() {
 }
 
 void AcousticInjector::setLevel(float level) {
+  
   _targetLevel = constrain(level, 0.0f, 1.0f);
 }
 
 void AcousticInjector::update() {
-  const float alpha = 0.9f; // factor de suavizado, ajustable
+  // factor de suavizado, ajustable
+  float alpha = (_targetLevel < _level) ? 0.95f : 0.3f;
+
   _level = alpha * _level + (1.0f - alpha) * _targetLevel;
 
   _levelInt = (uint8_t)(_level * 255.0f);

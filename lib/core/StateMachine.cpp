@@ -94,7 +94,6 @@ void StateMachine::update(float mapLoadPercent,
     case SystemState::VORTEX:
       if (tpsLoadPercent < thresholds.VORTEX_TPS_OFF) {
         current = SystemState::DESCAYENDO;
-        actuators->stopAcoustic();
         actuators->stopVortex();
         Serial.println("→ Transición: VORTEX → DESCAYENDO");
       }
