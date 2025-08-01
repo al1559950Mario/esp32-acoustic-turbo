@@ -2,6 +2,7 @@
 
 #include "VortexController.h"
 #include "AcousticInjector.h"
+#include "ThresholdManager.h"
 
 class ActuatorManager {
 public:
@@ -28,8 +29,11 @@ public:
 
   VortexController& getVortexController();
   AcousticInjector& getAcousticInjector();
+  
 
 private:
   VortexController vortex;
   AcousticInjector injector;
+  ThresholdManager* thresholdManager = nullptr;  ///< Puntero al gestor de umbrales
+
 };
