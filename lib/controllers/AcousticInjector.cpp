@@ -59,10 +59,8 @@ void AcousticInjector::setLevel(float level) {
 
 void AcousticInjector::update() {
   // factor de suavizado, ajustable
-  float alpha = (_targetLevel < _level) ? 0.95f : 0.3f;
-
+  float alpha = (_targetLevel < _level) ? 0.8f : 0.3f;
   _level = alpha * _level + (1.0f - alpha) * _targetLevel;
-
   _levelInt = (uint8_t)(_level * 255.0f);
 }
 

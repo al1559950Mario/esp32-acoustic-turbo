@@ -229,6 +229,7 @@ void ConsoleUI::imprimirDashboard() {
   if (millis() < tiempoProximaImpresionHUD) return;
 
   float tpsV = sensors->getTPS().readVolts();
+  float tpsPct = sensors->getTPS().readPorcent();
   float mapV = sensors->getMAP().readVolts();
   uint8_t dac = actuators->getAcousticInjector().getCurrentDAC();
   bool vortexOn = actuators->isTurboOn();
@@ -258,11 +259,11 @@ void ConsoleUI::imprimirDashboard() {
   float mapMinV = mapMin * 3.3f / 4095.0f;
   float mapMaxV = mapMax * 3.3f / 4095.0f;
 
-  // HUD en vivo: actualización en línea
-  this->printf(
-    "\r[%s|%lus] TPS=%.2fV(%.2f–%.2fV) | MAP=%.2fV(%.2f–%.2fV) | DAC=%3u | LVL=%.2f | FRQ=%.0fHz | Boost:%c | Beam:%c     ",
+// HUD en vivo: actualización en línea
+this->printf(
+    "\r[%s|%lus] TPS=%.2fV(%.2f–%.2fV) %.0f%% | MAP=%.2fV(%.2f–%.2fV) | DAC=%3u | LVL=%.2f | FRQ=%.0fHz | Boost:%c | Beam:%c     ",
     stName, elapsed,
-    tpsV, tpsMinV, tpsMaxV,
+    tpsV, tpsMinV, tpsMaxV, tpsPct,
     mapV, mapMinV, mapMaxV,
     dac,
     level,
@@ -270,6 +271,7 @@ void ConsoleUI::imprimirDashboard() {
     vortexOn ? '1' : '0',
     injOn ? '1' : '0'
   );
+
 
   // Detalle en nueva línea si cambió estado
   if (st != lastState) {
