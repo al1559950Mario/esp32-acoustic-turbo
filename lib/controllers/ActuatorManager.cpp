@@ -45,22 +45,11 @@ void ActuatorManager::stopAcoustic() {
 }
 
 void ActuatorManager::setAcousticParameters(float level, float mapLoadPercent) {
-  // Asegúrate de tener los thresholds antes de usarlos
-  auto thresholds = thresholdManager->getThresholds();
-
-  // Calcular frecuencia según carga MAP
   float freq = AcousticInjector::mapLoadToWaveFrequency(mapLoadPercent);
   injector.updateWaveFrequency(freq);
-
-  // Ajustar el nivel tomando en cuenta el umbral INJ_TPS_ON
-  float injTPSon = thresholds.INJ_TPS_ON;
-  float rawTPS = level * 100.0f;
-
-  float adjustedLevel = (rawTPS - injTPSon) / (100.0f - injTPSon);
-  adjustedLevel = constrain(adjustedLevel, 0.0f, 1.0f);
-
-  injector.setLevel(adjustedLevel);
+  injector.setLevel(level);
 }
+
 
 
 

@@ -38,6 +38,7 @@ void TaskSensorUpdate(void* param) {
     vTaskDelay(pdMS_TO_TICKS(10));          // Ejecuta cada 10 ms
   }
 }
+
 void TaskConsoleUpdate(void* param) {
   for (;;) {
     static bool clientePrevio = false;
@@ -135,8 +136,6 @@ void loop() {
   static bool hasTriedLoad = false;
   static bool hasCalibration = false;
 
-  
-
   if (!hasTriedLoad) {
     hasCalibration = calib.loadCalibration();
     hasTriedLoad = true;
@@ -146,13 +145,12 @@ void loop() {
   }
   calib.update(ui->isSimulation());
 
-
   if (sistemaActivo) {
-    float mapLoad = sensors.readMAPLoadPercent();
+    float mapLoadPercent = sensors.readMAPLoadPercent();
     float tpsPorcent = sensors.readLoadTPSPercent();
 
     fsm.update(
-      mapLoad,
+      mapLoadPercent,
       tpsPorcent,
       usbConsoleUI.getCalibRequest(),
       btConsoleUI.getCalibRequest(),
@@ -160,7 +158,7 @@ void loop() {
       debugMgr
     );
     
-    fsm.handleActions();
+    fsm.handleActions(tpsPorcent, mapLoadPercent);
   } else {
     actuators.stopAll();
   }

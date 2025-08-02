@@ -37,7 +37,8 @@ void StateMachine::update(float mapLoadPercent,
     thresholds = thresholdManager->getThresholds();
   }
 
-  currentLevel = tpsLoadPercent / 100.0f;
+  tpsNormalized = tpsLoadPercent / 100.0f;
+  mapNormalized = mapLoadPercent / 100.0f;
 
   switch (current) {
 
@@ -69,10 +70,14 @@ void StateMachine::update(float mapLoadPercent,
       break;
 
     case SystemState::IDLE:
-      if (readyForInjection(tpsLoadPercent, mapLoadPercent)) {
+      if (readyForInjection( mapLoadPercent)) {
         current = SystemState::INYECCION_ACUSTICA;
         if (!actuators->isAcousticOn()) {
-          actuators->startAcoustic(currentLevel);
+          actuators->startAcoustic(0.0f);
+          // Guardar bases para escalado
+          tpsInitialForInj = tpsLoadPercent;
+          mapInitialForInj = mapLoadPercent;
+
         }
         Serial.println("→ Transición: IDLE → INYECCION_ACUSTICA");
       }
@@ -100,10 +105,11 @@ void StateMachine::update(float mapLoadPercent,
       break;
 
     case SystemState::DESCAYENDO:
-      if (readyForInjection(tpsLoadPercent, mapLoadPercent)) {
+      if (readyForInjection(mapLoadPercent)) {
         current = SystemState::INYECCION_ACUSTICA;
         if (!actuators->isAcousticOn()) {
-          actuators->startAcoustic(currentLevel);
+          actuators->startAcoustic(0.0f);
+          
         }
         Serial.println("→ Transición: DESCAYENDO → INYECCION_ACUSTICA");
       }
@@ -124,18 +130,26 @@ void StateMachine::update(float mapLoadPercent,
   }
 }
 
-void StateMachine::handleActions() {
+void StateMachine::handleActions(float tpsLoadPercent, float mapLoadPercent) {
   if (current == SystemState::INYECCION_ACUSTICA) {
-    actuators->setAcousticParameters(currentLevel, lastMapLoadPercent);
+    float tpsScaled = 0.0f;
+    if (tpsLoadPercent > tpsInitialForInj) {
+      tpsScaled = (tpsLoadPercent - tpsInitialForInj) / (100.0f - tpsInitialForInj);
+      tpsScaled = constrain(tpsScaled, 0.0f, 1.0f);
+    }
+
+    float mapScaled = 0.0f;
+    if (mapLoadPercent > mapInitialForInj) {
+      mapScaled = (mapLoadPercent - mapInitialForInj) / (100.0f - mapInitialForInj);
+      mapScaled = constrain(mapScaled, 0.0f, 1.0f);
+    }
+
+    actuators->setAcousticParameters(tpsScaled, mapScaled);
     actuators->update();
   }
-
-  static uint32_t lastPrint = 0;
-  if (millis() - lastPrint > 500) {
-    lastPrint = millis();
-    //Serial.printf("TPS: %.1f%% → Level: %.2f\n", currentLevel * 100.0f, getLevel());
-  }
 }
+
+
 
 void StateMachine::debugForceState(SystemState nuevoEstado) {
   if (current == SystemState::DEBUG) {
@@ -146,9 +160,9 @@ void StateMachine::debugForceState(SystemState nuevoEstado) {
 }
 
 float StateMachine::getLevel() const {
-  return currentLevel;
+  return tpsNormalized;
 }
 
-bool StateMachine::readyForInjection(float tps, float mapLoad) {
-  return tps >= thresholds.INJ_TPS_ON && mapLoad >= thresholds.INJ_MAP_ON;
+bool StateMachine::readyForInjection(float mapLoad) {
+  return  mapLoad >= thresholds.INJ_MAP_ON;
 }

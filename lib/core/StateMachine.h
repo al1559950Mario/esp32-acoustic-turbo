@@ -66,7 +66,7 @@ public:
    * Ejecuta las acciones de salida según el estado actual.
    * @param acousticLevel Nivel de inyección acústica normalizado [0–1].
    */
-  void handleActions();
+  void handleActions(float, float);
 
   /**
    * Si el estado actual es DEBUG, lo reemplaza por uno nuevo.
@@ -74,7 +74,7 @@ public:
    */
   void debugForceState(SystemState nuevoEstado);
   float getLevel() const;
-  bool readyForInjection(float, float);
+  bool readyForInjection( float);
 
   CalibStep currentCalibStep = CalibStep::TPS_MIN;
   unsigned long lastStepTime = 0;
@@ -88,10 +88,13 @@ private:
   ActuatorManager* actuators = nullptr;
   CalibrationManager* calibMgr= nullptr;
   float              lastMapLoadPercent = 0.0f; ///< Guardar el último mapLoadPercent
+  float tpsInitialForInj = 0.0f;
+  float mapInitialForInj = 0.0f;
 
 
   
-  float currentLevel{0.0f};  ///< Nivel actual de inyección acústica calculado internamente
+  float tpsNormalized{0.0f}; 
+  float mapNormalized{0.0f}; 
 
 
 };
