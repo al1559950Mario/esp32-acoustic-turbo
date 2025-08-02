@@ -61,7 +61,6 @@ void ThresholdManager::loadDefaults() {
     thresholds["MAP_WAKEUP_PERCENT"] = 5.0f;
 
     // Umbrales para activar la inyección acústica
-    thresholds["INJ_TPS_ON"]         = 10.0f;   // % TPS mínimo para iniciar
     thresholds["INJ_MAP_ON"]         = 20.0f;   // % MAP mínimo para iniciar
 
     // Umbrales para detener la inyección acústica

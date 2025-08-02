@@ -199,6 +199,7 @@ void CalibrationManager::update(bool sim) {
     calibrationDone = true;
     saveCalibration();
     loadCalibration();
+    Serial.print('Favor de reiniciar el dispositivo o apagar el carro para aplicar cambios.');
   }
 }
 
