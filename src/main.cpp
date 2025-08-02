@@ -146,6 +146,7 @@ void loop() {
   calib.update(ui->isSimulation());
 
   if (sistemaActivo) {
+    sensors.update();
     float mapLoadPercent = sensors.readMAPLoadPercent();
     float tpsPorcent = sensors.readLoadTPSPercent();
 
@@ -158,7 +159,7 @@ void loop() {
       debugMgr
     );
     
-    fsm.handleActions(tpsPorcent, mapLoadPercent);
+    fsm.handleActions();
   } else {
     actuators.stopAll();
   }

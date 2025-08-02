@@ -2,6 +2,7 @@
 #include "MAPSensor.h"
 #include "TPSSensor.h"
 #include <Arduino.h>
+#include "CalibrationManager.h"
 
 class SensorManager {
 public:
@@ -26,14 +27,18 @@ public:
   MAPSensor& getMAP();
   TPSSensor& getTPS();
 
+  float getRelativeTPSLoad(uint16_t, uint16_t );
+  float getRelativeMAPLoad(uint16_t, uint16_t );
+
+
   void update(); // 👈 Opcional, si quieres usar una rutina periódica
 private:
   MAPSensor mapSensor;
   TPSSensor tpsSensor;
   float mapLoadPercent = 0.0f;  //
   bool simulacionActiva = false;
-  float filteredTPS = 0;
-  float filteredMAP = 0;
+  float filteredRawTPS = 0;
+  float filteredRawMAP = 0;
   const float alpha = 0.6;  // coeficiente del filtro
 
 

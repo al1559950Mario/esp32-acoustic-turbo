@@ -51,16 +51,16 @@ float SensorManager::representVoltsFromRaw(uint16_t raw) const {
 }
 
 void SensorManager::update() {
-  uint16_t rawMAP = mapSensor.readRaw();  // lectura directa
-  uint16_t rawTPS = tpsSensor.readRaw();  // lectura directa
+  uint16_t rawMAP = mapSensor.readRaw();
+  uint16_t rawTPS = tpsSensor.readRaw();
 
-  mapLoadPercent = mapSensor.convertRawToPercent(rawMAP);
-  tpsLoadPercent = tpsSensor.convertRawToPercent(rawTPS);;
-    // Filtro IIR aplicado a porcentaje
-  filteredMAP = alpha * mapLoadPercent + (1 - alpha) * filteredMAP;
-  filteredTPS = alpha * tpsLoadPercent + (1 - alpha) * filteredTPS;
-  mapLoadPercent = filteredMAP;
-  tpsLoadPercent = filteredTPS;
+  // Filtro IIR al raw directamente
+  filteredRawMAP = alpha * rawMAP + (1 - alpha) * filteredRawMAP;
+  filteredRawTPS = alpha * rawTPS + (1 - alpha) * filteredRawTPS;
+
+  //Porcentaje absoluto
+  mapLoadPercent = mapSensor.convertRawToPercent((uint16_t)filteredRawMAP);
+  tpsLoadPercent = tpsSensor.convertRawToPercent((uint16_t)filteredRawTPS);
 }
 
 void SensorManager::enableSimulacion() {
@@ -75,4 +75,18 @@ void SensorManager::disableSimulacion() {
 
 bool SensorManager::isSimulation() {
   return simulacionActiva;
+}
+
+float SensorManager::getRelativeTPSLoad(uint16_t tpsInitial, uint16_t max) {
+  if (max <= tpsInitial) return 0.0f;
+
+  float norm = ((float)filteredRawTPS - tpsInitial) / (max - tpsInitial);
+  return constrain(norm, 0.0f, 1.0f) * 100.0f;
+}
+
+float SensorManager::getRelativeMAPLoad(uint16_t mapInitial, uint16_t max) {
+  if (max <= mapInitial) return 0.0f;
+
+  float norm = ((float)filteredRawMAP - mapInitial) / (max - mapInitial);
+  return constrain(norm, 0.0f, 1.0f) * 100.0f;
 }

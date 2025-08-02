@@ -6,7 +6,7 @@
 
 void TPSSensor::begin(uint8_t analogPin) {
   _pin = analogPin;
-  cachedRaw = 0;  // inicializar lectura cacheada
+  _raw = 0;  // inicializar lectura cacheada
   pinMode(_pin, INPUT);
 
   adc1_channel_t channel = pinToADCChannel(_pin);
@@ -25,9 +25,9 @@ uint16_t TPSSensor::readRaw() {
     return 0;
   }
 
-  cachedRaw = analogRead(_pin);  // <-- lectura directa
+  _raw = analogRead(_pin);  // <-- lectura directa
 
-  return cachedRaw;
+  return _raw;
 }
 
 

@@ -23,5 +23,5 @@ public:
 
 private:
   uint8_t _pin = 0xFF;
-  volatile uint16_t cachedRaw = 0;  // lectura cacheada desde ISR
+  volatile uint16_t _raw = 0;  // lectura cacheada desde ISR
 };

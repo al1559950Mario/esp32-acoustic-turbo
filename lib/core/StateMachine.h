@@ -4,6 +4,7 @@
 #include "DebugManager.h"
 #include "ThresholdManager.h"
 #include "CalibrationManager.h"
+#include "SensorManager.h"
 
 
 /**
@@ -66,7 +67,7 @@ public:
    * Ejecuta las acciones de salida según el estado actual.
    * @param acousticLevel Nivel de inyección acústica normalizado [0–1].
    */
-  void handleActions(float, float);
+  void handleActions();
 
   /**
    * Si el estado actual es DEBUG, lo reemplaza por uno nuevo.
@@ -75,6 +76,8 @@ public:
   void debugForceState(SystemState nuevoEstado);
   float getLevel() const;
   bool readyForInjection( float);
+  float getTPSInitialForInj(){return tpsInitialForInj;};
+  float getMAPInitialForInj(){return mapInitialForInj;};
 
   CalibStep currentCalibStep = CalibStep::TPS_MIN;
   unsigned long lastStepTime = 0;
@@ -87,6 +90,7 @@ private:
   SystemState        current{SystemState::OFF};   ///< Estado actual
   ActuatorManager* actuators = nullptr;
   CalibrationManager* calibMgr= nullptr;
+  SensorManager* sensors = nullptr;
   float              lastMapLoadPercent = 0.0f; ///< Guardar el último mapLoadPercent
   float tpsInitialForInj = 0.0f;
   float mapInitialForInj = 0.0f;

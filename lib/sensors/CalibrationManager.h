@@ -2,6 +2,7 @@
 #include "SensorManager.h"
 #include <Preferences.h>
 
+class SensorManager;  
 
 enum class CalibStep {
   TPS_MIN,
