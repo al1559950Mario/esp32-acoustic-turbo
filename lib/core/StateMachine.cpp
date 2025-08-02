@@ -27,7 +27,6 @@ void StateMachine::update(float mapLoadPercent,
                           bool calibLoaded,
                           const DebugManager &dbg) {
   
-  lastMapLoadPercent = mapLoadPercent;
   if (current == SystemState::DEBUG) {
     return;
   }

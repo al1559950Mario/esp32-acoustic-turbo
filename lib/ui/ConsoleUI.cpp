@@ -43,11 +43,7 @@ void ConsoleUI::update() {
 
   if (inputAvailable()) {
     String linea = readLine();
-    //this->println("[DEBUG] Línea recibida cruda: " + linea);
-
     linea.trim();
-    //this->printf("[DEBUG] simulacionActiva = %s\n", simulacionActiva ? "true" : "false");
-
     if (simulationOnPython && linea.startsWith("tps_raw:")) {
       int idxTPS = linea.indexOf("tps_raw:");
       int idxMAP = linea.indexOf("map_raw:");
@@ -58,8 +54,6 @@ void ConsoleUI::update() {
 
         sensors->getTPS().setSimulatedRaw(tpsRaw);
         sensors->getMAP().setSimulatedRaw(mapRaw);
-
-        //this->println("Recibido tps=" + String(tpsRaw) + " map=" + String(mapRaw));
       }
     } else if (linea.length() == 1) {
       interpretarComando(linea.charAt(0));
@@ -69,7 +63,7 @@ void ConsoleUI::update() {
          linea.startsWith("clk_drv:") || linea.startsWith("entry ")) {
       // Es una línea de log del ESP o del simulador: ignorar
       } else {
-        this->println("⚠️  Comando no reconocido.");
+        //
       }
 
   }
