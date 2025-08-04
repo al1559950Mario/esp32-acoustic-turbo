@@ -124,9 +124,9 @@ bool CalibrationManager::runAutoCalibration(SensorManager& sensors, bool simulac
 
   if (!initialized) {
     Serial.println(F("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"));
-    Serial.println(F(" CALIBRACIÓN AUTOMÁTICA EN PROGRESO (20s)"));
-    Serial.println(F("  >> No presiones nada. Mueve el acelerador libremente."));
-    Serial.println(F("  >> Motor encendido por MAP_MAX. Motor apagado para MAP_MIN."));
+    Serial.println(F(" CALIBRACIÓN EN PROGRESO (20s)"));
+    Serial.println(F("  >> Enciende la llave sin motor, presiona el pedal a fondo"));
+    Serial.println(F("  >> Enciende el motor."));
     Serial.println(F("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"));
     startTime = millis();
     initialized = true;
@@ -199,7 +199,7 @@ void CalibrationManager::update(bool sim) {
     calibrationDone = true;
     saveCalibration();
     loadCalibration();
-    Serial.print('Favor de reiniciar el dispositivo o apagar el carro para aplicar cambios.');
+    Serial.print("Favor de reiniciar el dispositivo o apagar el carro para aplicar cambios.");
   }
 }
 
