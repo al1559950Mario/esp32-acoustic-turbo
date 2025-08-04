@@ -1,11 +1,11 @@
 #include "StateMachine.h"
 #include <Arduino.h>  // Para Serial
 
-void StateMachine::begin(bool hasCalibration, ActuatorManager* actuatorsPtr, ThresholdManager* thresholdManagerPtr) {
+void StateMachine::begin(bool hasCalibration, ActuatorManager* actuatorsPtr, ThresholdManager* thresholdManagerPtr, SensorManager* sensorsPtr) {
   current = hasCalibration
               ? SystemState::OFF
               : SystemState::SIN_CALIBRAR;
-
+  sensors = sensorsPtr;
   actuators = actuatorsPtr;
   thresholdManager = thresholdManagerPtr;
   if (thresholdManager) {
