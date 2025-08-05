@@ -10,7 +10,7 @@ float SensorManager::readVacuum_inHg() {
   return vacuum_inHg;
 }
 
-float SensorManager::readLoadTPSPercent() {
+float SensorManager::readTPSLoadPercent() {
   return tpsLoadPercent;
 }
 
@@ -77,16 +77,37 @@ bool SensorManager::isSimulation() {
   return simulacionActiva;
 }
 
-float SensorManager::getRelativeTPSLoad(uint16_t tpsInitial, uint16_t max) {
-  if (max <= tpsInitial) return 0.0f;
 
-  float norm = ((float)filteredRawTPS - tpsInitial) / (max - tpsInitial);
+float SensorManager::getRelativeTPSLoad(uint16_t tpsInitial, uint16_t max) {
+  Serial.println("[getRelativeTPSLoad] Entrando");
+  Serial.print("filteredRawTPS: "); Serial.println(tpsLoadPercent);
+  Serial.print("tpsInitial: "); Serial.println(tpsInitial);
+  Serial.print("max: "); Serial.println(max);
+
+  if (max <= tpsInitial) {
+    Serial.println("[getRelativeTPSLoad] max <= tpsInitial, retorno 0");
+    return 0.0f;
+  }
+
+  float norm = ((float)tpsLoadPercent - tpsInitial) / (max - tpsInitial);
+  Serial.print("norm: "); Serial.println(norm);
   return constrain(norm, 0.0f, 1.0f) * 100.0f;
 }
 
-float SensorManager::getRelativeMAPLoad(uint16_t mapInitial, uint16_t max) {
-  if (max <= mapInitial) return 0.0f;
 
-  float norm = ((float)filteredRawMAP - mapInitial) / (max - mapInitial);
+float SensorManager::getRelativeMAPLoad(uint16_t mapInitial, uint16_t max) {
+  Serial.println("[getRelativeMAPLoad] Entrando");
+  Serial.print("filteredRawMAP: "); Serial.println(mapLoadPercent);
+  Serial.print("mapInitial: "); Serial.println(mapInitial);
+  Serial.print("max: "); Serial.println(max);
+
+  if (max <= mapInitial) {
+    Serial.println("[getRelativeMAPLoad] max <= mapInitial, retorno 0");
+    return 0.0f;
+  }
+
+  float norm = ((float)mapLoadPercent - mapInitial) / (max - mapInitial);
+  Serial.print("norm: "); Serial.println(norm);
+
   return constrain(norm, 0.0f, 1.0f) * 100.0f;
 }

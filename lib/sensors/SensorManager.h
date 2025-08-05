@@ -11,7 +11,7 @@ public:
   void begin(uint8_t pinMAP, uint8_t pinTPS);
 
   float readVacuum_inHg();
-  float readLoadTPSPercent();
+  float readTPSLoadPercent();
   uint16_t readMAPRaw();
   uint16_t readTPSRaw();
   float readMAPVolts();

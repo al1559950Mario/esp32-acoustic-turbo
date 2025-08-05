@@ -74,8 +74,8 @@ void StateMachine::update(float mapLoadPercent,
         if (!actuators->isAcousticOn()) {
           actuators->startAcoustic(0.0f);
           // Guardar bases para escalado
-          tpsInitialForInj = sensors->readTPSRaw();
-          mapInitialForInj = sensors->readMAPRaw();
+          tpsInitialForInj = sensors->readTPSLoadPercent();
+          mapInitialForInj = sensors->readMAPLoadPercent();
 
         }
         Serial.println("→ Transición: IDLE → INYECCION_ACUSTICA");
@@ -131,6 +131,15 @@ void StateMachine::update(float mapLoadPercent,
 
 void StateMachine::handleActions() {
   if (current == SystemState::INYECCION_ACUSTICA) {
+    if (sensors == nullptr) {
+      Serial.println("[FSM] sensors es nullptr");
+      return;
+    }
+
+    if (actuators == nullptr) {
+      Serial.println("[FSM] actuators es nullptr");
+      return;
+    }
     float mapMax = calibMgr->getMAPMax();
     float tpsMax = calibMgr->getTPSMax();
     float deltaTPS = sensors->getRelativeTPSLoad(tpsInitialForInj, tpsMax);     // ← valor entre 0.0 y 1.0 relativo al inicial
@@ -138,8 +147,11 @@ void StateMachine::handleActions() {
     
     actuators->setAcousticParameters(deltaTPS, deltaMAP); 
     actuators->update();
+    Serial.println("[FSM] actuators->update OK");
+
   }
 }
+
 
 
 
