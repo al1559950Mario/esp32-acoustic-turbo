@@ -72,7 +72,7 @@ void StateMachine::update(float mapLoadPercent,
       if (readyForInjection( mapLoadPercent)) {
         current = SystemState::INYECCION_ACUSTICA;
         if (!actuators->isAcousticOn()) {
-          actuators->startAcoustic(0.0f);
+          actuators->startAcoustic(0.1f);
           // Guardar bases para escalado
           tpsInitialForInj = sensors->readTPSRaw();
           mapInitialForInj = sensors->readMAPRaw();
@@ -107,7 +107,7 @@ void StateMachine::update(float mapLoadPercent,
       if (readyForInjection(mapLoadPercent)) {
         current = SystemState::INYECCION_ACUSTICA;
         if (!actuators->isAcousticOn()) {
-          actuators->startAcoustic(0.0f);
+          actuators->startAcoustic(0.1f);
           
         }
         Serial.println("→ Transición: DESCAYENDO → INYECCION_ACUSTICA");
