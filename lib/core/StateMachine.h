@@ -39,7 +39,7 @@ public:
    * @param turboRef Puntero al controlador de turbo.
    * @param injectorRef Puntero al inyector acústico.
    */
-  void begin(bool hasCalibration, ActuatorManager* actuators, ThresholdManager* thresholdManagerPtr);
+  void begin(bool hasCalibration, ActuatorManager* actuators, ThresholdManager* thresholdManagerPtr, SensorManager* sensorsPtr);
 
   /**
    * Obtiene el estado actual.
