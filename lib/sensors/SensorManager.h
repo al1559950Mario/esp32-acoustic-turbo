@@ -27,8 +27,8 @@ public:
   MAPSensor& getMAP();
   TPSSensor& getTPS();
 
-  float getRelativeTPSLoad(uint16_t, uint16_t );
-  float getRelativeMAPLoad(uint16_t, uint16_t );
+  float getRelativeTPSLoad(uint16_t);
+  float getRelativeMAPLoad(uint16_t);
 
 
   void update(); // 👈 Opcional, si quieres usar una rutina periódica
@@ -39,7 +39,7 @@ private:
   bool simulacionActiva = false;
   float filteredRawTPS = 0;
   float filteredRawMAP = 0;
-  const float alpha = 0.6;  // coeficiente del filtro
+  const float alpha = 0.8;  // coeficiente del filtro
 
 
   float vacuum_inHg = 0;

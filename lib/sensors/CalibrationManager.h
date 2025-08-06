@@ -32,9 +32,9 @@ public:
 
 
   uint16_t getMAPMin() const;
-  uint16_t getMAPMax() const;
+  uint16_t getMAPMaxRaw() const;
   uint16_t getTPSMin() const;
-  uint16_t getTPSMax() const;
+  uint16_t getTPSMaxRaw() const;
 
 private:
   CalibrationManager() = default;

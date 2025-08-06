@@ -13,10 +13,10 @@
  */
 enum class SystemState {
   OFF,                   ///< Sistema apagado/standby
-  SIN_CALIBRAR,          ///< No se ha realizado calibración
+  NO_CALIB,          ///< No se ha realizado calibración
   CALIBRATION,           ///< Modo calibración activa
   IDLE,                  ///< Esperando subida de carga
-  INYECCION_ACUSTICA,    ///< Inyección acústica activa
+  BEAM,    ///< Inyección acústica activa
   VORTEX,                 ///< Turbo encendido
   DESCAYENDO,            ///< Turbo descendiendo
   DEBUG,
@@ -39,7 +39,7 @@ public:
    * @param turboRef Puntero al controlador de turbo.
    * @param injectorRef Puntero al inyector acústico.
    */
-  void begin(bool hasCalibration, ActuatorManager* actuators, ThresholdManager* thresholdManagerPtr, SensorManager* sensorsPtr);
+  void begin(bool hasCalibration, ActuatorManager* actuators, ThresholdManager* thresholdManagerPtr, SensorManager* sensorsPtr, CalibrationManager* calibMgrPtr);
 
   /**
    * Obtiene el estado actual.
@@ -76,8 +76,8 @@ public:
   void debugForceState(SystemState nuevoEstado);
   float getLevel() const;
   bool readyForInjection( float);
-  float getTPSInitialForInj(){return tpsInitialForInj;};
-  float getMAPInitialForInj(){return mapInitialForInj;};
+  float getTPSInitialForInj(){return tpsInitialPercent;};
+  float getMAPInitialForInj(){return mapInitialPercent;};
 
   CalibStep currentCalibStep = CalibStep::TPS_MIN;
   unsigned long lastStepTime = 0;
@@ -92,8 +92,8 @@ private:
   CalibrationManager* calibMgr= nullptr;
   SensorManager* sensors = nullptr;
   float              lastMapLoadPercent = 0.0f; ///< Guardar el último mapLoadPercent
-  float tpsInitialForInj = 0.0f;
-  float mapInitialForInj = 0.0f;
+  float tpsInitialPercent = 0.0f;
+  float mapInitialPercent = 0.0f;
 
 
   

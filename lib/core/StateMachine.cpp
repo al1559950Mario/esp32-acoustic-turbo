@@ -1,12 +1,14 @@
 #include "StateMachine.h"
 #include <Arduino.h>  // Para Serial
 
-void StateMachine::begin(bool hasCalibration, ActuatorManager* actuatorsPtr, ThresholdManager* thresholdManagerPtr, SensorManager* sensorsPtr) {
+void StateMachine::begin(bool hasCalibration, ActuatorManager* actuatorsPtr, ThresholdManager* thresholdManagerPtr, SensorManager* sensorsPtr, CalibrationManager* calibMgrPtr) {
   current = hasCalibration
               ? SystemState::OFF
-              : SystemState::SIN_CALIBRAR;
-  sensors = sensorsPtr;
-  actuators = actuatorsPtr;
+              : SystemState::NO_CALIB;
+  this->sensors = sensorsPtr;
+  this->actuators = actuatorsPtr;
+  this->calibMgr = calibMgrPtr;
+
   thresholdManager = thresholdManagerPtr;
   if (thresholdManager) {
     thresholds = thresholdManager->getThresholds();
@@ -42,14 +44,14 @@ void StateMachine::update(float mapLoadPercent,
   switch (current) {
 
     case SystemState::OFF:
-      if (mapLoadPercent < thresholds.MAP_WAKEUP_PERCENT) {
+      if (mapLoadPercent > thresholds.MAP_WAKEUP_PERCENT) {
 
         current = SystemState::IDLE;
         Serial.println("→ Transición: OFF → IDLE");
       }
       break;
 
-    case SystemState::SIN_CALIBRAR:
+    case SystemState::NO_CALIB:
       if (serialCalibReq || bleCalibReq) {
         current = SystemState::CALIBRATION;
         Serial.println("→ Transición: SIN_CALIBRAR → CALIBRATION");
@@ -69,8 +71,13 @@ void StateMachine::update(float mapLoadPercent,
       break;
 
     case SystemState::IDLE:
+      if (mapLoadPercent < 4.0f) {
+        current = SystemState::OFF;
+        Serial.println("→ Transición: IDLE → OFF (MAP = 0%)");
+        break;
+      }
       if (readyForInjection( mapLoadPercent)) {
-        current = SystemState::INYECCION_ACUSTICA;
+        current = SystemState::BEAM;
         if (!actuators->isAcousticOn()) {
           actuators->startAcoustic(0.1f);
           // Guardar bases para escalado
@@ -78,24 +85,24 @@ void StateMachine::update(float mapLoadPercent,
             Serial.println("Error: SensorManager no está inicializado");
             return;
           }
-          tpsInitialForInj = sensors->readTPSLoadPercent();
-          mapInitialForInj = sensors->readMAPLoadPercent();
+          tpsInitialPercent = sensors->readTPSLoadPercent();
+          mapInitialPercent = sensors->readMAPLoadPercent();
 
         }
-        Serial.println("→ Transición: IDLE → INYECCION_ACUSTICA");
+        Serial.println("→ Transición: IDLE → BEAM");
       }
       break;
 
-    case SystemState::INYECCION_ACUSTICA:
+    case SystemState::BEAM:
       if (tpsLoadPercent >= thresholds.VORTEX_TPS_ON && mapLoadPercent >= thresholds.VORTEX_MAP_ON) {
         current = SystemState::VORTEX;
         actuators->startVortex();
-        Serial.println("→ Transición: INYECCION_ACUSTICA → VORTEX");
+        Serial.println("→ Transición: BEAM → VORTEX");
       }
       else if (tpsLoadPercent <= thresholds.INJ_TPS_OFF) {
         current = SystemState::IDLE;
         actuators->stopAcoustic();
-        Serial.println("→ Transición: INYECCION_ACUSTICA → IDLE");
+        Serial.println("→ Transición: BEAM → IDLE");
       }
       break;
 
@@ -109,12 +116,12 @@ void StateMachine::update(float mapLoadPercent,
 
     case SystemState::DESCAYENDO:
       if (readyForInjection(mapLoadPercent)) {
-        current = SystemState::INYECCION_ACUSTICA;
+        current = SystemState::BEAM;
         if (!actuators->isAcousticOn()) {
           actuators->startAcoustic(0.1f);
           
         }
-        Serial.println("→ Transición: DESCAYENDO → INYECCION_ACUSTICA");
+        Serial.println("→ Transición: DESCAYENDO → BEAM");
       }
       else if (tpsLoadPercent <= thresholds.INJ_TPS_OFF || mapLoadPercent <= thresholds.INJ_MAP_OFF) {
         current = SystemState::IDLE;
@@ -134,11 +141,10 @@ void StateMachine::update(float mapLoadPercent,
 }
 
 void StateMachine::handleActions() {
-  if (current == SystemState::INYECCION_ACUSTICA) {
+  if (current == SystemState::BEAM || current == SystemState::VORTEX) {
     if (sensors == nullptr) {
       return;
     }
-
     if (actuators == nullptr) {
       return;
     }
@@ -146,12 +152,9 @@ void StateMachine::handleActions() {
       return;
     }
 
-    float mapMax = calibMgr->getMAPMax();
-    float tpsMax = calibMgr->getTPSMax();
-    float deltaTPS = sensors->getRelativeTPSLoad(tpsInitialForInj, tpsMax);     // ← valor entre 0.0 y 1.0 relativo al inicial
-    float deltaMAP = sensors->getRelativeMAPLoad(mapInitialForInj, mapMax);     // ← lo mismo para MAP
-    
-    actuators->setAcousticParameters(deltaTPS, deltaMAP); 
+    float deltaTPSPercent = sensors->getRelativeTPSLoad(tpsInitialPercent);     // ←  // ← valor entre 0.0 y 100.0 (porcentaje)
+    float deltaMAPercent = sensors->getRelativeMAPLoad(mapInitialPercent);     // ←  // ← valor entre 0.0 y 100.0 (porcentaje)
+    actuators->setAcousticParameters(deltaTPSPercent, deltaMAPercent); 
     actuators->update();
 
   }

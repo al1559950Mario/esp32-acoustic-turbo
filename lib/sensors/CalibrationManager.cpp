@@ -184,9 +184,9 @@ bool CalibrationManager::runAutoCalibration(SensorManager& sensors, bool simulac
 
 // Getters
 uint16_t CalibrationManager::getMAPMin() const { return mapMin; }
-uint16_t CalibrationManager::getMAPMax() const { return mapMax; }
+uint16_t CalibrationManager::getMAPMaxRaw() const { return mapMax; }
 uint16_t CalibrationManager::getTPSMin() const { return tpsMin; }
-uint16_t CalibrationManager::getTPSMax() const { return tpsMax; }
+uint16_t CalibrationManager::getTPSMaxRaw() const { return tpsMax; }
 
 void CalibrationManager::update(bool sim) {
   if (calibrationDone || sensors == nullptr) {

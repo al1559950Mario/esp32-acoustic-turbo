@@ -34,7 +34,7 @@ uint16_t MAPSensor::readRaw() {
 float MAPSensor::readNormalized() {
   uint16_t raw = readRaw();
   uint16_t min = CalibrationManager::getInstance().getMAPMin();
-  uint16_t max = CalibrationManager::getInstance().getMAPMax();
+  uint16_t max = CalibrationManager::getInstance().getMAPMaxRaw();
 
   if (max <= min) return 0.0f;
 
@@ -63,7 +63,7 @@ float MAPSensor::convertRawToHg(uint16_t raw) {
 
 float MAPSensor::convertRawToPercent(uint16_t raw) {
   uint16_t min = CalibrationManager::getInstance().getMAPMin();
-  uint16_t max = CalibrationManager::getInstance().getMAPMax();
+  uint16_t max = CalibrationManager::getInstance().getMAPMaxRaw();
 
   //Serial.print("[DEBUG] MAP Raw: "); Serial.println(raw);
   //Serial.print("[DEBUG] MAP Min: "); Serial.println(min);
@@ -85,7 +85,7 @@ float MAPSensor::convertRawToPercent(uint16_t raw) {
 float MAPSensor::readMAPLoadPercent() {
   uint16_t raw = readRaw();
   uint16_t min = CalibrationManager::getInstance().getMAPMin();
-  uint16_t max = CalibrationManager::getInstance().getMAPMax();
+  uint16_t max = CalibrationManager::getInstance().getMAPMaxRaw();
 
   if (max <= min) return 0.0f;
 

@@ -137,7 +137,7 @@ void ConsoleUI::interpretarComando(char c) {
       if (!devOnly()) break;
       CalibrationManager::getInstance().clearCalibration();
       if (fsm) {
-        fsm->debugForceState(SystemState::SIN_CALIBRAR);
+        fsm->debugForceState(SystemState::NO_CALIB);
         this->println(">> Se requiere recalibrar de nuevo para poder usar el sistema");
       } else {
         this->println("⚠️ No se puede cambiar estado: FSM no está disponible.");
@@ -240,9 +240,9 @@ void ConsoleUI::imprimirDashboard() {
 
   auto& calib = CalibrationManager::getInstance();
   uint16_t tpsMin = calib.getTPSMin();
-  uint16_t tpsMax = calib.getTPSMax();
+  uint16_t tpsMax = calib.getTPSMaxRaw();
   uint16_t mapMin = calib.getMAPMin();
-  uint16_t mapMax = calib.getMAPMax();
+  uint16_t mapMax = calib.getMAPMaxRaw();
 
   static const char* stateNames[] = {
     "OFF", "SIN_CAL", "CALIB", "IDLE",

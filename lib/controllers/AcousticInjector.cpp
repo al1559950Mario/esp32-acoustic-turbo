@@ -167,7 +167,7 @@ void AcousticInjector::testSimple() {
 
 float AcousticInjector::mapLoadToWaveFrequency(float percent) {
   constexpr float FREQ_MIN = 4200.0f;   // Baja carga
-  constexpr float FREQ_MAX = 6400.0f;   // Alta carga
+  constexpr float FREQ_MAX = 6500.0f;   // Alta carga
   percent = constrain(percent, 0.0f, 100.0f);
   return FREQ_MIN + (percent / 100.0f) * (FREQ_MAX - FREQ_MIN);
 }

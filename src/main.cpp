@@ -120,7 +120,7 @@ void setup() {
     Serial.println("❌ Error al iniciar ThresholdManager");
   }
 
-  fsm.begin(calibLoaded, &actuators, thresholdManagerPtr, &sensors);
+  fsm.begin(calibLoaded, &actuators, thresholdManagerPtr, &sensors, &calib);
 
   actuators.stopAll();
 
