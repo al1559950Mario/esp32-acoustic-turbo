@@ -74,6 +74,10 @@ void StateMachine::update(float mapLoadPercent,
         if (!actuators->isAcousticOn()) {
           actuators->startAcoustic(0.0f);
           // Guardar bases para escalado
+          if (!sensors) {
+            Serial.println("Error: SensorManager no está inicializado");
+            return;
+          }
           tpsInitialForInj = sensors->readTPSLoadPercent();
           mapInitialForInj = sensors->readMAPLoadPercent();
 
@@ -140,13 +144,13 @@ void StateMachine::handleActions() {
       Serial.println("[FSM] actuators es nullptr");
       return;
     }
-    float mapMax = calibMgr->getMAPMax();
-    float tpsMax = calibMgr->getTPSMax();
-    float deltaTPS = sensors->getRelativeTPSLoad(tpsInitialForInj, tpsMax);     // ← valor entre 0.0 y 1.0 relativo al inicial
-    float deltaMAP = sensors->getRelativeMAPLoad(mapInitialForInj, mapMax);     // ← lo mismo para MAP
+    //float mapMax = calibMgr->getMAPMax();
+    //float tpsMax = calibMgr->getTPSMax();
+    //float deltaTPS = sensors->getRelativeTPSLoad(tpsInitialForInj, tpsMax);     // ← valor entre 0.0 y 1.0 relativo al inicial
+    //float deltaMAP = sensors->getRelativeMAPLoad(mapInitialForInj, mapMax);     // ← lo mismo para MAP
     
-    actuators->setAcousticParameters(deltaTPS, deltaMAP); 
-    actuators->update();
+    //actuators->setAcousticParameters(deltaTPS, deltaMAP); 
+    //actuators->update();
     Serial.println("[FSM] actuators->update OK");
 
   }
