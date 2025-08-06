@@ -136,22 +136,19 @@ void StateMachine::update(float mapLoadPercent,
 void StateMachine::handleActions() {
   if (current == SystemState::INYECCION_ACUSTICA) {
     if (sensors == nullptr) {
-      Serial.println("[FSM] sensors es nullptr");
       return;
     }
 
     if (actuators == nullptr) {
-      Serial.println("[FSM] actuators es nullptr");
       return;
     }
-    //float mapMax = calibMgr->getMAPMax();
-    //float tpsMax = calibMgr->getTPSMax();
-    //float deltaTPS = sensors->getRelativeTPSLoad(tpsInitialForInj, tpsMax);     // ← valor entre 0.0 y 1.0 relativo al inicial
-    //float deltaMAP = sensors->getRelativeMAPLoad(mapInitialForInj, mapMax);     // ← lo mismo para MAP
+    float mapMax = calibMgr->getMAPMax();
+    float tpsMax = calibMgr->getTPSMax();
+    float deltaTPS = sensors->getRelativeTPSLoad(tpsInitialForInj, tpsMax);     // ← valor entre 0.0 y 1.0 relativo al inicial
+    float deltaMAP = sensors->getRelativeMAPLoad(mapInitialForInj, mapMax);     // ← lo mismo para MAP
     
-    //actuators->setAcousticParameters(deltaTPS, deltaMAP); 
-    //actuators->update();
-    Serial.println("[FSM] actuators->update OK");
+    actuators->setAcousticParameters(deltaTPS, deltaMAP); 
+    actuators->update();
 
   }
 }

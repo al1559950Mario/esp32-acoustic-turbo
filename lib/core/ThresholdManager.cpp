@@ -18,7 +18,6 @@ bool ThresholdManager::begin() {
 Thresholds ThresholdManager::getThresholds() const {
     Thresholds t;
     t.MAP_WAKEUP_PERCENT = thresholds.at("MAP_WAKEUP_PERCENT");
-    t.INJ_TPS_ON        = thresholds.at("INJ_TPS_ON");
     t.INJ_MAP_ON        = thresholds.at("INJ_MAP_ON");
     t.INJ_TPS_OFF       = thresholds.at("INJ_TPS_OFF");
     t.INJ_MAP_OFF       = thresholds.at("INJ_MAP_OFF");
@@ -62,6 +61,7 @@ void ThresholdManager::loadDefaults() {
 
     // Umbrales para activar la inyección acústica
     thresholds["INJ_MAP_ON"]         = 20.0f;   // % MAP mínimo para iniciar
+
 
     // Umbrales para detener la inyección acústica
     thresholds["INJ_TPS_OFF"]        = 8.0f;    // % TPS para apagar

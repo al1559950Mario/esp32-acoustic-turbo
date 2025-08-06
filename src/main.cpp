@@ -131,7 +131,6 @@ void setup() {
 }
 
 void loop() {
-  Serial.println("[LOOP] Entrando loop()");
   bool sistemaActivo = usbConsoleUI.isSistemaActivo() || btConsoleUI.isSistemaActivo();
 
   static bool hasTriedLoad = false;
@@ -140,13 +139,10 @@ void loop() {
   if (!hasTriedLoad) {
     hasCalibration = calib.loadCalibration();
     hasTriedLoad = true;
-    Serial.print("[LOOP] Calibración verificada: ");
-    Serial.println(hasCalibration);
   }
 
   if (ui->getCalibRequest()) {
     calib.clearCalibration();
-    Serial.println("[LOOP] Petición de calibración detectada");
   }
 
   calib.update(ui->isSimulation());
@@ -156,7 +152,6 @@ void loop() {
     float mapLoadPercent = sensors.readMAPLoadPercent();
     float tpsPorcent = sensors.readTPSLoadPercent();
 
-    Serial.println("[LOOP] Actualizando FSM...");
     fsm.update(
       mapLoadPercent,
       tpsPorcent,
@@ -165,9 +160,8 @@ void loop() {
       hasCalibration, 
       debugMgr
     );
-
-    Serial.println("[LOOP] Ejecutando acciones FSM");
     fsm.handleActions();
+
   } else {
     actuators.stopAll();
   }

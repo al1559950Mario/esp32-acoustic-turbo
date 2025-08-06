@@ -86,7 +86,9 @@ void ConsoleUI::interpretarComando(char c) {
     }
     return true;
   };
-  tiempoProximaImpresionHUD = millis() + 2500;
+  
+  if (simulationOnPython)
+      tiempoProximaImpresionHUD = millis() + 2500;
 
   switch (c) {
     case 'a':  // Toggle sistema ON/OFF
