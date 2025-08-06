@@ -142,6 +142,10 @@ void StateMachine::handleActions() {
     if (actuators == nullptr) {
       return;
     }
+    if (calibMgr == nullptr) {
+      return;
+    }
+
     float mapMax = calibMgr->getMAPMax();
     float tpsMax = calibMgr->getTPSMax();
     float deltaTPS = sensors->getRelativeTPSLoad(tpsInitialForInj, tpsMax);     // ← valor entre 0.0 y 1.0 relativo al inicial
