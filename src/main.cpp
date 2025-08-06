@@ -131,25 +131,32 @@ void setup() {
 }
 
 void loop() {
-
+  Serial.println("[LOOP] Entrando loop()");
   bool sistemaActivo = usbConsoleUI.isSistemaActivo() || btConsoleUI.isSistemaActivo();
+
   static bool hasTriedLoad = false;
   static bool hasCalibration = false;
 
   if (!hasTriedLoad) {
     hasCalibration = calib.loadCalibration();
     hasTriedLoad = true;
+    Serial.print("[LOOP] Calibración verificada: ");
+    Serial.println(hasCalibration);
   }
+
   if (ui->getCalibRequest()) {
-      calib.clearCalibration();
+    calib.clearCalibration();
+    Serial.println("[LOOP] Petición de calibración detectada");
   }
+
   calib.update(ui->isSimulation());
 
   if (sistemaActivo) {
-    sensors.update();
+    //sensors.update(); ya se esta manejando por task en paralelo borrar esta linea
     float mapLoadPercent = sensors.readMAPLoadPercent();
     float tpsPorcent = sensors.readTPSLoadPercent();
 
+    Serial.println("[LOOP] Actualizando FSM...");
     fsm.update(
       mapLoadPercent,
       tpsPorcent,
@@ -158,7 +165,8 @@ void loop() {
       hasCalibration, 
       debugMgr
     );
-    
+
+    Serial.println("[LOOP] Ejecutando acciones FSM");
     fsm.handleActions();
   } else {
     actuators.stopAll();
