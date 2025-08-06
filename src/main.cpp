@@ -8,8 +8,7 @@
 #include "BluetoothSerialConsoleUI.h"
 #include <BluetoothSerial.h>
 #include "ThresholdManager.h"
-
-
+#include "Logger.h"
 
 // PIN-OUT
 constexpr uint8_t PIN_MAP             = 35;
@@ -29,6 +28,8 @@ BluetoothSerial SerialBT;
 CalibrationManager& calib = CalibrationManager::getInstance();
 DebugManager       debugMgr;
 ThresholdManager* thresholdManagerPtr;
+Logger logger(SerialBT);  // Instancia global del logger
+
 bool calibLoaded = false;
 
 void TaskSensorUpdate(void* param) {
@@ -102,6 +103,8 @@ void setup() {
   btConsoleUI.attachSensors(&sensors);
   btConsoleUI.attachActuators(&actuators);
   btConsoleUI.imprimirDashboard();
+  btConsoleUI.attachLogger(&logger);
+
 
   usbConsoleUI.setMirror(&btConsoleUI);
   btConsoleUI.setMirror(&usbConsoleUI);
@@ -150,18 +153,20 @@ void loop() {
   if (sistemaActivo) {
     //sensors.update(); ya se esta manejando por task en paralelo borrar esta linea
     float mapLoadPercent = sensors.readMAPLoadPercent();
-    float tpsPorcent = sensors.readTPSLoadPercent();
+    float tpsLoadPorcent = sensors.readTPSLoadPercent();
 
     fsm.update(
       mapLoadPercent,
-      tpsPorcent,
+      tpsLoadPorcent,
       usbConsoleUI.getCalibRequest(),
       btConsoleUI.getCalibRequest(),
       hasCalibration, 
       debugMgr
     );
     fsm.handleActions();
-
+    if (logger.isEnabled()) {
+      logger.log(tpsLoadPorcent, mapLoadPercent);  //agregar más valores en el futuro
+    }
   } else {
     actuators.stopAll();
   }

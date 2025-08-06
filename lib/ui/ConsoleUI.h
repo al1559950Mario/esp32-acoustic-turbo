@@ -3,6 +3,7 @@
 #include "StateMachine.h"
 #include "SensorManager.h"
 #include "ActuatorManager.h" 
+#include "Logger.h"
 
 class ConsoleUI {
 public:
@@ -24,7 +25,9 @@ public:
   virtual void println(const String& msg) = 0;
   virtual void printf(const char* fmt, ...) = 0;
   virtual bool isSimulation() const { return  simulationOnPython; };
-
+  void attachLogger(Logger* loggerPtr) {
+    logger = loggerPtr;
+  }
 
   virtual bool isDeveloperMode() const;
 protected:
@@ -40,6 +43,7 @@ protected:
 
   unsigned long lastTransitionMS = 0;
   unsigned long tiempoProximaImpresionHUD = 0;
+  Logger* logger = nullptr;
 
   SystemState lastState = SystemState::OFF;
 

@@ -211,6 +211,24 @@ void ConsoleUI::interpretarComando(char c) {
                   sensors->getMAP().readRaw(),
                   sensors->getMAP().readVolts());
       break;
+    case 'l':  // Toggle logging CSV vía Bluetooth
+      if (!devOnly()) break;
+      if (logger) {
+        bool nuevoEstado = !logger->isEnabled();
+        logger->enable(nuevoEstado);
+
+        if (nuevoEstado) {
+          this->println(">> Logging ACTIVADO: se enviarán datos CSV por Bluetooth.");
+          dashboardEnabled = false;  // detener HUD si es necesario
+        } else {
+          this->println(">> Logging DESACTIVADO: se reanuda consola normal.");
+          dashboardEnabled = true;   // reactivar HUD
+        }
+      } else {
+        this->println("⚠️ Logger no conectado.");
+      }
+      break;
+
     default:
       if (!simulationOnPython) break;
       this->print("❓ Comando no reconocido: ");
