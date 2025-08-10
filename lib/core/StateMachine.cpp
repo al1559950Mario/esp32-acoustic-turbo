@@ -108,25 +108,25 @@ void StateMachine::update(float mapLoadPercent,
 
     case SystemState::VORTEX:
       if (tpsLoadPercent < thresholds.VORTEX_TPS_OFF) {
-        current = SystemState::DESCAYENDO;
+        current = SystemState::COOLDOWN;
         actuators->stopVortex();
-        Serial.println("→ Transición: VORTEX → DESCAYENDO");
+        Serial.println("→ Transición: VORTEX → COOLDOWN");
       }
       break;
 
-    case SystemState::DESCAYENDO:
+    case SystemState::COOLDOWN:
       if (readyForInjection(mapLoadPercent)) {
         current = SystemState::BEAM;
         if (!actuators->isAcousticOn()) {
           actuators->startAcoustic(0.1f);
           
         }
-        Serial.println("→ Transición: DESCAYENDO → BEAM");
+        Serial.println("→ Transición: COOLDOWN → BEAM");
       }
       else if (tpsLoadPercent <= thresholds.INJ_TPS_OFF || mapLoadPercent <= thresholds.INJ_MAP_OFF) {
         current = SystemState::IDLE;
         actuators->stopAcoustic();
-        Serial.println("→ Transición: DESCAYENDO → IDLE");
+        Serial.println("→ Transición: COOLDOWN → IDLE");
       }
       break;
 
@@ -155,6 +155,7 @@ void StateMachine::handleActions() {
     float deltaTPSPercent = sensors->getRelativeTPSLoad(tpsInitialPercent);     // ←  // ← valor entre 0.0 y 100.0 (porcentaje)
     float deltaMAPercent = sensors->getRelativeMAPLoad(mapInitialPercent);     // ←  // ← valor entre 0.0 y 100.0 (porcentaje)
     actuators->setAcousticParameters(deltaTPSPercent, deltaMAPercent); 
+    //actuators->update(deltaTPSPercent, deltaMAPercent);
     actuators->update();
 
   }

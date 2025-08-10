@@ -7,7 +7,7 @@ import threading
 IDLE_RPM       = 800
 MAX_RPM        = 7000
 SHIFT_RPM      = 6200
-DT             = 0.1
+DT             = 0.2
 THROTTLE_STEP  = 0.09   # Incremento deseado para objetivo
 THROTTLE_RATE  = 0.009   # Velocidad con la que throttle real se acerca al objetivo
 THROTTLE_DROP  = 0.2

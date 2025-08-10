@@ -18,7 +18,7 @@ enum class SystemState {
   IDLE,                  ///< Esperando subida de carga
   BEAM,    ///< Inyección acústica activa
   VORTEX,                 ///< Turbo encendido
-  DESCAYENDO,            ///< Turbo descendiendo
+  COOLDOWN,            ///< Turbo descendiendo
   DEBUG,
   UNKNOWN                  ///< Estado de debug (solo con forzar)
 };

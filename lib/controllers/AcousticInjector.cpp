@@ -4,9 +4,16 @@
 
 AcousticInjector* AcousticInjector::_instance = nullptr;
 
-const uint8_t AcousticInjector::_sineTable[AcousticInjector::TABLE_SIZE] = {
-  128, 176, 218, 245, 255, 245, 218, 176,
-  128, 80, 38, 11, 1, 11, 38, 80
+// Nuevo:
+uint8_t AcousticInjector::_sineTable[AcousticInjector::TABLE_SIZE] = {
+  128, 140, 153, 165, 177, 188, 198, 207,
+  215, 222, 227, 231, 234, 235, 235, 234,
+  231, 227, 222, 215, 207, 198, 188, 177,
+  165, 153, 140, 128, 115, 102,  90,  78,
+   67,  57,  48,  40,  33,  28,  24,  21,
+   20,  20,  21,  24,  28,  33,  40,  48,
+   57,  67,  78,  90, 102, 115, 128, 140,
+  153, 165, 177, 188, 198, 207, 215, 222
 };
 
 void AcousticInjector::begin(uint8_t dacPin, uint8_t relayPin) {
@@ -25,23 +32,48 @@ void AcousticInjector::begin(uint8_t dacPin, uint8_t relayPin) {
   _index = 0;
   _levelInt = 0;
 
+  // construir tabla seno en RAM
+  for (int i = 0; i < TABLE_SIZE; ++i) {
+    float s = sinf(2.0f * PI * (float)i / (float)TABLE_SIZE);
+    int v = (int)roundf(128.0f + s * 127.0f);
+    v = constrain(v, 0, 255);
+    _sineTable[i] = (uint8_t)v;
+  }
+
+  // configurar timer a sampleRate fijo (counts = us porque prescaler 80 -> 1MHz)
   _timer = timerBegin(2, 80, true); // Timer 2, 1 MHz
   timerAttachInterrupt(_timer, &AcousticInjector::onTimer, true);
-  timerAlarmWrite(_timer, 1000000 / SAMPLE_RATE, true); // 64kHz
+
+  float sampleRate = DEFAULT_SAMPLE_RATE; // p.ej. 64kHz
+  float periodPerSample = 1e6f / sampleRate; // μs
+  timerAlarmWrite(_timer, static_cast<uint32_t>(periodPerSample), true);
   timerAlarmDisable(_timer);
+
+  // init phase values
+  _phaseAcc = 0;
+  _phaseStep = 0;
+  _levelInt = (uint8_t)(_level * 255.0f);
+
 }
+
 
 void AcousticInjector::start(float level) {
   _targetLevel = constrain(level, 0.0f, 1.0f);
-  _level = 0.0f;
-  _levelInt = 0;
-  _index = 0;
 
+  // Antes:
+  // _level = 0.0f;
+  // _levelInt = 0;
+  // Ahora: arranca en el nivel objetivo solicitado (ej. 0.1f)
+  _level = _targetLevel;
+  _levelInt = (uint8_t)(_level * 255.0f);
+
+  _index = 0;
   digitalWrite(_relayPin, HIGH);
   delay(10);
-
   timerAlarmEnable(_timer);
 }
+
+
 
 void AcousticInjector::stop() {
   timerAlarmDisable(_timer);
@@ -68,15 +100,20 @@ void AcousticInjector::update() {
 void IRAM_ATTR AcousticInjector::onTimer() {
   if (!_instance) return;
 
-  uint8_t raw = _instance->_sineTable[_instance->_index];
+  // actualizar acumulador de fase
+  _instance->_phaseAcc += _instance->_phaseStep;
+
+  // sacar índice: parte entera de phaseAcc >> PHASE_FRAC
+  // asumiendo TABLE_SIZE potencia de 2, usamos máscara
+  uint32_t idx = (_instance->_phaseAcc >> PHASE_FRAC) & (TABLE_SIZE - 1);
+
+  uint8_t raw = _instance->_sineTable[idx];
   int16_t delta = (int16_t)raw - 128;
   int16_t modulated = 128 + ((delta * _instance->_levelInt) >> 8);
-  uint8_t output = constrain(modulated, 0, 255);
+  uint8_t output = (uint8_t)constrain(modulated, 0, 255);
 
   dac_output_voltage(_instance->_dacChannel, output);
   _instance->_lastDACValue = output;
-
-  _instance->_index = (_instance->_index + 1) % TABLE_SIZE;
 }
 
 void IRAM_ATTR AcousticInjector::applyPendingDAC() {
@@ -173,8 +210,24 @@ float AcousticInjector::mapLoadToWaveFrequency(float percent) {
 }
 
 void AcousticInjector::updateWaveFrequency(float freqHz) {
-  if (!_timer) return;
-  _currentFrequency = freqHz;
-  float periodPerSample = 1e6 / (freqHz * TABLE_SIZE);  // μs por muestra
-  timerAlarmWrite(_timer, static_cast<uint32_t>(periodPerSample), true);
+    if (!_timer) return;
+
+    // sampleRate fijo
+    const float sampleRate = DEFAULT_SAMPLE_RATE;
+
+    // calcular step en fixed-point: step = freqHz * TABLE_SIZE / sampleRate
+    // representado en (1<<PHASE_FRAC) fraccional
+    double step = (double)freqHz * (double)TABLE_SIZE * (double)(1ULL << PHASE_FRAC) / (double)sampleRate;
+    uint32_t newStep = (uint32_t)round(step);
+
+    // garantizar que no sea cero (para frecuencias muy bajas)
+    if (newStep == 0) newStep = 1;
+
+    _currentFrequency = freqHz;
+    _phaseStep = newStep;
+
+    // mantener el timer con la misma sampleRate (no tocarlo)
+    // (opcional) si quieres actualizar periodo por sample:
+    float periodPerSample = 1e6f / sampleRate;
+    timerAlarmWrite(_timer, static_cast<uint32_t>(periodPerSample), true);
 }

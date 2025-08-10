@@ -5,7 +5,7 @@
 
 class AcousticInjector {
 public:
-  static constexpr uint8_t TABLE_SIZE = 16;
+  static constexpr uint8_t TABLE_SIZE = 64;
   static constexpr uint32_t SAMPLE_RATE = 64000;  // 64 kHz para alta fidelidad
   // Paso de rampa para suavizar cambios en el nivel (_level).
   // Modificar este valor para hacer la transición más lenta (valor menor) o más rápida (valor mayor).
@@ -44,8 +44,15 @@ private:
   hw_timer_t* _timer = nullptr;
   volatile uint8_t _levelInt = 0;  // nivel escalado 0-255 para ISR
   float _currentFrequency = 0.0f;
+  static constexpr uint8_t PHASE_FRAC = 24;   
+  static_assert((1 << PHASE_FRAC) > 0, "PHASE_FRAC ok");
+
+  volatile uint32_t _phaseAcc = 0;
+  volatile uint32_t _phaseStep = 0; 
+  static constexpr float DEFAULT_SAMPLE_RATE = 64000.0f; // tasa de muestreo segura
 
 
   // Tabla seno 16 muestras para ISR rápido (0-255)
-  static const uint8_t _sineTable[TABLE_SIZE];
+  static uint8_t _sineTable[TABLE_SIZE];
+  
 };
