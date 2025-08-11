@@ -99,7 +99,7 @@ void StateMachine::update(float mapLoadPercent,
         actuators->startVortex();
         Serial.println("→ Transición: BEAM → VORTEX");
       }
-      else if (tpsLoadPercent <= thresholds.INJ_TPS_OFF) {
+      else if (tpsLoadPercent <= thresholds.INJ_TPS_OFF && mapLoadPercent <= thresholds.INJ_MAP_OFF) {
         current = SystemState::IDLE;
         actuators->stopAcoustic();
         Serial.println("→ Transición: BEAM → IDLE");
