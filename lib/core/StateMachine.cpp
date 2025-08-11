@@ -141,7 +141,7 @@ void StateMachine::update(float mapLoadPercent,
 }
 
 void StateMachine::handleActions() {
-  if (current == SystemState::BEAM || current == SystemState::VORTEX) {
+  if (current == SystemState::BEAM || current == SystemState::VORTEX || current == SystemState::COOLDOWN) {
     if (sensors == nullptr) {
       return;
     }
@@ -155,7 +155,6 @@ void StateMachine::handleActions() {
     float deltaTPSPercent = sensors->getRelativeTPSLoad(tpsInitialPercent);     // ←  // ← valor entre 0.0 y 100.0 (porcentaje)
     float deltaMAPercent = sensors->getRelativeMAPLoad(mapInitialPercent);     // ←  // ← valor entre 0.0 y 100.0 (porcentaje)
     actuators->setAcousticParameters(deltaTPSPercent, deltaMAPercent); 
-    //actuators->update(deltaTPSPercent, deltaMAPercent);
     actuators->update();
 
   }

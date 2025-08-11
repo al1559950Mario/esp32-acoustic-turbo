@@ -151,7 +151,6 @@ void loop() {
   calib.update(ui->isSimulation());
 
   if (sistemaActivo) {
-    //sensors.update(); ya se esta manejando por task en paralelo borrar esta linea
     float mapLoadPercent = sensors.readMAPLoadPercent();
     float tpsLoadPorcent = sensors.readTPSLoadPercent();
 

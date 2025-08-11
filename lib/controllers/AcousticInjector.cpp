@@ -90,14 +90,32 @@ void AcousticInjector::setLevel(float level) {
 }
 
 void AcousticInjector::update() {
-    float diff = _targetLevel - _level;
-    if (fabs(diff) < RAMP_STEP)
+    // Suavizado nivel 
+    float diffLevel = _targetLevel - _level;
+    if (fabs(diffLevel) < RAMP_STEP)
         _level = _targetLevel;
     else
-        _level += (diff > 0 ? RAMP_STEP : -RAMP_STEP);
-
+        _level += (diffLevel > 0 ? RAMP_STEP : -RAMP_STEP);
     _levelInt = (uint8_t)(_level * 255.0f);
+
+    // Suavizado frecuencia (lineal o logarítmico)
+    if (fabs(_targetFrequency - _currentFrequency) > 0.5f) { // umbral para evitar "bailoteos"
+        // Aquí puedes hacer un paso pequeño hacia la meta
+        float stepFreq = 10.0f; // Hz por llamada, ajustar según sensibilidad
+
+        if (_targetFrequency > _currentFrequency)
+            _currentFrequency += stepFreq;
+        else
+            _currentFrequency -= stepFreq;
+
+        // Evitar sobrepasar
+        if ((_targetFrequency - _currentFrequency) * stepFreq < 0)
+            _currentFrequency = _targetFrequency;
+
+        updateWaveFrequency(_currentFrequency);
+    }
 }
+
 
 
 
