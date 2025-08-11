@@ -1,9 +1,11 @@
 #include "SensorManager.h"
 
 
-void SensorManager::begin(uint8_t pinMAP, uint8_t pinTPS) {
+void SensorManager::begin(uint8_t pinMAP, uint8_t pinTPS, uint8_t pinPressureData, uint8_t pinPressureSCK) {
   mapSensor.begin(pinMAP);
   tpsSensor.begin(pinTPS);
+  pressureSensor.begin(pinPressureData, pinPressureSCK);
+
 }
 
 float SensorManager::readVacuum_inHg() {
@@ -87,4 +89,12 @@ float SensorManager::getRelativeTPSLoad(uint16_t tpsInitial) {
 float SensorManager::getRelativeMAPLoad(uint16_t mapInitialPercent) {
   float norm = ((float)mapLoadPercent - mapInitialPercent) / (100.0f - mapInitialPercent);
   return constrain(norm, 0.0f, 1.0f) * 100.0f;
+}
+
+float SensorManager::readPressure_kPa() {
+    return pressureSensor.readPressure_kPa();
+}
+
+long SensorManager::readPressureRaw() {
+    return pressureSensor.readRaw();
 }

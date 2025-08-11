@@ -16,6 +16,9 @@ constexpr uint8_t PIN_TPS             = 34;
 constexpr uint8_t PIN_RELAY_TURBO     =  2;
 constexpr uint8_t PIN_RELAY_ACOUSTIC  =  4;
 constexpr uint8_t PIN_DAC_ACOUSTIC    = 25;
+constexpr uint8_t PIN_PRESSURE_OUT = 26; // HX710B OUT
+constexpr uint8_t PIN_PRESSURE_SCK = 27; // HX710B SCK
+
 
 // Objetos globales
 StateMachine       fsm;
@@ -66,7 +69,7 @@ void TaskConsoleUpdate(void* param) {
 void setup() {
 
   // Inicializar sensores y actuadores
-  sensors.begin(PIN_MAP, PIN_TPS);
+  sensors.begin(PIN_MAP, PIN_TPS, PIN_PRESSURE_OUT, PIN_PRESSURE_SCK);
   actuators.begin(PIN_RELAY_TURBO, PIN_DAC_ACOUSTIC, PIN_RELAY_ACOUSTIC);
 
   xTaskCreatePinnedToCore(
