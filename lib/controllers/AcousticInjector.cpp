@@ -219,31 +219,39 @@ void AcousticInjector::testSimple() {
 }
 
 float AcousticInjector::mapLoadToWaveFrequency(float percent) {
-  constexpr float FREQ_MIN = 4500.0f;   // Baja carga
-  constexpr float FREQ_MAX = 5500.0f;   // Alta carga
-  percent = constrain(percent, 0.0f, 100.0f);
-  return FREQ_MIN + (percent / 100.0f) * (FREQ_MAX - FREQ_MIN);
+    constexpr float FREQ_MIN = 5500.0f;   // Hz
+    constexpr float FREQ_MAX = 6500.0f;   // Hz
+    percent = constrain(percent, 0.0f, 100.0f);
+
+    // Escala logarítmica
+    float logMin = logf(FREQ_MIN);
+    float logMax = logf(FREQ_MAX);
+    float logFreq = logMin + (percent / 100.0f) * (logMax - logMin);
+
+    return expf(logFreq);
 }
+
 
 void AcousticInjector::updateWaveFrequency(float freqHz) {
     if (!_timer) return;
 
     // sampleRate fijo
     const float sampleRate = DEFAULT_SAMPLE_RATE;
-
+    // suavizado perceptual (logarítmico)
+    float targetFreq = freqHz;
+    float smoothedFreq = powf(10.0f, 0.1f * log10f(_currentFrequency) + 0.9f * log10f(targetFreq));
     // calcular step en fixed-point: step = freqHz * TABLE_SIZE / sampleRate
     // representado en (1<<PHASE_FRAC) fraccional
-    double step = (double)freqHz * (double)TABLE_SIZE * (double)(1ULL << PHASE_FRAC) / (double)sampleRate;
+    double step = (double)smoothedFreq * (double)TABLE_SIZE * (double)(1ULL << PHASE_FRAC) / (double)sampleRate;
     uint32_t newStep = (uint32_t)round(step);
 
     // garantizar que no sea cero (para frecuencias muy bajas)
     if (newStep == 0) newStep = 1;
 
-    _currentFrequency = freqHz;
+    _currentFrequency = smoothedFreq;
+
     _phaseStep = newStep;
 
-    // mantener el timer con la misma sampleRate (no tocarlo)
-    // (opcional) si quieres actualizar periodo por sample:
     float periodPerSample = 1e6f / sampleRate;
     timerAlarmWrite(_timer, static_cast<uint32_t>(periodPerSample), true);
 }
