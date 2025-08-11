@@ -171,6 +171,6 @@ void loop() {
     actuators.stopAll();
   }
 
-  delay(20);
+  delay(5);
 }
 

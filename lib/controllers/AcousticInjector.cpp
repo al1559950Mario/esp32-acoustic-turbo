@@ -90,31 +90,47 @@ void AcousticInjector::setLevel(float level) {
 }
 
 void AcousticInjector::update() {
-  // factor de suavizado, ajustable
-  float alpha = (_targetLevel < _level) ? 0.8f : 0.3f;
-  _level = alpha * _level + (1.0f - alpha) * _targetLevel;
-  _levelInt = (uint8_t)(_level * 255.0f);
+    float diff = _targetLevel - _level;
+    if (fabs(diff) < RAMP_STEP)
+        _level = _targetLevel;
+    else
+        _level += (diff > 0 ? RAMP_STEP : -RAMP_STEP);
+
+    _levelInt = (uint8_t)(_level * 255.0f);
 }
+
 
 
 void IRAM_ATTR AcousticInjector::onTimer() {
   if (!_instance) return;
 
-  // actualizar acumulador de fase
   _instance->_phaseAcc += _instance->_phaseStep;
 
-  // sacar índice: parte entera de phaseAcc >> PHASE_FRAC
-  // asumiendo TABLE_SIZE potencia de 2, usamos máscara
+  // Índice entero y siguiente para interpolar
   uint32_t idx = (_instance->_phaseAcc >> PHASE_FRAC) & (TABLE_SIZE - 1);
+  uint32_t nextIdx = (idx + 1) & (TABLE_SIZE - 1);
 
-  uint8_t raw = _instance->_sineTable[idx];
-  int16_t delta = (int16_t)raw - 128;
-  int16_t modulated = 128 + ((delta * _instance->_levelInt) >> 8);
+  // Fracción para interpolar
+  uint32_t frac = _instance->_phaseAcc & ((1ULL << PHASE_FRAC) - 1);
+
+  uint8_t sample1 = _instance->_sineTable[idx];
+  uint8_t sample2 = _instance->_sineTable[nextIdx];
+
+  int16_t delta = (int16_t)sample2 - (int16_t)sample1;
+  uint16_t interp = (uint16_t)sample1 + ((delta * frac) >> PHASE_FRAC);
+
+  // Modulación de nivel (0-255)
+  int16_t centered = (int16_t)interp - 128;
+  int16_t modulated = 128 + ((centered * _instance->_levelInt) >> 8);
   uint8_t output = (uint8_t)constrain(modulated, 0, 255);
 
   dac_output_voltage(_instance->_dacChannel, output);
   _instance->_lastDACValue = output;
 }
+
+
+
+
 
 void IRAM_ATTR AcousticInjector::applyPendingDAC() {
   uint8_t raw = _sineTable[_index];
@@ -203,8 +219,8 @@ void AcousticInjector::testSimple() {
 }
 
 float AcousticInjector::mapLoadToWaveFrequency(float percent) {
-  constexpr float FREQ_MIN = 4200.0f;   // Baja carga
-  constexpr float FREQ_MAX = 6500.0f;   // Alta carga
+  constexpr float FREQ_MIN = 4500.0f;   // Baja carga
+  constexpr float FREQ_MAX = 5500.0f;   // Alta carga
   percent = constrain(percent, 0.0f, 100.0f);
   return FREQ_MIN + (percent / 100.0f) * (FREQ_MAX - FREQ_MIN);
 }

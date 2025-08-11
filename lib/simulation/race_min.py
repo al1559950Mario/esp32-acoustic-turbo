@@ -8,11 +8,11 @@ IDLE_RPM       = 800
 MAX_RPM        = 7000
 SHIFT_RPM      = 6200
 DT             = 0.2
-THROTTLE_STEP  = 0.09   # Incremento deseado para objetivo
-THROTTLE_RATE  = 0.009   # Velocidad con la que throttle real se acerca al objetivo
-THROTTLE_DROP  = 0.2
-MAP_RISE_COEF  = 0.05
-MAP_REBOTE_COEF = 0.2
+THROTTLE_STEP  = 0.19   # Incremento deseado para objetivo
+THROTTLE_RATE  = 0.019   # Velocidad con la que throttle real se acerca al objetivo
+THROTTLE_DROP  = 0.4
+MAP_RISE_COEF  = 0.1
+MAP_REBOTE_COEF = 0.4
 RPM_RISE_COEF  = 0.1
 
 TPS_V_OPEN     = 2.25
@@ -47,22 +47,68 @@ def volt_to_adc(volts):
     return int((volts / 3.3) * 4095)
 
 def enviar_comando(ser, cmd):
-    ser.write((cmd + '\n').encode('utf-8'))
-    time.sleep(0.1)
-    while ser.in_waiting:
-        respuesta = ser.readline().decode('utf-8', errors='ignore').strip()
-        if respuesta:
-            print(f"\n<<< ESP32 responde: {respuesta}")
+    """Envía un comando simple al ESP32 (añade newline)."""
+    try:
+        ser.write((cmd + '\n').encode('utf-8'))
+        # si quieres evitar bloqueo, podríamos quitar el sleep; lo dejo por compatibilidad
+        time.sleep(0.1)
+        while ser.in_waiting:
+            respuesta = ser.readline().decode('utf-8', errors='ignore').strip()
+            if respuesta:
+                print(f"\n<<< ESP32 responde: {respuesta}")
+    except Exception as e:
+        print(f"Error enviando comando: {e}")
 
 def key_pressed():
-    if msvcrt.kbhit():
-        ch = msvcrt.getch()
-        if ch == b'\xe0':  # tecla especial (flechas, etc)
-            ch2 = msvcrt.getch()
-            return ch + ch2  # Retornamos bytes dobles para flechas
+    """
+    Lee teclas no bloqueante y normaliza:
+      - flechas -> 'up', 'down', 'left', 'right'
+      - letras/dígitos -> 'a'..'z', '0'..'9'
+    Devuelve None si no hay tecla.
+    """
+    if not msvcrt.kbhit():
+        return None
+
+    ch = msvcrt.getch()
+
+    # Teclas especiales clásicas: primer byte 0x00 o 0xE0, segundo byte indica tecla
+    if ch in (b'\x00', b'\xe0'):
+        ch2 = msvcrt.getch()
+        if ch2 == b'H':
+            return 'up'
+        elif ch2 == b'P':
+            return 'down'
+        elif ch2 == b'M':
+            return 'right'
+        elif ch2 == b'K':
+            return 'left'
         else:
-            if ch.isalpha() or ch.isdigit():
-                return ch.decode('utf-8').lower()
+            return None
+
+    # Secuencias ANSI: ESC [ A/B/C/D  (puede ocurrir en algunas terminales)
+    if ch == b'\x1b':  # ESC
+        # si hay más bytes, intentar leerlos (no bloqueante: kbhit)
+        if msvcrt.kbhit():
+            ch2 = msvcrt.getch()
+            if ch2 == b'[' and msvcrt.kbhit():
+                ch3 = msvcrt.getch()
+                if ch3 == b'A':
+                    return 'up'
+                elif ch3 == b'B':
+                    return 'down'
+                elif ch3 == b'C':
+                    return 'right'
+                elif ch3 == b'D':
+                    return 'left'
+        return None
+
+    # Letras/dígitos simples
+    try:
+        s = ch.decode('utf-8', errors='ignore').lower()
+    except Exception:
+        return None
+    if s.isalnum():
+        return s
     return None
 
 def describir_tps(volts):
@@ -86,8 +132,6 @@ def thread_envio(ser):
     while running:
         # Calcula el voltaje de TPS y MAP según modo
         tps_v = TPS_V_CLOSED + (TPS_V_OPEN - TPS_V_CLOSED) * throttle
-        #tps_v = TPS_V_OPEN + (TPS_V_CLOSED - TPS_V_OPEN) * throttle
-
         map_adc_valor = map_v
 
         TPS_MIN_V = TPS_V_CLOSED
@@ -143,8 +187,8 @@ else:
     time.sleep(1)
 
 # Inicia hilos para envío y lectura asincrónica
-thread_send = threading.Thread(target=thread_envio, args=(ser,))
-thread_read = threading.Thread(target=thread_lectura, args=(ser,))
+thread_send = threading.Thread(target=thread_envio, args=(ser,), daemon=True)
+thread_read = threading.Thread(target=thread_lectura, args=(ser,), daemon=True)
 thread_send.start()
 thread_read.start()
 
@@ -183,32 +227,33 @@ try:
                 target_map = MAP_V_IDLE + throttle * (MAP_V_MAX - MAP_V_IDLE)
                 map_v += (target_map - map_v) * MAP_RISE_COEF
 
+        # --- lectura de tecla normalizada ---
         key = key_pressed()
         if key:
-            if isinstance(key, bytes):
-                if key == b'\xe0H':  # Flecha arriba (acelerar)
-                    throttle_target = min(1.0, throttle_target + THROTTLE_STEP)
-                elif key == b'\xe0P':  # Flecha abajo (frenar)
-                    throttle_target = max(0.0, throttle_target - THROTTLE_STEP)
-                elif key == b'\xe0M':  # Flecha derecha (subir marcha)
-                    if gear < len(GEAR_RATIOS) - 1:
-                        prev_ratio = GEAR_RATIOS[gear]
-                        gear += 1
-                        next_ratio = GEAR_RATIOS[gear]
-                        rpm *= (next_ratio / prev_ratio)
-                        throttle_target *= THROTTLE_DROP
-                        throttle_rebote = True
-                        print(f"\n>>> CAMBIO A MARCHA {gear+1}, RPM ajustado a {rpm:.0f}")
-                elif key == b'\xe0K':  # Flecha izquierda (bajar marcha)
-                    if gear > 0:
-                        prev_ratio = GEAR_RATIOS[gear]
-                        gear -= 1
-                        next_ratio = GEAR_RATIOS[gear]
-                        rpm *= (next_ratio / prev_ratio)
-                        throttle_target *= THROTTLE_DROP
-                        throttle_rebote = True
-                        print(f"\n<<< RETROCEDE A MARCHA {gear+1}, RPM ajustado a {rpm:.0f}")
+            if key == 'up':
+                throttle_target = min(1.0, throttle_target + THROTTLE_STEP)
+            elif key == 'down':
+                throttle_target = max(0.0, throttle_target - THROTTLE_STEP)
+            elif key == 'right':
+                if gear < len(GEAR_RATIOS) - 1:
+                    prev_ratio = GEAR_RATIOS[gear]
+                    gear += 1
+                    next_ratio = GEAR_RATIOS[gear]
+                    rpm *= (next_ratio / prev_ratio)
+                    throttle_target *= THROTTLE_DROP
+                    throttle_rebote = True
+                    print(f"\n>>> CAMBIO A MARCHA {gear+1}, RPM ajustado a {rpm:.0f}")
+            elif key == 'left':
+                if gear > 0:
+                    prev_ratio = GEAR_RATIOS[gear]
+                    gear -= 1
+                    next_ratio = GEAR_RATIOS[gear]
+                    rpm *= (next_ratio / prev_ratio)
+                    throttle_target *= THROTTLE_DROP
+                    throttle_rebote = True
+                    print(f"\n<<< RETROCEDE A MARCHA {gear+1}, RPM ajustado a {rpm:.0f}")
             else:
+                # letras/dígitos
                 if key == '1':
                     modo_envio_constante = 1
                     print("\n>>>\n TPS_MIN\n")
@@ -234,7 +279,7 @@ try:
     print("\n>>> Simulación finalizada.")
 finally:
     running = False
-    thread_send.join()
-    thread_read.join()
+    thread_send.join(timeout=0.5)
+    thread_read.join(timeout=0.5)
     if ser:
         ser.close()
