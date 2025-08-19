@@ -64,8 +64,8 @@ void ThresholdManager::loadDefaults() {
 
 
     // Umbrales para detener la inyección acústica
-    thresholds["INJ_TPS_OFF"]        = 8.0f;    // % TPS para apagar
-    thresholds["INJ_MAP_OFF"]        = 15.0f;   // % MAP para apagar
+    thresholds["INJ_TPS_OFF"]        = 15.0f;    // % TPS para apagar
+    thresholds["INJ_MAP_OFF"]        = 25.0f;   // % MAP para apagar
 
     // Umbrales para activar el vortex
     thresholds["VORTEX_TPS_ON"]       = 45.0f;   // % TPS para activar
