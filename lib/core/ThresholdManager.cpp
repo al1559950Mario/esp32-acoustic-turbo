@@ -60,7 +60,7 @@ void ThresholdManager::loadDefaults() {
     thresholds["MAP_WAKEUP_PERCENT"] = 5.0f;
 
     // Umbrales para activar la inyección acústica
-    thresholds["INJ_MAP_ON"]         = 20.0f;   // % MAP mínimo para iniciar
+    thresholds["INJ_MAP_ON"]         = 35.0f;   // % MAP mínimo para iniciar
 
 
     // Umbrales para detener la inyección acústica
@@ -71,7 +71,7 @@ void ThresholdManager::loadDefaults() {
     thresholds["VORTEX_TPS_ON"]       = 45.0f;   // % TPS para activar
     thresholds["VORTEX_MAP_ON"]       = 75.0f;   // % MAP para activar (presión alta)
 
-    // Umbral para apagar el vortex
+    // Umbral para apagar el vorte
     thresholds["VORTEX_TPS_OFF"]      = 30.0f;   // % TPS para apagar vortex
 }
 

@@ -3,7 +3,7 @@
 #include "TPSSensor.h"
 #include <Arduino.h>
 #include "CalibrationManager.h"
-#include "PressureSensorHX710B.h"
+#include "PressureSensor.h"
 
 class SensorManager {
 public:
@@ -39,7 +39,7 @@ public:
 private:
   MAPSensor mapSensor;
   TPSSensor tpsSensor;
-  PressureSensorHX710B pressureSensor;
+  PressureSensor pressureSensor;
 
   float mapLoadPercent = 0.0f;  //
   bool simulacionActiva = false;

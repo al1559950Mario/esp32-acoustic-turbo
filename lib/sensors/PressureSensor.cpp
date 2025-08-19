@@ -1,6 +1,6 @@
-#include "PressureSensorHX710B.h"
+#include "PressureSensor.h"
 
-void PressureSensorHX710B::begin(uint8_t pinData, uint8_t pinSCK) {
+void PressureSensor::begin(uint8_t pinData, uint8_t pinSCK) {
     _pinData = pinData;
     _pinSCK  = pinSCK;
 
@@ -9,7 +9,7 @@ void PressureSensorHX710B::begin(uint8_t pinData, uint8_t pinSCK) {
     digitalWrite(_pinSCK, LOW);
 }
 
-long PressureSensorHX710B::readRaw() {
+long PressureSensor::readRaw() {
     // Esperar a que DATA esté en LOW (dato listo)
     while (digitalRead(_pinData) == HIGH) {
         delayMicroseconds(1);
@@ -39,17 +39,17 @@ long PressureSensorHX710B::readRaw() {
     return value;
 }
 
-float PressureSensorHX710B::readPressure_kPa() {
+float PressureSensor::readPressure_kPa() {
     long raw = readRaw();
     return (raw * _scale) + _offset;
 }
 
-void PressureSensorHX710B::tare() {
+void PressureSensor::tare() {
     long raw = readRaw();
     _offset = -(raw * _scale);
 }
 
-void PressureSensorHX710B::setCalibration(float scale, float offset) {
+void PressureSensor::setCalibration(float scale, float offset) {
     _scale  = scale;
     _offset = offset;
 }

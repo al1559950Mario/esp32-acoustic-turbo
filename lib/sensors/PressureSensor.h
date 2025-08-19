@@ -1,9 +1,9 @@
 #pragma once
 #include <Arduino.h>
 
-class PressureSensorHX710B {
+class PressureSensor {
 public:
-    PressureSensorHX710B() = default;
+    PressureSensor() = default;
 
     void begin(uint8_t pinData, uint8_t pinSCK);
     long readRaw();
