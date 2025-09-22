@@ -18,6 +18,8 @@ constexpr uint8_t PIN_RELAY_ACOUSTIC  =  4;
 constexpr uint8_t PIN_DAC_ACOUSTIC    = 25;
 constexpr uint8_t PIN_PRESSURE_OUT = 26; // HX710B OUT
 constexpr uint8_t PIN_PRESSURE_SCK = 27; // HX710B SCK
+constexpr uint8_t PIN_BTS_PWM = 18;   // pin conectado al PWM del BTS
+constexpr uint8_t PWM_CHANNEL_BTS = 0; // canal de ESP32 (0-15)
 
 
 // Objetos globales
@@ -70,7 +72,7 @@ void setup() {
 
   // Inicializar sensores y actuadores
   sensors.begin(PIN_MAP, PIN_TPS, PIN_PRESSURE_OUT, PIN_PRESSURE_SCK);
-  actuators.begin(PIN_RELAY_TURBO, PIN_DAC_ACOUSTIC, PIN_RELAY_ACOUSTIC);
+  actuators.begin(PIN_BTS_PWM, PWM_CHANNEL_BTS, PIN_DAC_ACOUSTIC, PIN_RELAY_ACOUSTIC);
 
   xTaskCreatePinnedToCore(
     TaskSensorUpdate,
@@ -155,11 +157,14 @@ void loop() {
 
   if (sistemaActivo) {
     float mapLoadPercent = sensors.readMAPLoadPercent();
-    float tpsLoadPorcent = sensors.readTPSLoadPercent();
+    float tpsLoadPercent = sensors.readTPSLoadPercent();
+
+    actuators.update(tpsLoadPercent, mapLoadPercent);
+
 
     fsm.update(
       mapLoadPercent,
-      tpsLoadPorcent,
+      tpsLoadPercent,
       usbConsoleUI.getCalibRequest(),
       btConsoleUI.getCalibRequest(),
       hasCalibration, 
@@ -167,7 +172,7 @@ void loop() {
     );
     fsm.handleActions();
     if (logger.isEnabled()) {
-      logger.log(tpsLoadPorcent, mapLoadPercent);  //agregar más valores en el futuro
+      logger.log(tpsLoadPercent, mapLoadPercent);  //agregar más valores en el futuro
     }
   } else {
     actuators.stopAll();
