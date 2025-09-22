@@ -159,9 +159,6 @@ void loop() {
     float mapLoadPercent = sensors.readMAPLoadPercent();
     float tpsLoadPercent = sensors.readTPSLoadPercent();
 
-    actuators.update(tpsLoadPercent, mapLoadPercent);
-
-
     fsm.update(
       mapLoadPercent,
       tpsLoadPercent,

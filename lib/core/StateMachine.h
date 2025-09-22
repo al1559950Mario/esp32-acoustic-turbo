@@ -94,7 +94,8 @@ private:
   float              lastMapLoadPercent = 0.0f; ///< Guardar el último mapLoadPercent
   float tpsInitialPercent = 0.0f;
   float mapInitialPercent = 0.0f;
-
+  float _tpsLoadPercent = 0.0f;
+  float _mapLoadPercent = 0.0f;
 
   
   float tpsNormalized{0.0f}; 
