@@ -1,39 +1,53 @@
 #include "VortexController.h"
 
-void VortexController::begin(uint8_t pinRelay) {
-  relayPin = pinRelay;
-  pinMode(relayPin, OUTPUT);
-  digitalWrite(relayPin, LOW);  // Asegura que el turbo arranque apagado
-  active = false;
+void VortexController::begin(uint8_t pwmPin_, uint8_t pwmChannel_) {
+    pwmPin = pwmPin_;
+    pwmChannel = pwmChannel_;
+
+    pinMode(pwmPin, OUTPUT);
+
+    // Configurar PWM: canal, frecuencia 20 kHz, resolución 8 bits
+    ledcSetup(pwmChannel, 20000, 8);
+    ledcAttachPin(pwmPin, pwmChannel);
+
+    active = false;
+    lastPWM = 0.0f;
+    ledcWrite(pwmChannel, 0);
 }
 
 void VortexController::start() {
-  if (!active) {
-    digitalWrite(relayPin, HIGH);  // Activa el relé
-    active = true;
-    // Serial.println(">> Turbo ON");
-  }
+    if (!active) {
+        ledcWrite(pwmChannel, (int)(lastPWM * 255));
+        active = true;
+    }
 }
 
 void VortexController::stop() {
-  if (active) {
-    digitalWrite(relayPin, LOW);  // Desactiva el relé
-    active = false;
-    // Serial.println(">> Turbo OFF");
-  }
+    if (active) {
+        ledcWrite(pwmChannel, 0);
+        active = false;
+    }
+}
+
+void VortexController::updatePowerLevel(float tpsLoadPercent, float mapLoadPercent) {
+    // Normalizar a 0-1
+    float tps = constrain(tpsLoadPercent / 100.0f, 0.0f, 1.0f);
+    float map = constrain(mapLoadPercent / 100.0f, 0.0f, 1.0f);
+
+    // Combinación simple TPS * MAP
+    float pwmLevel = tps * map;
+
+    lastPWM = pwmLevel;
+
+    if (active) {
+        ledcWrite(pwmChannel, (int)(pwmLevel * 255));
+    }
 }
 
 bool VortexController::isOn() const {
-  return active;
-}
-
-void VortexController::updatePowerLevel(float level) {
-  if (!active) return;
-
-  // 🚧 Futuro: aplicar PWM, DAC o lógica de control variable
-  // Por ahora no hace nada
+    return active;
 }
 
 bool VortexController::isActive() const {
-  return active;  // ← o lo que estés usando para rastrear el estado actual
+    return active;
 }

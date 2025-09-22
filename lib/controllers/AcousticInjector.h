@@ -19,7 +19,7 @@ public:
   // Modificar este valor para hacer la transición más lenta (valor menor) o más rápida (valor mayor).
   static constexpr float RAMP_STEP = 0.01f;
 
-  void begin(uint8_t dacPin, uint8_t relayPin);
+  void begin(uint8_t dacPin);
   void start(float level);
   void stop();
   void setLevel(float level);
@@ -28,8 +28,6 @@ public:
   uint8_t getCurrentDAC() const;
   bool isActive() const;
   static void IRAM_ATTR onTimer();
-  void testRelay(bool);
-  bool isRelayActive() const;
   void test();  // Prueba rápida del sonido acústico
   void emitResonant(float level); // Señal por fase acumulada
   void testSimple();
@@ -49,7 +47,6 @@ public:
 
 private:
   uint8_t  _dacPin = 0;
-  uint8_t  _relayPin = 0;
   uint8_t  _index = 0;      // índice para tabla seno (solo para modo tabla)
   float    _level = 0.0f;
   float    _targetLevel = 0.0f;
@@ -69,8 +66,6 @@ private:
   FrequencyRangeOption _freqOption = RANGE_3;
   float _freqMin = 5500.0f;
   float _freqMax = 6500.0f;
-
-
   // Tabla seno 16 muestras para ISR rápido (0-255)
   static uint8_t _sineTable[TABLE_SIZE];
   

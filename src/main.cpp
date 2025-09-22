@@ -15,13 +15,13 @@
 #include "freertos/semphr.h"
 
 // PIN-OUT
-constexpr uint8_t PIN_RELAY_TURBO     =  2;
-constexpr uint8_t PIN_RELAY_ACOUSTIC  =  4;
 constexpr uint8_t PIN_DAC_ACOUSTIC    = 25;
 constexpr uint8_t PIN_PRESSURE_OUT    = 26; // HX710B OUT
 constexpr uint8_t PIN_PRESSURE_SCK    = 27; // HX710B SCK
-constexpr uint8_t PIN_I2C_SDA         = 18;
-constexpr uint8_t PIN_I2C_SCL         = 19;
+constexpr uint8_t PIN_BTS_PWM = 18;   // pin conectado al PWM del BTS
+constexpr uint8_t PWM_CHANNEL_BTS = 0; // canal de ESP32 (0-15)
+constexpr uint8_t PIN_I2C_SDA         = 21;
+constexpr uint8_t PIN_I2C_SCL         = 22;
 
 // Objetos globales
 StateMachine       fsm;
@@ -78,7 +78,7 @@ void setup() {
 
   // Inicializar sensores y actuadores
   sensors.begin(PIN_PRESSURE_OUT, PIN_PRESSURE_SCK, PIN_I2C_SDA, PIN_I2C_SCL);
-  actuators.begin(PIN_RELAY_TURBO, PIN_DAC_ACOUSTIC, PIN_RELAY_ACOUSTIC);
+  actuators.begin(PIN_BTS_PWM, PWM_CHANNEL_BTS, PIN_DAC_ACOUSTIC);
 
   // Crear task de consola
   if (xTaskCreatePinnedToCore(TaskConsoleUpdate, "ConsoleUpdate", 4096, nullptr, 1, nullptr, 0) != pdPASS) {
@@ -160,6 +160,9 @@ void loop() {
   if (sistemaActivo) {
     float mapLoadPercent = sensors.readMAPLoadPercent();
     float tpsLoadPercent = sensors.readTPSLoadPercent();
+
+    actuators.update(tpsLoadPercent, mapLoadPercent);
+
     if (tpsLoadPercent >= 100.0f || mapLoadPercent >= 100.0f) {
       Serial.println("[ERROR] Carga al 100% detectada. Saltando FSM.");
       return;
@@ -177,7 +180,7 @@ void loop() {
     fsm.handleActions();
 
     if (logger.isEnabled()) {
-      logger.log(tpsLoadPercent, mapLoadPercent);
+      logger.log(tpsLoadPercent, mapLoadPercent);  //agregar más valores en el futuro
     }
   } else {
     actuators.stopAll();

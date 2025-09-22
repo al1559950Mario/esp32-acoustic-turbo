@@ -16,13 +16,10 @@ uint8_t AcousticInjector::_sineTable[AcousticInjector::TABLE_SIZE] = {
   153, 165, 177, 188, 198, 207, 215, 222
 };
 
-void AcousticInjector::begin(uint8_t dacPin, uint8_t relayPin) {
+void AcousticInjector::begin(uint8_t dacPin) {
   _instance = this;
 
   _dacPin = dacPin;
-  _relayPin = relayPin;
-  pinMode(_relayPin, OUTPUT);
-  digitalWrite(_relayPin, LOW);
 
   _dacChannel = (_dacPin == 25) ? DAC_CHANNEL_1 : DAC_CHANNEL_2;
   dac_output_enable(_dacChannel);
@@ -68,7 +65,6 @@ void AcousticInjector::start(float level) {
   _levelInt = (uint8_t)(_level * 255.0f);
 
   _index = 0;
-  digitalWrite(_relayPin, HIGH);
   delay(10);
   timerAlarmEnable(_timer);
 }
@@ -78,7 +74,6 @@ void AcousticInjector::start(float level) {
 void AcousticInjector::stop() {
   timerAlarmDisable(_timer);
   dac_output_voltage(_dacChannel, 128);
-  digitalWrite(_relayPin, LOW);
   _level = 0.0f;
   _targetLevel = 0.0f;
   _levelInt = 0;
@@ -166,21 +161,12 @@ uint8_t AcousticInjector::getCurrentDAC() const {
 }
 
 bool AcousticInjector::isActive() const {
-  return digitalRead(_relayPin) == HIGH;
+
 }
 
-void AcousticInjector::testRelay(bool on) {
-  digitalWrite(_relayPin, on ? HIGH : LOW);
-  Serial.printf(">> Relé %s manualmente.\n", on ? "activado" : "desactivado");
-}
-
-bool AcousticInjector::isRelayActive() const {
-  return digitalRead(_relayPin) == HIGH;
-}
 
 void AcousticInjector::test() {
   Serial.println(F("🔊 Prueba acústica iniciada..."));
-  testRelay(true);
   start(1.0f);
 
   for (int i = 0; i < 250; i++) {
@@ -192,7 +178,6 @@ void AcousticInjector::test() {
   }
 
   stop();
-  testRelay(false);
   Serial.println(F("✅ Prueba finalizada."));
 }
 
@@ -222,7 +207,6 @@ void AcousticInjector::emitResonant(float level) {
 
 void AcousticInjector::testSimple() {
   Serial.println(F("🔊 Test simple iniciado"));
-  testRelay(true);
   start(1.0f);
 
   unsigned long startTime = millis();
@@ -232,7 +216,6 @@ void AcousticInjector::testSimple() {
   }
 
   stop();
-  testRelay(false);
   Serial.println(F("✅ Test simple finalizado"));
 }
 
