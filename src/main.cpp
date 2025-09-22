@@ -158,6 +158,8 @@ void loop() {
   bool sistemaActivo = usbConsoleUI.isSistemaActivo() || btConsoleUI.isSistemaActivo();
 
   if (sistemaActivo) {
+    float mapLoadPercent = sensors.readMAPLoadPercent();
+    float tpsLoadPercent = sensors.readTPSLoadPercent();
     if (tpsLoadPercent >= 100.0f || mapLoadPercent >= 100.0f) {
       Serial.println("[ERROR] Carga al 100% detectada. Saltando FSM.");
       return;

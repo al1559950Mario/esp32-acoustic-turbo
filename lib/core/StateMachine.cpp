@@ -37,7 +37,8 @@ void StateMachine::update(float mapLoadPercent,
   if (thresholdManager) {
     thresholds = thresholdManager->getThresholds();
   }
-
+  _mapLoadPercent = mapLoadPercent;
+  _tpsLoadPercent = tpsLoadPercent;
   tpsNormalized = tpsLoadPercent / 100.0f;
   mapNormalized = mapLoadPercent / 100.0f;
 
@@ -155,7 +156,7 @@ void StateMachine::handleActions() {
     float deltaTPSPercent = sensors->getRelativeTPSLoad(tpsInitialPercent);     // ←  // ← valor entre 0.0 y 100.0 (porcentaje)
     float deltaMAPercent = sensors->getRelativeMAPLoad(mapInitialPercent);     // ←  // ← valor entre 0.0 y 100.0 (porcentaje)
     actuators->setAcousticParameters(deltaTPSPercent, deltaMAPercent); 
-    actuators->update();
+    actuators->update(_tpsLoadPercent, _mapLoadPercent);
 
   }
 }
