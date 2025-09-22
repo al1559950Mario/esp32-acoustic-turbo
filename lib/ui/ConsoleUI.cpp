@@ -113,6 +113,24 @@ void ConsoleUI::interpretarComando(char c) {
       imprimirHelp();
       break;
 
+    case 'f':  // Cambiar rango de frecuencia acústica
+        if (!devOnly()) break;
+        {
+            auto& injector = actuators->getAcousticInjector();
+            uint8_t nextOption = (static_cast<uint8_t>(injector.getFrequencyRangeOption()) + 1) % 4; // 4 opciones
+            injector.setFrequencyRangeOption(static_cast<AcousticInjector::FrequencyRangeOption>(nextOption));
+
+            // Obtener rango actual
+            float fMin = injector.getFreqMin();
+            float fMax = injector.getFreqMax();
+
+            this->printf(">> Nuevo rango de frecuencia seleccionado: %d → %.0f Hz – %.0f Hz\n",
+                        nextOption + 1, fMin, fMax);
+        }
+        break;
+
+
+
     case 'i':  // Toggle relé inyector acústico (dev mode)
       if (!devOnly()) break;
       if (actuators->getAcousticInjector().isActive()) {
@@ -341,6 +359,7 @@ void ConsoleUI::imprimirHelp() {
     this->println(F("  v  → Visualizar curva TPS-MAP (pendiente desarrollo)"));
     this->println(F("  r  → Borrar calibración actual"));
     this->println(F("  z  → Activar/Desactivar modo simulación"));
+    this->println(F("  f  → Alternar rango de frequencia del BEAM"));
   }
 }
 

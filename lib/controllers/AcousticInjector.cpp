@@ -237,13 +237,10 @@ void AcousticInjector::testSimple() {
 }
 
 float AcousticInjector::mapLoadToWaveFrequency(float percent) {
-    constexpr float FREQ_MIN = 5500.0f;   // Hz
-    constexpr float FREQ_MAX = 6500.0f;   // Hz
     percent = constrain(percent, 0.0f, 100.0f);
 
-    // Escala logarítmica
-    float logMin = logf(FREQ_MIN);
-    float logMax = logf(FREQ_MAX);
+    float logMin = logf(_freqMin);
+    float logMax = logf(_freqMax);
     float logFreq = logMin + (percent / 100.0f) * (logMax - logMin);
 
     return expf(logFreq);
@@ -272,4 +269,31 @@ void AcousticInjector::updateWaveFrequency(float freqHz) {
 
     float periodPerSample = 1e6f / sampleRate;
     timerAlarmWrite(_timer, static_cast<uint32_t>(periodPerSample), true);
+}
+
+void AcousticInjector::setFrequencyRangeOption(FrequencyRangeOption option) {
+    _freqOption = option;
+
+    switch(option) {
+        case RANGE_1:
+            _freqMin = 4400.0f;
+            _freqMax = 5100.0f;
+            break;
+        case RANGE_2:
+            _freqMin = 5100.0f;
+            _freqMax = 5800.0f;
+            break;
+        case RANGE_3:
+            _freqMin = 5800.0f;
+            _freqMax = 6500.0f;
+            break;
+        case RANGE_4:
+            _freqMin = 4400.0f;
+            _freqMax = 6500.0f;
+            break;            
+        default:
+            _freqMin = 5800.0f;
+            _freqMax = 6500.0f;
+            break;
+    }
 }

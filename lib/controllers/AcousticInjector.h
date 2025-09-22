@@ -5,6 +5,14 @@
 
 class AcousticInjector {
 public:
+  enum FrequencyRangeOption : uint8_t {
+      RANGE_1 = 0,  // 4400 – 5100 Hz
+      RANGE_2 = 1,  // 5100 – 5800 Hz
+      RANGE_3 = 2,   // 5800 – 6500 Hz
+      RANGE_4 = 3 //FULL RANGE
+  };
+  void setFrequencyRangeOption(FrequencyRangeOption option);
+  FrequencyRangeOption getFrequencyRangeOption() const;
   static constexpr uint8_t TABLE_SIZE = 64;
   static constexpr uint32_t SAMPLE_RATE = 64000;  // 64 kHz para alta fidelidad
   // Paso de rampa para suavizar cambios en el nivel (_level).
@@ -29,9 +37,12 @@ public:
     _targetFrequency = freq;
   }
   void updateWaveFrequency(float freqHz);  // Cambiar nombre para aclarar que es por onda completa
-  static float mapLoadToWaveFrequency(float mapLoadPercent);
+  float mapLoadToWaveFrequency(float mapLoadPercent);
   float getLevel() const { return _level; }
   float getFrequency() const { return _currentFrequency; }
+  float AcousticInjector::getFreqMin() const { return _freqMin; }
+  float AcousticInjector::getFreqMax() const { return _freqMax; }
+
 
 
   static AcousticInjector* _instance;
@@ -55,6 +66,9 @@ private:
   volatile uint32_t _phaseStep = 0; 
   static constexpr float FREQ_RAMP_STEP = 1.0f; // Hz por llamada a update()
   static constexpr float DEFAULT_SAMPLE_RATE = 32000.0f; // tasa de muestreo segura
+  FrequencyRangeOption _freqOption = RANGE_3;
+  float _freqMin = 5500.0f;
+  float _freqMax = 6500.0f;
 
 
   // Tabla seno 16 muestras para ISR rápido (0-255)
