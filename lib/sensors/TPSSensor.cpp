@@ -1,33 +1,16 @@
 // TPSSensor.cpp (implementación con ISR minimalista)
 #include "TPSSensor.h"
 #include "CalibrationManager.h"
-#include "driver/adc.h"
-#include "ADCUtils.h"  // si usas utilidades ADC específicas
 
-void TPSSensor::begin(uint8_t analogPin) {
-  _pin = analogPin;
-  _raw = 0;  // inicializar lectura cacheada
-  pinMode(_pin, INPUT);
 
-  adc1_channel_t channel = pinToADCChannel(_pin);
-  if (channel != ADC1_CHANNEL_MAX) {
-    adc1_config_width(ADC_WIDTH_BIT_12);  // Resolución a 12 bits (0-4095)
-    adc1_config_channel_atten(channel, ADC_ATTEN_DB_11);  // Atenuación para 3.3V
-  }
+void TPSSensor::begin(uint8_t adsChannel, Adafruit_ADS1115* adsPtr) {
+  _adsChannel = adsChannel;
+  _ads = adsPtr;
 }
 
 uint16_t TPSSensor::readRaw() {
-  if (modoSimulacion) {
-    return rawSimulado;
-  }
-  if (_pin == 0xFF) {
-    Serial.println("ERROR: TPSSensor pin no inicializado!");
-    return 0;
-  }
-
-  _raw = analogRead(_pin);  // <-- lectura directa
-
-  return _raw;
+  if (modoSimulacion) return rawSimulado;
+  return _ads->readADC_SingleEnded(_adsChannel);
 }
 
 
@@ -49,15 +32,8 @@ float TPSSensor::readVolts() {
   if (modoSimulacion) {
     return (rawSimulado * 3.3f) / 4095.0f;
   }
-  if (_pin == 0xFF) {
-    Serial.println("ERROR: TPSSensor pin no inicializado en readVolts!");
-    return 0.0f;
-  }
-  uint16_t raw = analogRead(_pin);
-
-  if (raw <= 5) return 0.0f;
-  if (raw >= 4090) return 3.3f;
-  return raw * 3.3f / 4095.0f;
+  int16_t raw = readRaw();
+  return raw * 0.1875f / 1000.0f;  // GAIN_TWOTHIRDS
 }
 
 bool TPSSensor::isValidReading() {

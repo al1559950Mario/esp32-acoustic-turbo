@@ -4,12 +4,13 @@
 #include <Arduino.h>
 #include "CalibrationManager.h"
 #include "PressureSensor.h"
+#include <Adafruit_ADS1X15.h>
 
 class SensorManager {
 public:
   SensorManager() = default;
 
-  void begin(uint8_t pinMAP, uint8_t pinTPS, uint8_t pinPressureData, uint8_t pinPressureSCK);
+  void begin(uint8_t pinPressureData, uint8_t pinPressureSCK, uint8_t pinSDA, uint8_t pinSCL);
 
   float readVacuum_inHg();
   float readTPSLoadPercent();
@@ -33,6 +34,11 @@ public:
 
   float readPressure_kPa();
   long readPressureRaw();
+  bool adsReady = false;
+
+  Adafruit_ADS1115 ads;
+
+
 
 
   void update(); // 👈 Opcional, si quieres usar una rutina periódica
