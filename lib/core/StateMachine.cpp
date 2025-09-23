@@ -1,182 +1,194 @@
 #include "StateMachine.h"
 #include <Arduino.h>  // Para Serial
 
-void StateMachine::begin(bool hasCalibration, ActuatorManager* actuatorsPtr, ThresholdManager* thresholdManagerPtr, SensorManager* sensorsPtr, CalibrationManager* calibMgrPtr) {
-  current = hasCalibration
-              ? SystemState::OFF
-              : SystemState::NO_CALIB;
-  this->sensors = sensorsPtr;
-  this->actuators = actuatorsPtr;
-  this->calibMgr = calibMgrPtr;
+// ======= BEGIN =======
 
-  thresholdManager = thresholdManagerPtr;
-  if (thresholdManager) {
-    thresholds = thresholdManager->getThresholds();
-  }
+void StateMachine::begin(bool hasCalibration,
+                         ActuatorManager* actuatorsPtr,
+                         ThresholdManager* thresholdManagerPtr,
+                         SensorManager* sensorsPtr,
+                         CalibrationManager* calibMgrPtr) {
+    current = hasCalibration ? SystemState::OFF : SystemState::NO_CALIB;
+    this->sensors = sensorsPtr;
+    this->actuators = actuatorsPtr;
+    this->calibMgr = calibMgrPtr;
+    thresholdManager = thresholdManagerPtr;
 
-  Serial.print(">> StateMachine iniciado en estado: ");
-  Serial.println(static_cast<int>(current));
+    if (thresholdManager) {
+        thresholds = thresholdManager->getThresholds();
+    }
+
+    // Inicializa temporizador vortex
+    vortexPending = false;
+    vortexStartMillis = 0;
+
+    lastState = current;  // Para Serial limitado
+    Serial.print(">> StateMachine iniciado en estado: ");
+    Serial.println(static_cast<int>(current));
 }
 
 SystemState StateMachine::getState() const {
-  return current;
+    return current;
 }
 
+// ======= UPDATE =======
 void StateMachine::update(float mapLoadPercent,
                           float tpsLoadPercent,
                           bool serialCalibReq,
                           bool bleCalibReq,
                           bool calibLoaded,
                           const DebugManager &dbg) {
-  
-  if (current == SystemState::DEBUG) {
-    return;
-  }
 
-  // Actualizar umbrales dinámicamente
-  if (thresholdManager) {
-    thresholds = thresholdManager->getThresholds();
-  }
-  _mapLoadPercent = mapLoadPercent;
-  _tpsLoadPercent = tpsLoadPercent;
-  tpsNormalized = tpsLoadPercent / 100.0f;
-  mapNormalized = mapLoadPercent / 100.0f;
+    // Actualiza thresholds dinámicamente
+    if (thresholdManager) thresholds = thresholdManager->getThresholds();
 
-  switch (current) {
+    _mapLoadPercent = mapLoadPercent;
+    _tpsLoadPercent = tpsLoadPercent;
+    tpsNormalized = tpsLoadPercent / 100.0f;
+    mapNormalized = mapLoadPercent / 100.0f;
 
-    case SystemState::OFF:
-      if (mapLoadPercent > thresholds.MAP_WAKEUP_PERCENT) {
+    switch (current) {
+        case SystemState::OFF:
+            if (mapLoadPercent > thresholds.MAP_WAKEUP_PERCENT) {
+                current = SystemState::IDLE;
+            }
+            break;
 
-        current = SystemState::IDLE;
-        Serial.println("→ Transición: OFF → IDLE");
-      }
-      break;
+        case SystemState::NO_CALIB:
+            if (serialCalibReq || bleCalibReq) {
+                current = SystemState::CALIBRATION;
+            } else if (calibLoaded) {
+                current = SystemState::OFF;
+            }
+            break;
 
-    case SystemState::NO_CALIB:
-      if (serialCalibReq || bleCalibReq) {
-        current = SystemState::CALIBRATION;
-        Serial.println("→ Transición: SIN_CALIBRAR → CALIBRATION");
-      } else if (calibLoaded) {
-        current = SystemState::OFF;
-        Serial.println("→ Transición: SIN_CALIBRAR → OFF (calibración detectada)");
-      }
-      break;
+        case SystemState::CALIBRATION:
+            if (calibLoaded) {
+                current = SystemState::OFF;
+            }
+            break;
 
-    case SystemState::CALIBRATION:
-      //calibMgr->update();  // Avanza la calibración sin bloquear
+        case SystemState::IDLE:
+            if (mapLoadPercent < 4.0f) {
+                current = SystemState::OFF;
+                if (actuators) {
+                    actuators->stopAcoustic();
+                    actuators->stopVortex();
+                    vortexPending = false;
+                }
+                break;
+            }
+            if (readyForInjection(mapLoadPercent)) {
+                current = SystemState::BEAM;
+                if (actuators && !actuators->isAcousticOn()) {
+                    actuators->startAcoustic(0.1f);
+                    vortexStartMillis = millis();
+                    vortexPending = true;
 
-      if (calibLoaded) {
-        current = SystemState::OFF;
-        Serial.println("→ Transición: CALIBRATION → OFF");
-      }
-      break;
+                    if (sensors) {
+                        tpsInitialPercent = sensors->readTPSLoadPercent();
+                        mapInitialPercent = sensors->readMAPLoadPercent();
+                    }
+                }
+            }
+            break;
 
-    case SystemState::IDLE:
-      if (mapLoadPercent < 4.0f) {
-        current = SystemState::OFF;
-        Serial.println("→ Transición: IDLE → OFF (MAP = 0%)");
-        break;
-      }
-      if (readyForInjection( mapLoadPercent)) {
-        current = SystemState::BEAM;
-        if (!actuators->isAcousticOn()) {
-          actuators->startAcoustic(0.1f);
-          // Guardar bases para escalado
-          if (!sensors) {
-            Serial.println("Error: SensorManager no está inicializado");
-            return;
-          }
-          tpsInitialPercent = sensors->readTPSLoadPercent();
-          mapInitialPercent = sensors->readMAPLoadPercent();
+        case SystemState::BEAM:
+            if (tpsLoadPercent >= thresholds.VORTEX_TPS_ON && mapLoadPercent >= thresholds.VORTEX_MAP_ON) {
+                current = SystemState::VORTEX;
+            } else if (tpsLoadPercent <= thresholds.INJ_TPS_OFF && mapLoadPercent <= thresholds.INJ_MAP_OFF) {
+                current = SystemState::IDLE;
+                if (actuators) {
+                    actuators->stopAcoustic();
+                    actuators->stopVortex();
+                    vortexPending = false;
+                }
+            }
+            break;
 
-        }
-        Serial.println("→ Transición: IDLE → BEAM");
-      }
-      break;
+        case SystemState::VORTEX:
+            if (tpsLoadPercent < thresholds.VORTEX_TPS_OFF) {
+                current = SystemState::COOLDOWN;
+            }
+            break;
 
-    case SystemState::BEAM:
-      if (tpsLoadPercent >= thresholds.VORTEX_TPS_ON && mapLoadPercent >= thresholds.VORTEX_MAP_ON) {
-        current = SystemState::VORTEX;
-        actuators->startVortex();
-        Serial.println("→ Transición: BEAM → VORTEX");
-      }
-      else if (tpsLoadPercent <= thresholds.INJ_TPS_OFF && mapLoadPercent <= thresholds.INJ_MAP_OFF) {
-        current = SystemState::IDLE;
-        actuators->stopAcoustic();
-        Serial.println("→ Transición: BEAM → IDLE");
-      }
-      break;
+        case SystemState::COOLDOWN:
+            if (readyForInjection(mapLoadPercent)) {
+                current = SystemState::BEAM;
+                if (actuators && !actuators->isAcousticOn()) {
+                    actuators->startAcoustic(0.1f);
+                    vortexStartMillis = millis();
+                    vortexPending = true;
+                }
+            } else if (tpsLoadPercent <= thresholds.INJ_TPS_OFF || mapLoadPercent <= thresholds.INJ_MAP_OFF) {
+                current = SystemState::IDLE;
+                if (actuators) {
+                    actuators->stopAcoustic();
+                    actuators->stopVortex();
+                    vortexPending = false;
+                }
+            }
+            break;
 
-    case SystemState::VORTEX:
-      if (tpsLoadPercent < thresholds.VORTEX_TPS_OFF) {
-        current = SystemState::COOLDOWN;
-        actuators->stopVortex();
-        Serial.println("→ Transición: VORTEX → COOLDOWN");
-      }
-      break;
+        case SystemState::DEBUG:
+            break;
 
-    case SystemState::COOLDOWN:
-      if (readyForInjection(mapLoadPercent)) {
-        current = SystemState::BEAM;
-        if (!actuators->isAcousticOn()) {
-          actuators->startAcoustic(0.1f);
-          
-        }
-        Serial.println("→ Transición: COOLDOWN → BEAM");
-      }
-      else if (tpsLoadPercent <= thresholds.INJ_TPS_OFF || mapLoadPercent <= thresholds.INJ_MAP_OFF) {
-        current = SystemState::IDLE;
-        actuators->stopAcoustic();
-        Serial.println("→ Transición: COOLDOWN → IDLE");
-      }
-      break;
+        case SystemState::UNKNOWN:
+            current = SystemState::OFF;
+            break;
+    }
 
-    case SystemState::DEBUG:
-      break;
-    case SystemState::UNKNOWN:
-      Serial.println(">> Estado UNKNOWN detectado, reseteando a OFF");
-      current = SystemState::OFF;
-      break;
-
-  }
+    // Serial solo si cambio de estado
+    if (current != lastState) {
+        Serial.print("→ Transición: ");
+        Serial.print(static_cast<int>(lastState));
+        Serial.print(" → ");
+        Serial.println(static_cast<int>(current));
+        lastState = current;
+    }
 }
 
+// ======= HANDLE ACTIONS =======
 void StateMachine::handleActions() {
-  if (current == SystemState::BEAM || current == SystemState::VORTEX || current == SystemState::COOLDOWN) {
-    if (sensors == nullptr) {
-      return;
-    }
-    if (actuators == nullptr) {
-      return;
-    }
-    if (calibMgr == nullptr) {
-      return;
+    if (!sensors || !actuators || !calibMgr) return;
+
+    if (current == SystemState::BEAM || current == SystemState::VORTEX || current == SystemState::COOLDOWN) {
+        float deltaTPSPercent = sensors->getRelativeTPSLoad(tpsInitialPercent);
+        float deltaMAPercent = sensors->getRelativeMAPLoad(mapInitialPercent);
+
+        // Solo actualizar si hay cambio significativo
+        if (abs(deltaTPSPercent - lastTPSPercent) > 0.1f ||
+            abs(deltaMAPercent - lastMAPPercent) > 0.1f) {
+            actuators->setAcousticParameters(deltaTPSPercent, deltaMAPercent);
+            actuators->update(_tpsLoadPercent, _mapLoadPercent);
+            lastTPSPercent = deltaTPSPercent;
+            lastMAPPercent = deltaMAPercent;
+        }
     }
 
-    float deltaTPSPercent = sensors->getRelativeTPSLoad(tpsInitialPercent);     // ←  // ← valor entre 0.0 y 100.0 (porcentaje)
-    float deltaMAPercent = sensors->getRelativeMAPLoad(mapInitialPercent);     // ←  // ← valor entre 0.0 y 100.0 (porcentaje)
-    actuators->setAcousticParameters(deltaTPSPercent, deltaMAPercent); 
-    actuators->update(_tpsLoadPercent, _mapLoadPercent);
-
-  }
+    // Activar vortex tras delay
+    if (vortexPending && (millis() - vortexStartMillis >= vortexDelayMs)) {
+        actuators->startVortex();
+        vortexPending = false;
+        Serial.println(">> Vortex activado tras timing inicial");
+    }
 }
 
-
-
-
-
+// ======= DEBUG FORCE STATE =======
 void StateMachine::debugForceState(SystemState nuevoEstado) {
-  if (current == SystemState::DEBUG) {
-    current = nuevoEstado;
-    Serial.print(">> Estado forzado a: ");
-    Serial.println(static_cast<int>(nuevoEstado));
-  }
+    if (current == SystemState::DEBUG) {
+        current = nuevoEstado;
+        Serial.print(">> Estado forzado a: ");
+        Serial.println(static_cast<int>(nuevoEstado));
+    }
 }
 
+// ======= GET LEVEL =======
 float StateMachine::getLevel() const {
-  return tpsNormalized;
+    return tpsNormalized;
 }
 
+// ======= READY FOR INJECTION =======
 bool StateMachine::readyForInjection(float mapLoad) {
-  return  mapLoad >= thresholds.INJ_MAP_ON;
+    return mapLoad >= thresholds.INJ_MAP_ON;
 }
