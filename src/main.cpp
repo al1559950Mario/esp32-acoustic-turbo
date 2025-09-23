@@ -1,190 +1,88 @@
-#include <Arduino.h>
-#include "StateMachine.h"
-#include "CalibrationManager.h"
-#include "DebugManager.h"
-#include "ActuatorManager.h"
-#include "SensorManager.h"
-#include "USBSerialConsoleUI.h"
-#include "BluetoothSerialConsoleUI.h"
-#include <BluetoothSerial.h>
-#include "ThresholdManager.h"
-#include "Logger.h"
+#include <SPI.h>
+#include <SD.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_ILI9341.h>
 
-// FreeRTOS para mutex
-#include "freertos/FreeRTOS.h"
-#include "freertos/semphr.h"
+// Pines TFT
+constexpr uint8_t PIN_TFT_CS  = 15;
+constexpr uint8_t PIN_TFT_DC  = 2;
+constexpr uint8_t PIN_TFT_RST = 4;
 
-// PIN-OUT
-constexpr uint8_t PIN_DAC_ACOUSTIC    = 25;
-constexpr uint8_t PIN_PRESSURE_OUT    = 26; // HX710B OUT
-constexpr uint8_t PIN_PRESSURE_SCK    = 27; // HX710B SCK
-constexpr uint8_t PIN_BTS_PWM = 18;   // pin conectado al PWM del BTS
-constexpr uint8_t PWM_CHANNEL_BTS = 0; // canal de ESP32 (0-15)
-constexpr uint8_t PIN_I2C_SDA         = 21;
-constexpr uint8_t PIN_I2C_SCL         = 22;
+// Pin CS SD (solo para inicialización)
+constexpr uint8_t PIN_SD_CS = 13;
 
-// Objetos globales
-StateMachine       fsm;
-SensorManager      sensors;
-ActuatorManager    actuators;
-ConsoleUI*         ui = nullptr;
-USBSerialConsoleUI usbConsoleUI(&ui);
-BluetoothSerialConsoleUI btConsoleUI(&ui);
-BluetoothSerial    SerialBT;
-CalibrationManager& calib = CalibrationManager::getInstance();
-DebugManager       debugMgr;
-ThresholdManager*  thresholdManagerPtr;
-Logger             logger(SerialBT);
+// Inicializar TFT
+Adafruit_ILI9341 tft(PIN_TFT_CS, PIN_TFT_DC, PIN_TFT_RST);
 
-// Mutex para acceso seguro a I2C
-SemaphoreHandle_t i2cMutex = nullptr;
+// Configuración de “frames” simulados
+constexpr uint8_t NUM_FRAMES_IDLE   = 8;
+constexpr uint8_t NUM_FRAMES_LOAD   = 10;
+constexpr uint8_t NUM_FRAMES_VORTEX = 12;
 
-// Task: UI / Consola
-void TaskConsoleUpdate(void* param) {
-  for (;;) {
-    static bool clientePrevio = false;
-    bool clienteActual = SerialBT.hasClient();
+// Estados del sistema
+enum State {IDLE, LOAD, VORTEX};
+State estado = IDLE;
 
-    if (clienteActual && !clientePrevio) {
-      Serial.println("→ Cliente Bluetooth conectado. Cambiando a BLE UI.");
-      ui = &btConsoleUI;
-    } else if (!clienteActual && clientePrevio) {
-      Serial.println("→ Cliente Bluetooth desconectado. Volviendo a Serial UI.");
-      ui = &usbConsoleUI;
-    }
-    clientePrevio = clienteActual;
+// Variables de simulación del sensor MAP (0.0 a 1.0)
+float sensorMAP = 0.0;
+float sensorStep = 0.02; // velocidad simulada
 
-    if (xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(200)) == pdTRUE) {
-      if (ui) ui->update();
-      xSemaphoreGive(i2cMutex);
-    } else {
-      Serial.println("[WARN] TaskConsoleUpdate: timeout i2cMutex, saltando ui->update()");
-    }
-
-    debugMgr.updateFromSerial(Serial);
-    vTaskDelay(pdMS_TO_TICKS(20));
-  }
-}
+// Frame actual para loop de IDLE y VORTEX
+uint8_t frameLoop = 0;
 
 void setup() {
   Serial.begin(115200);
+  Serial.println("=== Simulación Paso 1: GIFs Dinámicos ===");
 
-  // Crear mutex
-  i2cMutex = xSemaphoreCreateMutex();
-  if (!i2cMutex) {
-    Serial.println("❌ Error creando i2cMutex");
-    while (1) delay(1000);
+  // Inicializar TFT
+  tft.begin();
+  tft.setRotation(1); // horizontal
+  tft.fillScreen(ILI9341_BLACK);
+
+  // Inicializar SD (solo para probar conexión)
+  if(!SD.begin(PIN_SD_CS)) {
+    Serial.println("Error inicializando SD");
+  } else {
+    Serial.println("SD inicializada correctamente");
   }
-
-  // Inicializar sensores y actuadores
-  sensors.begin(PIN_PRESSURE_OUT, PIN_PRESSURE_SCK, PIN_I2C_SDA, PIN_I2C_SCL);
-  actuators.begin(PIN_BTS_PWM, PWM_CHANNEL_BTS, PIN_DAC_ACOUSTIC);
-
-  // Crear task de consola
-  if (xTaskCreatePinnedToCore(TaskConsoleUpdate, "ConsoleUpdate", 4096, nullptr, 1, nullptr, 0) != pdPASS) {
-    Serial.println("❌ Error creando TaskConsoleUpdate");
-  }
-
-  // Inicializar UIs
-  usbConsoleUI.begin();
-  usbConsoleUI.setFSM(&fsm);
-  usbConsoleUI.attachSensors(&sensors);
-  usbConsoleUI.attachActuators(&actuators);
-  usbConsoleUI.imprimirDashboard();
-
-  btConsoleUI.begin();
-  btConsoleUI.setFSM(&fsm);
-  btConsoleUI.attachSensors(&sensors);
-  btConsoleUI.attachActuators(&actuators);
-  btConsoleUI.imprimirDashboard();
-  btConsoleUI.attachLogger(&logger);
-
-  usbConsoleUI.setMirror(&btConsoleUI);
-  btConsoleUI.setMirror(&usbConsoleUI);
-
-  ui = &usbConsoleUI;
-
-  esp_log_level_set("*", ESP_LOG_WARN);
-
-  // Calibración
-  calib.begin(&sensors);
-  bool calibLoaded = calib.loadCalibration();
-
-  thresholdManagerPtr = new ThresholdManager();
-  if (!thresholdManagerPtr->begin()) {
-    Serial.println("❌ Error al iniciar ThresholdManager");
-  }
-
-  fsm.begin(calibLoaded, &actuators, thresholdManagerPtr, &sensors, &calib);
-  actuators.stopAll();
-
-  if (!calibLoaded)
-    Serial.println("  Estado inicial: SIN_CALIBRAR (necesita calibración)");
-  else
-    Serial.println("  Estado inicial: OFF (calibración cargada)");
 }
 
 void loop() {
-  static bool hasCalibrationLoaded = false;
-  static bool firstLoop = true;
+  switch(estado){
+    case IDLE:
+      playGIFLoop(NUM_FRAMES_IDLE, ILI9341_RED);
+      sensorMAP += sensorStep/4; // lento para IDLE
+      if(sensorMAP > 0.05) estado = LOAD;
+      break;
 
-  if (firstLoop) {
-    delay(50); // da tiempo a estabilizar I2C
-    hasCalibrationLoaded = calib.loadCalibration();
-    firstLoop = false;
+    case LOAD:
+      playGIFLoad(NUM_FRAMES_LOAD, sensorMAP);
+      sensorMAP += sensorStep; // progresivo
+      if(sensorMAP >= 0.8) estado = VORTEX;
+      break;
+
+    case VORTEX:
+      playGIFLoop(NUM_FRAMES_VORTEX, ILI9341_BLUE);
+      sensorMAP = 0.0; // reinicia simulación
+      estado = IDLE;
+      break;
   }
 
-  // Recalibración solicitada por UI
-  if (ui->getCalibRequest()) {
-    Serial.println("[DEBUG] Solicitud de recalibración detectada");
-    calib.clearCalibration();
-  }
+  delay(100); // pequeño delay para notar cambio de frame
+}
 
-  calib.update(ui->isSimulation());
+// Función para loop constante de frames (IDLE y VORTEX)
+void playGIFLoop(uint8_t numFrames, uint16_t baseColor){
+  // Cambia ligeramente el color para simular frame distinto
+  tft.fillScreen(baseColor + frameLoop*50);
+  frameLoop = (frameLoop + 1) % numFrames;
+}
 
-  float mapLoadPercent = 0.0f;
-  float tpsLoadPercent = 0.0f;
-
-  // Lectura sensores protegida con mutex
-  if (xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(200)) == pdTRUE) {
-    sensors.update();
-    mapLoadPercent = sensors.readMAPLoadPercent();
-    tpsLoadPercent = sensors.readTPSLoadPercent();
-    xSemaphoreGive(i2cMutex);
-  } else {
-    Serial.println("[WARN] loop: timeout i2cMutex, saltando lectura sensores");
-  }
-
-  bool sistemaActivo = usbConsoleUI.isSistemaActivo() || btConsoleUI.isSistemaActivo();
-
-  if (sistemaActivo) {
-    float mapLoadPercent = sensors.readMAPLoadPercent();
-    float tpsLoadPercent = sensors.readTPSLoadPercent();
-
-    actuators.update(tpsLoadPercent, mapLoadPercent);
-
-    if (tpsLoadPercent >= 100.0f || mapLoadPercent >= 100.0f) {
-      Serial.println("[ERROR] Carga al 100% detectada. Saltando FSM.");
-      return;
-    }
-
-    fsm.update(
-      mapLoadPercent,
-      tpsLoadPercent,
-      usbConsoleUI.getCalibRequest(),
-      btConsoleUI.getCalibRequest(),
-      hasCalibrationLoaded,
-      debugMgr
-    );
-
-    fsm.handleActions();
-
-    if (logger.isEnabled()) {
-      logger.log(tpsLoadPercent, mapLoadPercent);  //agregar más valores en el futuro
-    }
-  } else {
-    actuators.stopAll();
-  }
-
-  delay(10); // frecuencia loop ~100 Hz
+// Función LOAD: frame proporcional al sensor
+void playGIFLoad(uint8_t numFrames, float sensorRelative){
+  uint8_t frameIndex = round(sensorRelative * (numFrames - 1));
+  // Limpiar pantalla y dibujar barra proporcional
+  tft.fillScreen(ILI9341_BLACK);
+  int width = (frameIndex + 1) * (240 / numFrames); // barra horizontal
+  tft.fillRect(0, 140, width, 40, ILI9341_YELLOW);
 }
