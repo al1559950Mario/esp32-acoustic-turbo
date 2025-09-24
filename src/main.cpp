@@ -14,6 +14,8 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 
+#include <atomic>
+
 // PIN-OUT
 constexpr uint8_t PIN_RELAY_TURBO     =  2;
 constexpr uint8_t PIN_RELAY_ACOUSTIC  =  4;
@@ -39,6 +41,9 @@ Logger             logger(SerialBT);
 // Mutex para acceso seguro a I2C
 SemaphoreHandle_t i2cMutex = nullptr;
 
+static std::atomic<float> g_mapLoadPercent{0.0f};
+static std::atomic<float> g_tpsLoadPercent{0.0f};
+
 // Task: UI / Consola
 void TaskConsoleUpdate(void* param) {
   for (;;) {
@@ -54,17 +59,29 @@ void TaskConsoleUpdate(void* param) {
     }
     clientePrevio = clienteActual;
 
-    if (xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(200)) == pdTRUE) {
-      if (ui) ui->update();
-      xSemaphoreGive(i2cMutex);
-    } else {
-      Serial.println("[WARN] TaskConsoleUpdate: timeout i2cMutex, saltando ui->update()");
+    if (ui) {
+      float mapVal = g_mapLoadPercent.load(std::memory_order_relaxed);
+      float tpsVal = g_tpsLoadPercent.load(std::memory_order_relaxed);
+      ui->updateValues(mapVal, tpsVal);
+      ui->update();
     }
 
     debugMgr.updateFromSerial(Serial);
     vTaskDelay(pdMS_TO_TICKS(20));
   }
 }
+
+void TaskSensorUpdate(void* param) {
+  auto* sensorMgr = static_cast<SensorManager*>(param);
+  SensorManager& sm = *sensorMgr;
+  for (;;) {
+    sm.update();  // único lugar que toca I2C
+    g_mapLoadPercent.store(sm.readMAPLoadPercent(), std::memory_order_relaxed);
+    g_tpsLoadPercent.store(sm.readTPSLoadPercent(), std::memory_order_relaxed);
+    vTaskDelay(pdMS_TO_TICKS(10));
+  }
+}
+
 
 void setup() {
   Serial.begin(115200);
@@ -79,6 +96,17 @@ void setup() {
   // Inicializar sensores y actuadores
   sensors.begin(PIN_PRESSURE_OUT, PIN_PRESSURE_SCK, PIN_I2C_SDA, PIN_I2C_SCL);
   actuators.begin(PIN_RELAY_TURBO, PIN_DAC_ACOUSTIC, PIN_RELAY_ACOUSTIC);
+
+    // Tarea dedicada a sensores (solo aquí se usa I2C)
+  xTaskCreatePinnedToCore(
+    TaskSensorUpdate,
+    "SensorUpdate",
+    4096,
+    &sensors,  
+    2,         // prioridad algo superior
+    nullptr,
+    1          // core 1 para no interferir con Wi-Fi/BT
+  );
 
   // Crear task de consola
   if (xTaskCreatePinnedToCore(TaskConsoleUpdate, "ConsoleUpdate", 4096, nullptr, 1, nullptr, 0) != pdPASS) {
@@ -145,15 +173,9 @@ void loop() {
   float mapLoadPercent = 0.0f;
   float tpsLoadPercent = 0.0f;
 
-  // Lectura sensores protegida con mutex
-  if (xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(200)) == pdTRUE) {
-    sensors.update();
-    mapLoadPercent = sensors.readMAPLoadPercent();
-    tpsLoadPercent = sensors.readTPSLoadPercent();
-    xSemaphoreGive(i2cMutex);
-  } else {
-    Serial.println("[WARN] loop: timeout i2cMutex, saltando lectura sensores");
-  }
+  // Leer sensor “copiado”
+  float mapLoadPercent = g_mapLoadPercent.load(std::memory_order_relaxed);
+  float tpsLoadPercent = g_tpsLoadPercent.load(std::memory_order_relaxed);
 
   bool sistemaActivo = usbConsoleUI.isSistemaActivo() || btConsoleUI.isSistemaActivo();
 
@@ -181,5 +203,5 @@ void loop() {
     actuators.stopAll();
   }
 
-  delay(10); // frecuencia loop ~100 Hz
+  vTaskDelay(pdMS_TO_TICKS(10));  // mantiene ~100 Hz
 }
