@@ -133,8 +133,8 @@ bool CalibrationManager::runAutoCalibration(SensorManager& sensors, bool simulac
   }
 
   // Leer sensores
-  uint16_t tpsRaw = sensors.readTPSRaw();
-  uint16_t mapRaw = sensors.readMAPRaw();
+  uint16_t tpsRaw = sensors.readTPSRawCached();
+  uint16_t mapRaw = sensors.readMAPRawCached();
 
   // Actualizar candidatos
   tpsMinCandidate = min(tpsMinCandidate, tpsRaw);
