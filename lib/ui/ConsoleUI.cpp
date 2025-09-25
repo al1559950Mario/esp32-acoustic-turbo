@@ -129,19 +129,6 @@ void ConsoleUI::interpretarComando(char c) {
         }
         break;
 
-
-
-    case 'i':  // Toggle relé inyector acústico (dev mode)
-      if (!devOnly()) break;
-      if (actuators->getAcousticInjector().isActive()) {
-        bool estadoActual = actuators->getAcousticInjector().isRelayActive();
-        actuators->getAcousticInjector().testRelay(!estadoActual);
-        this->printf(">> Relé %s.\n", !estadoActual ? "activado" : "desactivado");
-      } else {
-        this->println("⚠️ Inyector no disponible.");
-      }
-      break;
-
     case 'm':  // Mostrar ayuda
       imprimirHelp();
       break;
@@ -354,8 +341,6 @@ void ConsoleUI::imprimirHelp() {
   if (developerMode) {
     this->println(F("\n🧪 Modo desarrollador activo:"));
     this->println(F("  b  → Probar sonido acústico"));
-    this->println(F("  i  → Activar relé INYECCIÓN_ACÚSTICA"));
-    this->println(F("  t  → Activar relé TURBO"));
     this->println(F("  u  → (Comando dev pendiente)"));
     this->println(F("  x  → Paro manual, volver a IDLE"));
     this->println(F("  v  → Visualizar curva TPS-MAP (pendiente desarrollo)"));

@@ -55,6 +55,7 @@ void AcousticInjector::begin(uint8_t dacPin) {
 
 
 void AcousticInjector::start(float level) {
+  _active = true;
   _targetLevel = constrain(level, 0.0f, 1.0f);
 
   // Antes:
@@ -161,7 +162,7 @@ uint8_t AcousticInjector::getCurrentDAC() const {
 }
 
 bool AcousticInjector::isActive() const {
-
+  return _active;
 }
 
 
@@ -279,4 +280,8 @@ void AcousticInjector::setFrequencyRangeOption(FrequencyRangeOption option) {
             _freqMax = 6500.0f;
             break;
     }
+}
+
+AcousticInjector::FrequencyRangeOption AcousticInjector::getFrequencyRangeOption() const {
+  return _freqOption;
 }

@@ -38,8 +38,8 @@ public:
   float mapLoadToWaveFrequency(float mapLoadPercent);
   float getLevel() const { return _level; }
   float getFrequency() const { return _currentFrequency; }
-  float AcousticInjector::getFreqMin() const { return _freqMin; }
-  float AcousticInjector::getFreqMax() const { return _freqMax; }
+  float getFreqMin() const { return _freqMin; }
+  float getFreqMax() const { return _freqMax; }
 
 
 
@@ -58,6 +58,7 @@ private:
   float _targetFrequency = 0.0f;
   static constexpr uint8_t PHASE_FRAC = 16;   
   static_assert((1 << PHASE_FRAC) > 0, "PHASE_FRAC ok");
+  bool _active = false;
 
   volatile uint32_t _phaseAcc = 0;
   volatile uint32_t _phaseStep = 0; 

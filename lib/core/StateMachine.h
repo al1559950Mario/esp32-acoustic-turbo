@@ -88,6 +88,7 @@ private:
   Thresholds thresholds;                         ///< Copia local de los umbrales actuales
   ThresholdManager* thresholdManager = nullptr;  ///< Puntero al gestor de umbrales
   SystemState        current{SystemState::OFF};   ///< Estado actual
+  SystemState lastState;
   ActuatorManager* actuators = nullptr;
   CalibrationManager* calibMgr= nullptr;
   SensorManager* sensors = nullptr;
@@ -101,6 +102,8 @@ private:
   bool vortexPending = false;  
   float tpsNormalized{0.0f}; 
   float mapNormalized{0.0f}; 
+  float lastTPSPercent;   // <— último TPS%
+  float lastMAPPercent;   // <— último MAP%
 
 
 };
