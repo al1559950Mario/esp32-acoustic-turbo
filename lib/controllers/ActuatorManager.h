@@ -9,8 +9,8 @@ public:
   ActuatorManager() = default;
 
   // Inicializa ambos actuadores con sus pines respectivos
-  void begin(uint8_t turboPwmPin, uint8_t turboPwmChannel,
-                            uint8_t acousticDacPin, uint8_t acousticRelayPin);
+  void begin( uint8_t turboPwmPin, uint8_t turboPwmChannel,
+                            uint8_t acousticDacPin);
 
   // Actualiza lógica interna (por ejemplo, rampas, timers)
   void update(float tpsLoadPercent, float mapLoadPercent);

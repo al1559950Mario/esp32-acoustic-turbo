@@ -9,100 +9,102 @@
 #include <BluetoothSerial.h>
 #include "ThresholdManager.h"
 #include "Logger.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 // PIN-OUT
-constexpr uint8_t PIN_MAP             = 35;
-constexpr uint8_t PIN_TPS             = 34;
-constexpr uint8_t PIN_RELAY_TURBO     =  2;
-constexpr uint8_t PIN_RELAY_ACOUSTIC  =  4;
 constexpr uint8_t PIN_DAC_ACOUSTIC    = 25;
-constexpr uint8_t PIN_PRESSURE_OUT = 26; // HX710B OUT
-constexpr uint8_t PIN_PRESSURE_SCK = 27; // HX710B SCK
+constexpr uint8_t PIN_PRESSURE_OUT    = 26; // HX710B OUT
+constexpr uint8_t PIN_PRESSURE_SCK    = 27; // HX710B SCK
 constexpr uint8_t PIN_BTS_PWM = 18;   // pin conectado al PWM del BTS
 constexpr uint8_t PWM_CHANNEL_BTS = 0; // canal de ESP32 (0-15)
-
+constexpr uint8_t PIN_I2C_SDA         = 21;
+constexpr uint8_t PIN_I2C_SCL         = 22;
 
 // Objetos globales
-StateMachine       fsm;
-SensorManager      sensors;
-ActuatorManager    actuators;
-ConsoleUI* ui = nullptr;
-USBSerialConsoleUI usbConsoleUI(&ui);
+StateMachine         fsm;
+SensorManager        sensors;
+ActuatorManager      actuators;
+ConsoleUI*           ui               = nullptr;
+USBSerialConsoleUI   usbConsoleUI(&ui);
 BluetoothSerialConsoleUI btConsoleUI(&ui);
-BluetoothSerial SerialBT;
-CalibrationManager& calib = CalibrationManager::getInstance();
-DebugManager       debugMgr;
-ThresholdManager* thresholdManagerPtr;
-Logger logger(SerialBT);  // Instancia global del logger
+BluetoothSerial      SerialBT;
+CalibrationManager&  calib            = CalibrationManager::getInstance();
+DebugManager         debugMgr;
+ThresholdManager*    thresholdManagerPtr;
+Logger               logger(SerialBT);
 
+// Indicador de calibración cargada
 bool calibLoaded = false;
 
+// Tarea de sensores (sólo lee ADS1115 y cachea raws y porcentajes)
 void TaskSensorUpdate(void* param) {
-  SensorManager* sensorMgr = static_cast<SensorManager*>(param);
+  auto* sm = static_cast<SensorManager*>(param);
   for (;;) {
-    sensorMgr->update();                    // Mantén este método como está
-    vTaskDelay(pdMS_TO_TICKS(10));          // Ejecuta cada 10 ms
+    sm->update();  
+  uint16_t rawMAP = sm->readMAPRawCached();
+  uint16_t rawTPS = sm->readTPSRawCached();
+  float voltsMAP = sm->readMAPVolts();
+  float voltsTPS = sm->readTPSVolts();
+  ui->printf("MAP=%4u TPS=%4u MAP=%6.3fV TPS=%6.3fV\n", rawMAP, rawTPS, voltsMAP, voltsTPS);
+
+    vTaskDelay(pdMS_TO_TICKS(10));
   }
 }
 
+// Tarea de consola/UI (core 0): nunca toca I²C
 void TaskConsoleUpdate(void* param) {
   for (;;) {
-    static bool clientePrevio = false;
-    bool clienteActual = SerialBT.hasClient();
-
-    if (clienteActual && !clientePrevio) {
-      Serial.println("→ Cliente Bluetooth conectado. Cambiando a BLE UI.");
+    bool btClient = SerialBT.hasClient();
+    if (btClient && ui != &btConsoleUI) {
       ui = &btConsoleUI;
-    } else if (!clienteActual && clientePrevio) {
-      Serial.println("→ Cliente Bluetooth desconectado. Volviendo a Serial UI.");
+    } else if (!btClient && ui != &usbConsoleUI) {
       ui = &usbConsoleUI;
     }
-    clientePrevio = clienteActual;
 
     if (ui) ui->update();
     debugMgr.updateFromSerial(Serial);
-    
-    vTaskDelay(pdMS_TO_TICKS(20));  // ajusta según necesidad
+    vTaskDelay(pdMS_TO_TICKS(20));
   }
 }
 
-
-
 void setup() {
+  Serial.begin(115200);
+  while (!Serial) { delay(1); }
 
-  // Inicializar sensores y actuadores
-  sensors.begin(PIN_MAP, PIN_TPS, PIN_PRESSURE_OUT, PIN_PRESSURE_SCK);
-  actuators.begin(PIN_BTS_PWM, PWM_CHANNEL_BTS, PIN_DAC_ACOUSTIC, PIN_RELAY_ACOUSTIC);
+  // Inicialización de sensores y actuadores
+  sensors.begin(PIN_PRESSURE_OUT, PIN_PRESSURE_SCK, PIN_I2C_SDA, PIN_I2C_SCL);
+  actuators.begin(PIN_BTS_PWM, PWM_CHANNEL_BTS, PIN_DAC_ACOUSTIC);
 
+  // Crear TaskSensorUpdate en Core 1
   xTaskCreatePinnedToCore(
     TaskSensorUpdate,
-    "SensorPolling",
+    "SensorUpdate",
     2048,
-    &sensors,  // tu instancia global o singleton
-    1,         // prioridad baja
+    &sensors,
+    2,
     nullptr,
-    1          // core 1 si se usa Wifi o BT
+    1
   );
 
+  // Crear TaskConsoleUpdate en Core 0
   xTaskCreatePinnedToCore(
     TaskConsoleUpdate,
     "ConsoleUpdate",
-    4096,     // más memoria si usas Bluetooth
+    4096,
     nullptr,
-    1,        // misma prioridad que sensores
+    1,
     nullptr,
-    0         // Core 0, deja sensores en core 1
+    0
   );
 
-  // Iniciar UI Serial USB
+  // Inicializar UIs
   usbConsoleUI.begin();
   usbConsoleUI.setFSM(&fsm);
   usbConsoleUI.attachSensors(&sensors);
   usbConsoleUI.attachActuators(&actuators);
   usbConsoleUI.imprimirDashboard();
 
-  // Iniciar UI Bluetooth Serial clásico
-  //SerialBT.setPin("0000");  // Opcional
   btConsoleUI.begin();
   btConsoleUI.setFSM(&fsm);
   btConsoleUI.attachSensors(&sensors);
@@ -110,71 +112,70 @@ void setup() {
   btConsoleUI.imprimirDashboard();
   btConsoleUI.attachLogger(&logger);
 
-
   usbConsoleUI.setMirror(&btConsoleUI);
   btConsoleUI.setMirror(&usbConsoleUI);
-
   ui = &usbConsoleUI;
 
-  esp_log_level_set("*", ESP_LOG_WARN);  // Silencia todos los módulos, solo muestra WARN o superior
+  esp_log_level_set("*", ESP_LOG_WARN);
 
-
-
-  // Estado inicial
+  // Cargar calibración y configurar FSM
   calib.begin(&sensors);
-  bool calibLoaded = calib.loadCalibration();
+  calibLoaded = calib.loadCalibration();
   thresholdManagerPtr = new ThresholdManager();
   if (!thresholdManagerPtr->begin()) {
-    Serial.println("❌ Error al iniciar ThresholdManager");
+    ui->println("❌ Error al iniciar ThresholdManager");
   }
-
   fsm.begin(calibLoaded, &actuators, thresholdManagerPtr, &sensors, &calib);
-
   actuators.stopAll();
 
-  if (!calibLoaded)
-    Serial.println("  Estado inicial: SIN_CALIBRAR (necesita calibración)");
-  else
-    Serial.println("  Estado inicial: OFF (calibración cargada)");
+  ui->println(
+    calibLoaded
+      ? "  Estado inicial: OFF (calibración cargada)"
+      : "  Estado inicial: SIN_CALIBRAR (necesita calibración)"
+  );
 }
 
 void loop() {
-  bool sistemaActivo = usbConsoleUI.isSistemaActivo() || btConsoleUI.isSistemaActivo();
-
-  static bool hasTriedLoad = false;
-  static bool hasCalibration = false;
-
-  if (!hasTriedLoad) {
-    hasCalibration = calib.loadCalibration();
-    hasTriedLoad = true;
-  }
-
-  if (ui->getCalibRequest()) {
+  // Procesar solicitud de recalibración
+  if (ui && ui->getCalibRequest()) {
+    ui->println("[Loop] Recalibración solicitada");
     calib.clearCalibration();
+    calibLoaded = false;
   }
 
-  calib.update(ui->isSimulation());
+  // Avanzar proceso de calibración si no está completa
+  calib.update(ui ? ui->isSimulation() : false);
 
+  // Leer valores cacheados
+  float mapPct = sensors.readMAPLoadPercent();
+  float tpsPct = sensors.readTPSLoadPercent();
+
+  bool sistemaActivo = usbConsoleUI.isSistemaActivo() || btConsoleUI.isSistemaActivo();
   if (sistemaActivo) {
     float mapLoadPercent = sensors.readMAPLoadPercent();
     float tpsLoadPercent = sensors.readTPSLoadPercent();
 
-    fsm.update(
-      mapLoadPercent,
-      tpsLoadPercent,
-      usbConsoleUI.getCalibRequest(),
-      btConsoleUI.getCalibRequest(),
-      hasCalibration, 
-      debugMgr
-    );
-    fsm.handleActions();
-    if (logger.isEnabled()) {
-      logger.log(tpsLoadPercent, mapLoadPercent);  //agregar más valores en el futuro
+    actuators.update(tpsLoadPercent, mapLoadPercent);
+
+    if (mapPct >= 100.0f || tpsPct >= 100.0f) {
+      ui->println("[ERROR] Carga 100%, saltando FSM");
+    } else {
+      fsm.update(
+        mapPct,
+        tpsPct,
+        usbConsoleUI.getCalibRequest(),
+        btConsoleUI.getCalibRequest(),
+        calibLoaded,
+        debugMgr
+      );
+      fsm.handleActions();
+      if (logger.isEnabled()) {
+        logger.log(tpsPct, mapPct);  //agregar más valores en el futuro
+      }
     }
   } else {
     actuators.stopAll();
   }
 
-  delay(5);
+  vTaskDelay(pdMS_TO_TICKS(10));
 }
-

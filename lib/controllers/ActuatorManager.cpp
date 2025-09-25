@@ -3,9 +3,9 @@
 
 /// Inicializa actuadores: BTS7960 y Acoustic Injector
 void ActuatorManager::begin(uint8_t turboPwmPin, uint8_t turboPwmChannel,
-                            uint8_t acousticDacPin, uint8_t acousticRelayPin) {
+                            uint8_t acousticDacPin) {
     vortex.begin(turboPwmPin, turboPwmChannel);
-    injector.begin(acousticDacPin, acousticRelayPin);
+    injector.begin(acousticDacPin);
 
     // Apagar ambos al inicio
     vortex.stop();
@@ -69,7 +69,7 @@ void ActuatorManager::stopAcoustic() {
 /// @param level: potencia relativa [0-100]
 /// @param mapLoadPercent: carga MAP para calcular frecuencia
 void ActuatorManager::setAcousticParameters(float level, float mapLoadPercent) {
-    float freq = AcousticInjector::mapLoadToWaveFrequency(mapLoadPercent);
+    float freq = injector.mapLoadToWaveFrequency(mapLoadPercent);
     injector.setTargetFrequency(freq);
     injector.setLevel(constrain(level / 100.0f, 0.0f, 1.0f));
 }

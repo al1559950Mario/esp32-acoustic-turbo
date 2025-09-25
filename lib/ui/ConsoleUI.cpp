@@ -129,19 +129,6 @@ void ConsoleUI::interpretarComando(char c) {
         }
         break;
 
-
-
-    case 'i':  // Toggle relé inyector acústico (dev mode)
-      if (!devOnly()) break;
-      if (actuators->getAcousticInjector().isActive()) {
-        bool estadoActual = actuators->getAcousticInjector().isRelayActive();
-        actuators->getAcousticInjector().testRelay(!estadoActual);
-        this->printf(">> Relé %s.\n", !estadoActual ? "activado" : "desactivado");
-      } else {
-        this->println("⚠️ Inyector no disponible.");
-      }
-      break;
-
     case 'm':  // Mostrar ayuda
       imprimirHelp();
       break;
@@ -260,9 +247,10 @@ void ConsoleUI::imprimirDashboard() {
   if (!fsm || !sensors || !actuators) return;
   if (millis() < tiempoProximaImpresionHUD) return;
 
-  float tpsV = sensors->getTPS().readVolts();
-  float tpsPct = sensors->getTPS().readPorcent();
-  float mapV = sensors->getMAP().readVolts();
+  float tpsV = sensors->readTPSVolts();
+  float tpsPct = sensors->readTPSLoadPercent();
+  float mapPct = sensors->readMAPLoadPercent();
+  float mapV = sensors->readMAPVolts();
   uint8_t dac = actuators->getAcousticInjector().getCurrentDAC();
   bool vortexOn = actuators->isTurboOn();
   bool injOn = actuators->isAcousticOn();
@@ -286,17 +274,18 @@ void ConsoleUI::imprimirDashboard() {
   };
   const char* stName = stateNames[int(st)];
 
-  float tpsMinV = tpsMin * 3.3f / 4095.0f;
-  float tpsMaxV = tpsMax * 3.3f / 4095.0f;
-  float mapMinV = mapMin * 3.3f / 4095.0f;
-  float mapMaxV = mapMax * 3.3f / 4095.0f;
+  constexpr float LSB_MV = 0.1875f;  // mV por bit en GAIN_TWOTHIRDS
+  float tpsMinV = (tpsMin * LSB_MV) / 1000.0f;
+  float tpsMaxV = (tpsMax * LSB_MV) / 1000.0f;
+  float mapMinV = (mapMin * LSB_MV) / 1000.0f;
+  float mapMaxV = (mapMax * LSB_MV) / 1000.0f;
 
 // HUD en vivo: actualización en línea
 this->printf(
-    "\r[%s|%lus] TPS=%.2fV(%.2f–%.2fV) %.0f%% | MAP=%.2fV(%.2f–%.2fV) | DAC=%3u | LVL=%.2f | FRQ=%.0fHz | Boost:%c | Beam:%c     ",
+    "\r[%s|%lus] TPS=%.2fV(%.2f–%.2fV) %.0f%% | MAP=%.2fV(%.2f–%.2fV) %.0f%% | DAC=%3u | LVL=%.2f | FRQ=%.0fHz | Boost:%c | Beam:%c     ",
     stName, elapsed,
     tpsV, tpsMinV, tpsMaxV, tpsPct,
-    mapV, mapMinV, mapMaxV,
+    mapV, mapMinV, mapMaxV, mapPct,
     dac,
     level,
     freq,
@@ -352,8 +341,6 @@ void ConsoleUI::imprimirHelp() {
   if (developerMode) {
     this->println(F("\n🧪 Modo desarrollador activo:"));
     this->println(F("  b  → Probar sonido acústico"));
-    this->println(F("  i  → Activar relé INYECCIÓN_ACÚSTICA"));
-    this->println(F("  t  → Activar relé TURBO"));
     this->println(F("  u  → (Comando dev pendiente)"));
     this->println(F("  x  → Paro manual, volver a IDLE"));
     this->println(F("  v  → Visualizar curva TPS-MAP (pendiente desarrollo)"));

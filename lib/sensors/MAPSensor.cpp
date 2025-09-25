@@ -1,34 +1,15 @@
 #include "MAPSensor.h"
 #include "CalibrationManager.h"
-#include "driver/adc.h"
-#include "ADCUtils.h"
 
-void MAPSensor::begin(uint8_t analogPin) {
-  _pin = analogPin;
-  cachedRaw = 0;
-  pinMode(_pin, INPUT);
 
-  adc1_channel_t channel = pinToADCChannel(_pin);
-  if (channel == ADC1_CHANNEL_MAX) {
-    Serial.println("Error: GPIO inválido para ADC1.");
-    return;
-  }
-
-  if (channel != ADC1_CHANNEL_MAX) {
-    adc1_config_width(ADC_WIDTH_BIT_12);
-    adc1_config_channel_atten(channel, ADC_ATTEN_DB_11);
-  }
+void MAPSensor::begin(uint8_t adsChannel, Adafruit_ADS1115* adsPtr) {
+  _adsChannel = adsChannel;
+  _ads = adsPtr;
 }
 
 uint16_t MAPSensor::readRaw() {
   if (modoSimulacion) return rawSimulado;
-  if (_pin == 0xFF) {
-    Serial.println("ERROR: MAPSensor pin no inicializado!");
-    return 0;
-  }
-  cachedRaw = analogRead(_pin);
-
-  return cachedRaw;
+  return _ads->readADC_SingleEnded(_adsChannel);
 }
 
 float MAPSensor::readNormalized() {
@@ -48,10 +29,10 @@ float MAPSensor::readVacuum_inHg() {
   return vacMin + norm * (vacMax - vacMin);
 }
 
-float MAPSensor::readVolts() const {
+float MAPSensor::readVolts() {
   if (modoSimulacion) return (rawSimulado * 3.3f) / 4095.0f;
-  uint16_t raw = analogRead(_pin);
-  return (raw * 3.3f) / 4095.0f;
+  int16_t raw = readRaw();
+  return raw * 0.1875f / 1000.0f;  // GAIN_TWOTHIRDS
 }
 
 float MAPSensor::convertRawToHg(uint16_t raw) {
