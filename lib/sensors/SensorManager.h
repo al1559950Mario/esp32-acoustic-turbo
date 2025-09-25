@@ -14,8 +14,8 @@ public:
 
   float readVacuum_inHg();
   float readTPSLoadPercent();
-  uint16_t readMAPRaw();
-  uint16_t readTPSRaw();
+  uint16_t readMAPRawCached();
+  uint16_t readTPSRawCached();
   float readMAPVolts();
   float readTPSVolts();
   bool isTPSValid();
@@ -52,6 +52,8 @@ private:
   float filteredRawTPS = 0;
   float filteredRawMAP = 0;
   const float alpha = 0.8;  // coeficiente del filtro
+  float rawTPSCached = 0.0f;
+  float rawMAPCached = 0.0f;
 
 
   float vacuum_inHg = 0;

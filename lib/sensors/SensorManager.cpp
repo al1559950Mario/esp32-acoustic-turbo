@@ -24,20 +24,20 @@ float SensorManager::readTPSLoadPercent() {
   return tpsLoadPercent;
 }
 
-uint16_t SensorManager::readMAPRaw() {
-  return mapSensor.readRaw();
+uint16_t SensorManager::readMAPRawCached() {
+  return rawMAPCached;
 }
 
-uint16_t SensorManager::readTPSRaw() {
-  return tpsSensor.readRaw();
+uint16_t SensorManager::readTPSRawCached() {
+  return rawTPSCached;
 }
 
 float SensorManager::readMAPVolts() {
-  return mapSensor.readVolts();
+  return representVoltsFromRaw(rawMAPCached);
 }
 
 float SensorManager::readTPSVolts() {
-  return tpsSensor.readVolts();
+  return representVoltsFromRaw(rawTPSCached);
 }
 
 bool SensorManager::isTPSValid() {
@@ -57,20 +57,19 @@ float SensorManager::readMAPLoadPercent() {
 }
 
 float SensorManager::representVoltsFromRaw(uint16_t raw) const {
-  return (raw * 3.3f) / 4095.0f;
+  // 6.144 V / 32768 pasos ≈ 0.1875 mV/bit
+  constexpr float LSB = 6.144f / 32768.0f;  
+  return raw * LSB;
 }
 
-void SensorManager::update() {
-  int16_t rawMAP = ads.readADC_SingleEnded(1);
-  int16_t rawTPS = ads.readADC_SingleEnded(0); 
 
-    // Debug: valores crudos
-  Serial.print("[DEBUG] rawMAP = "); Serial.print(rawMAP);
-  Serial.print(" | rawTPS = "); Serial.println(rawTPS);
+void SensorManager::update() {
+  rawMAPCached = ads.readADC_SingleEnded(1);
+  rawTPSCached = ads.readADC_SingleEnded(0); 
 
   // Filtro IIR al raw directamente
-  filteredRawMAP = alpha * rawMAP + (1 - alpha) * filteredRawMAP;
-  filteredRawTPS = alpha * rawTPS + (1 - alpha) * filteredRawTPS;
+  filteredRawMAP = alpha * rawMAPCached + (1 - alpha) * filteredRawMAP;
+  filteredRawTPS = alpha * rawTPSCached + (1 - alpha) * filteredRawTPS;
 
   //Porcentaje absoluto
   mapLoadPercent = mapSensor.convertRawToPercent((uint16_t)filteredRawMAP);

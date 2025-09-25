@@ -9,10 +9,8 @@
 #include <BluetoothSerial.h>
 #include "ThresholdManager.h"
 #include "Logger.h"
-
-// FreeRTOS para mutex
 #include "freertos/FreeRTOS.h"
-#include "freertos/semphr.h"
+#include "freertos/task.h"
 
 // PIN-OUT
 constexpr uint8_t PIN_DAC_ACOUSTIC    = 25;
@@ -24,43 +22,47 @@ constexpr uint8_t PIN_I2C_SDA         = 21;
 constexpr uint8_t PIN_I2C_SCL         = 22;
 
 // Objetos globales
-StateMachine       fsm;
-SensorManager      sensors;
-ActuatorManager    actuators;
-ConsoleUI*         ui = nullptr;
-USBSerialConsoleUI usbConsoleUI(&ui);
+StateMachine         fsm;
+SensorManager        sensors;
+ActuatorManager      actuators;
+ConsoleUI*           ui               = nullptr;
+USBSerialConsoleUI   usbConsoleUI(&ui);
 BluetoothSerialConsoleUI btConsoleUI(&ui);
-BluetoothSerial    SerialBT;
-CalibrationManager& calib = CalibrationManager::getInstance();
-DebugManager       debugMgr;
-ThresholdManager*  thresholdManagerPtr;
-Logger             logger(SerialBT);
+BluetoothSerial      SerialBT;
+CalibrationManager&  calib            = CalibrationManager::getInstance();
+DebugManager         debugMgr;
+ThresholdManager*    thresholdManagerPtr;
+Logger               logger(SerialBT);
 
-// Mutex para acceso seguro a I2C
-SemaphoreHandle_t i2cMutex = nullptr;
+// Indicador de calibración cargada
+bool calibLoaded = false;
 
-// Task: UI / Consola
+// Tarea de sensores (sólo lee ADS1115 y cachea raws y porcentajes)
+void TaskSensorUpdate(void* param) {
+  auto* sm = static_cast<SensorManager*>(param);
+  for (;;) {
+    sm->update();  
+  uint16_t rawMAP = sm->readMAPRawCached();
+  uint16_t rawTPS = sm->readTPSRawCached();
+  float voltsMAP = sm->readMAPVolts();
+  float voltsTPS = sm->readTPSVolts();
+  ui->printf("MAP=%4u TPS=%4u MAP=%6.3fV TPS=%6.3fV\n", rawMAP, rawTPS, voltsMAP, voltsTPS);
+
+    vTaskDelay(pdMS_TO_TICKS(10));
+  }
+}
+
+// Tarea de consola/UI (core 0): nunca toca I²C
 void TaskConsoleUpdate(void* param) {
   for (;;) {
-    static bool clientePrevio = false;
-    bool clienteActual = SerialBT.hasClient();
-
-    if (clienteActual && !clientePrevio) {
-      Serial.println("→ Cliente Bluetooth conectado. Cambiando a BLE UI.");
+    bool btClient = SerialBT.hasClient();
+    if (btClient && ui != &btConsoleUI) {
       ui = &btConsoleUI;
-    } else if (!clienteActual && clientePrevio) {
-      Serial.println("→ Cliente Bluetooth desconectado. Volviendo a Serial UI.");
+    } else if (!btClient && ui != &usbConsoleUI) {
       ui = &usbConsoleUI;
     }
-    clientePrevio = clienteActual;
 
-    if (xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(200)) == pdTRUE) {
-      if (ui) ui->update();
-      xSemaphoreGive(i2cMutex);
-    } else {
-      Serial.println("[WARN] TaskConsoleUpdate: timeout i2cMutex, saltando ui->update()");
-    }
-
+    if (ui) ui->update();
     debugMgr.updateFromSerial(Serial);
     vTaskDelay(pdMS_TO_TICKS(20));
   }
@@ -68,22 +70,33 @@ void TaskConsoleUpdate(void* param) {
 
 void setup() {
   Serial.begin(115200);
+  while (!Serial) { delay(1); }
 
-  // Crear mutex
-  i2cMutex = xSemaphoreCreateMutex();
-  if (!i2cMutex) {
-    Serial.println("❌ Error creando i2cMutex");
-    while (1) delay(1000);
-  }
-
-  // Inicializar sensores y actuadores
+  // Inicialización de sensores y actuadores
   sensors.begin(PIN_PRESSURE_OUT, PIN_PRESSURE_SCK, PIN_I2C_SDA, PIN_I2C_SCL);
   actuators.begin(PIN_BTS_PWM, PWM_CHANNEL_BTS, PIN_DAC_ACOUSTIC);
 
-  // Crear task de consola
-  if (xTaskCreatePinnedToCore(TaskConsoleUpdate, "ConsoleUpdate", 4096, nullptr, 1, nullptr, 0) != pdPASS) {
-    Serial.println("❌ Error creando TaskConsoleUpdate");
-  }
+  // Crear TaskSensorUpdate en Core 1
+  xTaskCreatePinnedToCore(
+    TaskSensorUpdate,
+    "SensorUpdate",
+    2048,
+    &sensors,
+    2,
+    nullptr,
+    1
+  );
+
+  // Crear TaskConsoleUpdate en Core 0
+  xTaskCreatePinnedToCore(
+    TaskConsoleUpdate,
+    "ConsoleUpdate",
+    4096,
+    nullptr,
+    1,
+    nullptr,
+    0
+  );
 
   // Inicializar UIs
   usbConsoleUI.begin();
@@ -101,90 +114,68 @@ void setup() {
 
   usbConsoleUI.setMirror(&btConsoleUI);
   btConsoleUI.setMirror(&usbConsoleUI);
-
   ui = &usbConsoleUI;
 
   esp_log_level_set("*", ESP_LOG_WARN);
 
-  // Calibración
+  // Cargar calibración y configurar FSM
   calib.begin(&sensors);
-  bool calibLoaded = calib.loadCalibration();
-
+  calibLoaded = calib.loadCalibration();
   thresholdManagerPtr = new ThresholdManager();
   if (!thresholdManagerPtr->begin()) {
-    Serial.println("❌ Error al iniciar ThresholdManager");
+    ui->println("❌ Error al iniciar ThresholdManager");
   }
-
   fsm.begin(calibLoaded, &actuators, thresholdManagerPtr, &sensors, &calib);
   actuators.stopAll();
 
-  if (!calibLoaded)
-    Serial.println("  Estado inicial: SIN_CALIBRAR (necesita calibración)");
-  else
-    Serial.println("  Estado inicial: OFF (calibración cargada)");
+  ui->println(
+    calibLoaded
+      ? "  Estado inicial: OFF (calibración cargada)"
+      : "  Estado inicial: SIN_CALIBRAR (necesita calibración)"
+  );
 }
 
 void loop() {
-  static bool hasCalibrationLoaded = false;
-  static bool firstLoop = true;
-
-  if (firstLoop) {
-    delay(50); // da tiempo a estabilizar I2C
-    hasCalibrationLoaded = calib.loadCalibration();
-    firstLoop = false;
-  }
-
-  // Recalibración solicitada por UI
-  if (ui->getCalibRequest()) {
-    Serial.println("[DEBUG] Solicitud de recalibración detectada");
+  // Procesar solicitud de recalibración
+  if (ui && ui->getCalibRequest()) {
+    ui->println("[Loop] Recalibración solicitada");
     calib.clearCalibration();
+    calibLoaded = false;
   }
 
-  calib.update(ui->isSimulation());
+  // Avanzar proceso de calibración si no está completa
+  calib.update(ui ? ui->isSimulation() : false);
 
-  float mapLoadPercent = 0.0f;
-  float tpsLoadPercent = 0.0f;
-
-  // Lectura sensores protegida con mutex
-  if (xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(200)) == pdTRUE) {
-    sensors.update();
-    mapLoadPercent = sensors.readMAPLoadPercent();
-    tpsLoadPercent = sensors.readTPSLoadPercent();
-    xSemaphoreGive(i2cMutex);
-  } else {
-    Serial.println("[WARN] loop: timeout i2cMutex, saltando lectura sensores");
-  }
+  // Leer valores cacheados
+  float mapPct = sensors.readMAPLoadPercent();
+  float tpsPct = sensors.readTPSLoadPercent();
 
   bool sistemaActivo = usbConsoleUI.isSistemaActivo() || btConsoleUI.isSistemaActivo();
-
   if (sistemaActivo) {
     float mapLoadPercent = sensors.readMAPLoadPercent();
     float tpsLoadPercent = sensors.readTPSLoadPercent();
 
     actuators.update(tpsLoadPercent, mapLoadPercent);
 
-    if (tpsLoadPercent >= 100.0f || mapLoadPercent >= 100.0f) {
-      Serial.println("[ERROR] Carga al 100% detectada. Saltando FSM.");
-      return;
-    }
-
-    fsm.update(
-      mapLoadPercent,
-      tpsLoadPercent,
-      usbConsoleUI.getCalibRequest(),
-      btConsoleUI.getCalibRequest(),
-      hasCalibrationLoaded,
-      debugMgr
-    );
-
-    fsm.handleActions();
-
-    if (logger.isEnabled()) {
-      logger.log(tpsLoadPercent, mapLoadPercent);  //agregar más valores en el futuro
+    if (mapPct >= 100.0f || tpsPct >= 100.0f) {
+      ui->println("[ERROR] Carga 100%, saltando FSM");
+    } else {
+      fsm.update(
+        mapPct,
+        tpsPct,
+        usbConsoleUI.getCalibRequest(),
+        btConsoleUI.getCalibRequest(),
+        calibLoaded,
+        debugMgr
+      );
+      fsm.handleActions();
+      if (logger.isEnabled()) {
+        logger.log(tpsPct, mapPct);  //agregar más valores en el futuro
+      }
     }
   } else {
     actuators.stopAll();
   }
 
-  delay(10); // frecuencia loop ~100 Hz
+  vTaskDelay(pdMS_TO_TICKS(10));
 }
