@@ -150,6 +150,14 @@ void loop() {
   float mapPct = sensors.readMAPLoadPercent();
   float tpsPct = sensors.readTPSLoadPercent();
 
+  float p = sensors.readPressure_kPa();
+  Serial.printf("Presion: %.2f kPa\n", p);
+  float rms = sensors.computeRMS();
+  float peaks = sensors.computeEventRate();
+  float tau = sensors.computeTau();
+  Serial.printf("RMS=%.2fkPa, Peaks=%.1fHz, Tau=%.2fms\n", rms, peaks, tau);
+
+
   bool sistemaActivo = usbConsoleUI.isSistemaActivo() || btConsoleUI.isSistemaActivo();
   if (sistemaActivo) {
     float mapLoadPercent = sensors.readMAPLoadPercent();
