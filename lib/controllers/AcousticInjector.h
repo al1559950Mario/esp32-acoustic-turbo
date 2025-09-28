@@ -69,8 +69,6 @@ private:
   float _freqMax = 6500.0f;
   bool _skipSmoothStep = false;
   void resetInternal() {
-    Serial.printf("[RESET] phaseAcc=%u, index=%u, level=%.2f\n",
-                _phaseAcc, _index, _level);
   // Barrido
   _phaseAcc     = 0;
   _phaseStep    = 0;

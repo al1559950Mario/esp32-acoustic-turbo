@@ -47,7 +47,8 @@ public:
 
   const float* getPressureBuffer() const { return pressureBuffer; }
   size_t getBufferSize() const { return PRESSURE_BUFFER_SIZE; }
-
+  float getPressurePercent();
+  float getPressurePSI();
 
 
   void update(); // 👈 Opcional, si quieres usar una rutina periódica

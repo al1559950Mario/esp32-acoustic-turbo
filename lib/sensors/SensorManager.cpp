@@ -75,7 +75,7 @@ void SensorManager::update() {
     rawMAPCached = ads.readADC_SingleEnded(1);
     rawTPSCached = ads.readADC_SingleEnded(0); 
   }
-
+  //updatePressure();
   // Filtro IIR al raw directamente
   filteredRawMAP = alpha * rawMAPCached + (1 - alpha) * filteredRawMAP;
   filteredRawTPS = alpha * rawTPSCached + (1 - alpha) * filteredRawTPS;
@@ -83,14 +83,24 @@ void SensorManager::update() {
   //Porcentaje absoluto
   mapLoadPercent = mapSensor.convertRawToPercent((uint16_t)filteredRawMAP);
   tpsLoadPercent = tpsSensor.convertRawToPercent((uint16_t)filteredRawTPS);
-  updatePressure();
+  
 }
 
 void SensorManager::updatePressure() {
-    float p = pressureSensor.readPressure_kPa();
-    pressureBuffer[bufferIndex++] = p;
+    float pKPa = pressureSensor.readPressure_kPa();
+
+    // Guardar en buffer
+    pressureBuffer[bufferIndex++] = pKPa;
     if(bufferIndex >= PRESSURE_BUFFER_SIZE) bufferIndex = 0;
+
+    // Porcentaje relativo a ±40 kPa
+    float pPercent = (pKPa / 40.0f) * 100.0f;
+
+    // Conversión a PSI
+    float pPsi = pKPa * 0.145038f;
+
 }
+
 
 
 
@@ -185,3 +195,16 @@ float SensorManager::computeRMS() {
     }
     return (count > 0) ? sqrt(sumSq / count) : 0.0f;
   }
+
+
+  // Devuelve la presión del buffer como porcentaje relativo a ±40 kPa
+float SensorManager::getPressurePercent() {
+    float pKPa = getPressureFromBuffer();
+    return (pKPa / 40.0f) * 100.0f;
+}
+
+// Devuelve la presión del buffer en PSI
+float SensorManager::getPressurePSI() {
+    float pKPa = getPressureFromBuffer();
+    return pKPa * 0.145038f;
+}

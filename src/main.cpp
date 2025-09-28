@@ -41,7 +41,8 @@ bool calibLoaded = false;
 void TaskSensorUpdate(void* param) {
   auto* sm = static_cast<SensorManager*>(param);
   for (;;) {
-    sm->update();  
+    sm->update();
+    sm->updatePressure();
     vTaskDelay(pdMS_TO_TICKS(10));
   }
 }
@@ -144,12 +145,22 @@ void loop() {
   float mapPct = sensors.readMAPLoadPercent();
   float tpsPct = sensors.readTPSLoadPercent();
 
-  float p = sensors.readPressure_kPa();
-  Serial.printf("Presion: %.2f kPa\n", p);
-  float rms = sensors.computeRMS();
-  float peaks = sensors.computeEventRate();
-  float tau = sensors.computeTau();
-  Serial.printf("RMS=%.2fkPa, Peaks=%.1fHz, Tau=%.2fms\n", rms, peaks, tau);
+  sensors.updatePressure();
+  float rawP = sensors.readPressureRaw();
+  float lastPressure = sensors.getPressureFromBuffer();
+  float lastPercent  = sensors.getPressurePercent();
+  float lastPsi      = sensors.getPressurePSI();
+  float rms          = sensors.computeRMS();
+  float tau          = sensors.computeTau(0.5f, 12.5f);
+  float rate         = sensors.computeEventRate(0.5f, 12.5f);
+
+  Serial.print("Presión: "); Serial.print(rawP, 2); Serial.print(" raw, ");
+   Serial.print("Presión: "); Serial.print(lastPressure, 2); Serial.print(" Buffer, ");
+  Serial.print(lastPercent, 2); Serial.print("%, ");
+  Serial.print(lastPsi, 2); Serial.print(" PSI | ");
+  Serial.print("RMS: "); Serial.print(rms, 2); 
+  Serial.print(" | Tau: "); Serial.print(tau, 2);
+  Serial.print(" ms | EventRate: "); Serial.println(rate, 2);
 
 
   bool sistemaActivo = usbConsoleUI.isSistemaActivo() || btConsoleUI.isSistemaActivo();
