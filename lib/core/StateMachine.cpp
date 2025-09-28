@@ -220,14 +220,30 @@ void StateMachine::handleActions() {
         if (abs(deltaTPSPercent - lastTPSPercent) > 0.1f
          || abs(deltaMAPercent  - lastMAPPercent ) > 0.1f) {
             actuators->setAcousticParameters(deltaTPSPercent, deltaMAPercent);
-            actuators->update(_tpsLoadPercent, _mapLoadPercent);
             lastTPSPercent = deltaTPSPercent;
             lastMAPPercent = deltaMAPercent;
         }
+
+        // ==== Turbo escalado relativo ====
+        float tpsRel = (sensors->readTPSLoadPercent() - tpsInitialPercent) /
+                       (thresholds.VORTEX_TPS_ON - tpsInitialPercent);
+        float mapRel = (sensors->readMAPLoadPercent() - mapInitialPercent) /
+                       (thresholds.VORTEX_MAP_ON - mapInitialPercent);
+
+        tpsRel = constrain(tpsRel, 0.0f, 1.0f);
+        mapRel = constrain(mapRel, 0.0f, 1.0f);
+
+        float vortexLevel = tpsRel * mapRel;  // Escalado combinado TPS*MAP
+        // Saturar a 100% si el cálculo excede 1.0
+        vortexLevel = (vortexLevel > 1.0f) ? 1.0f : vortexLevel;
+        actuators->setVortexLevel(vortexLevel);
+
+        // Actualizar actuadores generales
+        actuators->update(_tpsLoadPercent, _mapLoadPercent);
     }
 
-    if (vortexPending
-     && (millis() - vortexStartMillis) >= vortexDelayMs) {
+    // Activar vortex tras delay inicial
+    if (vortexPending && (millis() - vortexStartMillis >= vortexDelayMs)) {
         actuators->startVortex();
         vortexPending = false;
         Serial.println(">> Vortex activado tras timing inicial");

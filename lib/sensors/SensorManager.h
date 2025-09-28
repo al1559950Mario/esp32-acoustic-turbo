@@ -38,6 +38,11 @@ public:
 
   Adafruit_ADS1115 ads;
 
+  float getPressureFromBuffer();
+  float updatePressure();
+  float computeRMS();
+  float computeEventRate(float threshold = 1.0f);
+  float computeTau(float samplingPeriod_ms = 12.5f);
 
 
 
@@ -58,4 +63,9 @@ private:
 
   float vacuum_inHg = 0;
   float tpsLoadPercent  = 0;
+
+    // Buffer para métricas futuras
+  static constexpr size_t PRESSURE_BUFFER_SIZE = 800; // 10 s a 80 Hz
+  float pressureBuffer[PRESSURE_BUFFER_SIZE];
+  size_t bufferIndex = 0;
 };

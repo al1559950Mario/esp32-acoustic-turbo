@@ -23,8 +23,6 @@ void ActuatorManager::update(float tpsLoadPercent, float mapLoadPercent) {
     // Actualiza Acoustic Injector
     injector.update();
 
-    // Actualiza turbo BTS7960 combinando TPS*MAP
-    vortex.updatePowerLevel(tpsLoadPercent, mapLoadPercent);
 }
 
 /// Enciende el turbo al nivel actual
@@ -47,8 +45,9 @@ void ActuatorManager::stopVortex() {
 /// @param level: 0.0 = apagado, 1.0 = máxima potencia
 void ActuatorManager::setVortexLevel(float level) {
     level = constrain(level, 0.0f, 1.0f);
-    vortex.updatePowerLevel(level * 100.0f, 100.0f); // forzar al 100% MAP
+    vortex.updatePowerLevel(level); // level ya está normalizado 0–1
 }
+
 
 /// Estado del turbo
 bool ActuatorManager::isTurboOn() const {

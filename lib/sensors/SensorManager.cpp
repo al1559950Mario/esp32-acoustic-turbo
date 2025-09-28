@@ -13,6 +13,9 @@ void SensorManager::begin(uint8_t pinPressureData, uint8_t pinPressureSCK, uint8
   mapSensor.begin(1, &ads);  // A1 para MAP
   tpsSensor.begin(0, &ads);  // A0 para TPS
   pressureSensor.begin(pinPressureData, pinPressureSCK);
+      // Inicializar buffer
+  for (size_t i = 0; i < PRESSURE_BUFFER_SIZE; i++) pressureBuffer[i] = 0.0f;
+  bufferIndex = 0;
 }
 
 
@@ -80,6 +83,13 @@ void SensorManager::update() {
   //Porcentaje absoluto
   mapLoadPercent = mapSensor.convertRawToPercent((uint16_t)filteredRawMAP);
   tpsLoadPercent = tpsSensor.convertRawToPercent((uint16_t)filteredRawTPS);
+  updatePressure();
+}
+
+void SensorManager::updatePressure() {
+    float p = pressureSensor.readPressure_kPa();
+    pressureBuffer[bufferIndex++] = p;
+    if(bufferIndex >= PRESSURE_BUFFER_SIZE) bufferIndex = 0;
 }
 
 
@@ -118,3 +128,60 @@ float SensorManager::readPressure_kPa() {
 long SensorManager::readPressureRaw() {
     return pressureSensor.readRaw();
 }
+
+// Último valor del buffer (para UI o logging)
+float SensorManager::getPressureFromBuffer() {
+    size_t lastIndex = (bufferIndex == 0) ? PRESSURE_BUFFER_SIZE - 1 : bufferIndex - 1;
+    return pressureBuffer[lastIndex];
+}
+
+ // Tau: tiempo de decaimiento de picos (>37% del valor máximo del pico)
+  float computeTau(float threshold_kPa = 0.5f, float samplingPeriod_ms = 12.5f) {
+    float tauSum = 0.0f;
+    size_t tauCount = 0;
+
+    for (size_t i = 1; i < PRESSURE_BUFFER_SIZE; i++) {
+      float diff = pressureBuffer[i] - pressureBuffer[i-1];
+      if (diff > threshold_kPa) { // inicio de pico válido
+        float peak = pressureBuffer[i];
+        for (size_t j = i+1; j < PRESSURE_BUFFER_SIZE; j++) {
+          if (pressureBuffer[j] <= 0.37f * peak) {
+            tauSum += (j - i) * samplingPeriod_ms;
+            tauCount++;
+            break;
+          }
+        }
+      }
+    }
+
+    return (tauCount > 0) ? (tauSum / tauCount) : 0.0f;
+  }
+
+  // EventRate: cantidad de cambios significativos por segundo
+  float computeEventRate(float threshold_kPa = 0.5f, float samplingPeriod_ms = 12.5f) {
+    size_t events = 0;
+
+    for (size_t i = 1; i < PRESSURE_BUFFER_SIZE; i++) {
+      float diff = pressureBuffer[i] - pressureBuffer[i-1];
+      if (diff > threshold_kPa) events++;
+    }
+
+    // Convertir a eventos por segundo
+    float totalTime_s = (PRESSURE_BUFFER_SIZE * samplingPeriod_ms) / 1000.0f;
+    return (totalTime_s > 0.0f) ? (events / totalTime_s) : 0.0f;
+  }
+
+ float computeRMS() {
+    float sumSq = 0.0f;
+    size_t count = 0;
+    float offset = readPressure_kPa(); // usar último valor como referencia
+
+    for (size_t i = 0; i < PRESSURE_BUFFER_SIZE; i++) {
+      float val = pressureBuffer[i] - offset;
+      if (val != 0.0f) { // ignorar ceros iniciales
+        sumSq += val * val;
+        count++;
+      }
+    }
+    return (count > 0) ? sqrt(sumSq / count) : 0.0f;
+  }

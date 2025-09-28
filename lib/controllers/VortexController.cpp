@@ -29,20 +29,17 @@ void VortexController::stop() {
     }
 }
 
-void VortexController::updatePowerLevel(float tpsLoadPercent, float mapLoadPercent) {
-    // Normalizar a 0-1
-    float tps = constrain(tpsLoadPercent / 100.0f, 0.0f, 1.0f);
-    float map = constrain(mapLoadPercent / 100.0f, 0.0f, 1.0f);
+void VortexController::updatePowerLevel(float level) {
+    // Asegurar rango 0–1
+    level = constrain(level, 0.0f, 1.0f);
 
-    // Combinación simple TPS * MAP
-    float pwmLevel = tps * map;
-
-    lastPWM = pwmLevel;
+    lastPWM = level;
 
     if (active) {
-        ledcWrite(pwmChannel, (int)(pwmLevel * 255));
+        ledcWrite(pwmChannel, (int)(level * 255));
     }
 }
+
 
 bool VortexController::isOn() const {
     return active;
