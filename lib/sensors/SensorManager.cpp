@@ -136,7 +136,7 @@ float SensorManager::getPressureFromBuffer() {
 }
 
  // Tau: tiempo de decaimiento de picos (>37% del valor máximo del pico)
-  float computeTau(float threshold_kPa = 0.5f, float samplingPeriod_ms = 12.5f) {
+float SensorManager::computeTau(float threshold_kPa, float samplingPeriod_ms) {
     float tauSum = 0.0f;
     size_t tauCount = 0;
 
@@ -158,7 +158,7 @@ float SensorManager::getPressureFromBuffer() {
   }
 
   // EventRate: cantidad de cambios significativos por segundo
-  float computeEventRate(float threshold_kPa = 0.5f, float samplingPeriod_ms = 12.5f) {
+float SensorManager::computeEventRate(float threshold_kPa , float samplingPeriod_ms ) {
     size_t events = 0;
 
     for (size_t i = 1; i < PRESSURE_BUFFER_SIZE; i++) {
@@ -171,7 +171,7 @@ float SensorManager::getPressureFromBuffer() {
     return (totalTime_s > 0.0f) ? (events / totalTime_s) : 0.0f;
   }
 
- float computeRMS() {
+float SensorManager::computeRMS() {
     float sumSq = 0.0f;
     size_t count = 0;
     float offset = readPressure_kPa(); // usar último valor como referencia

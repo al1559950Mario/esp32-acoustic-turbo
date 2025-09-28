@@ -284,10 +284,6 @@ void ConsoleUI::imprimirDashboard() {
   float mapMinV = (mapMin * LSB_MV) / 1000.0f;
   float mapMaxV = (mapMax * LSB_MV) / 1000.0f;
 
-  float rms = computeRMS(sensors->pressureBuffer, SensorManager::PRESSURE_BUFFER_SIZE);
-  float peaks = computeEventRate(sensors->pressureBuffer, SensorManager::PRESSURE_BUFFER_SIZE);
-  float tau = computeTau(sensors->pressureBuffer, SensorManager::PRESSURE_BUFFER_SIZE);
-
 
 // HUD en vivo: actualización en línea
 this->printf(

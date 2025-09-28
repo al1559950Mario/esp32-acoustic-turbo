@@ -42,12 +42,6 @@ void TaskSensorUpdate(void* param) {
   auto* sm = static_cast<SensorManager*>(param);
   for (;;) {
     sm->update();  
-  uint16_t rawMAP = sm->readMAPRawCached();
-  uint16_t rawTPS = sm->readTPSRawCached();
-  float voltsMAP = sm->readMAPVolts();
-  float voltsTPS = sm->readTPSVolts();
-  //ui->printf("MAP=%4u TPS=%4u MAP=%6.3fV TPS=%6.3fV\n", rawMAP, rawTPS, voltsMAP, voltsTPS);
-
     vTaskDelay(pdMS_TO_TICKS(10));
   }
 }
@@ -165,7 +159,7 @@ void loop() {
 
     actuators.update(tpsLoadPercent, mapLoadPercent);
 
-    if (mapPct >= 100.0f & tpsPct >= 100.0f) {
+    if (mapPct >= 100.0f && tpsPct >= 100.0f) {
       ui->println("[ERROR] Carga 100%, saltando FSM");
     } else {
       fsm.update(

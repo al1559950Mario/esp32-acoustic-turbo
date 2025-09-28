@@ -200,10 +200,6 @@ void StateMachine::update(float mapLoadPercent,
     }
 
     if (current != lastState) {
-        Serial.print("→ Transición: ");
-        Serial.print(static_cast<int>(lastState));
-        Serial.print(" → ");
-        Serial.println(static_cast<int>(current));
         lastState = current;
     }
 }
@@ -246,7 +242,6 @@ void StateMachine::handleActions() {
     if (vortexPending && (millis() - vortexStartMillis >= vortexDelayMs)) {
         actuators->startVortex();
         vortexPending = false;
-        Serial.println(">> Vortex activado tras timing inicial");
     }
 }
 

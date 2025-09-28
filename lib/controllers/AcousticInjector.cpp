@@ -240,9 +240,6 @@ void AcousticInjector::updateWaveFrequency(float freqHz) {
     double step = freqHz * TABLE_SIZE * (1ULL << PHASE_FRAC) / sr;
     uint32_t newStep = (step < 1.0) ? 1 : uint32_t(round(step));
 
-    Serial.printf("UWF ► freq=%.1f Hz  phaseStep=%u  phaseAcc=%llu\n",
-                  freqHz, newStep, (uint64_t)_phaseAcc);
-
     _phaseStep = newStep;
 
     // reprograma periodo de timer a sample-period igual

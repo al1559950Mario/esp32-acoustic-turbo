@@ -39,10 +39,14 @@ public:
   Adafruit_ADS1115 ads;
 
   float getPressureFromBuffer();
-  float updatePressure();
+  void  updatePressure();
+
   float computeRMS();
-  float computeEventRate(float threshold = 1.0f);
-  float computeTau(float samplingPeriod_ms = 12.5f);
+  float computeEventRate(float threshold_kPa = 0.5f, float samplingPeriod_ms = 12.5f);
+  float computeTau(float threshold_kPa = 0.5f, float samplingPeriod_ms = 12.5f);
+
+  const float* getPressureBuffer() const { return pressureBuffer; }
+  size_t getBufferSize() const { return PRESSURE_BUFFER_SIZE; }
 
 
 
