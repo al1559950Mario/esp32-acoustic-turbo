@@ -55,24 +55,35 @@ void AcousticInjector::begin(uint8_t dacPin) {
 
 
 void AcousticInjector::start(float level) {
-  _active = true;
+  // 1) Reinicio total (fase, nivel, índices…)
+  resetInternal();
+  _active      = true;
   _targetLevel = constrain(level, 0.0f, 1.0f);
+  _level       = _targetLevel;
+  _levelInt    = uint8_t(_level * 255);
 
-  // Antes:
-  // _level = 0.0f;
-  // _levelInt = 0;
-  // Ahora: arranca en el nivel objetivo solicitado (ej. 0.1f)
-  _level = _targetLevel;
-  _levelInt = (uint8_t)(_level * 255.0f);
+  // 2) Configurar “punto de partida” y “objetivo”
+  const float startFreq  = 2000.0f;               // arranque en 2 kHz
+  float       targetFreq = _targetFrequency;      // debe venir de mapLoadToWaveFrequency()
 
-  _index = 0;
-  delay(10);
+  _currentFrequency = startFreq;
+  _targetFrequency  = targetFreq;
+
+  // 3) Calcular primer phaseStep en 2 kHz
+  updateWaveFrequency(_currentFrequency);
+
+  // 4) Arrancar timer/DAC
+  timerWrite(_timer, 0);
+  delay(1);
   timerAlarmEnable(_timer);
 }
 
 
 
+
 void AcousticInjector::stop() {
+  resetInternal();
+  _active = false;
   timerAlarmDisable(_timer);
   dac_output_voltage(_dacChannel, 128);
   _level = 0.0f;
@@ -86,30 +97,23 @@ void AcousticInjector::setLevel(float level) {
 }
 
 void AcousticInjector::update() {
-    // Suavizado nivel 
-    float diffLevel = _targetLevel - _level;
-    if (fabs(diffLevel) < RAMP_STEP)
-        _level = _targetLevel;
-    else
-        _level += (diffLevel > 0 ? RAMP_STEP : -RAMP_STEP);
-    _levelInt = (uint8_t)(_level * 255.0f);
+  if (!_active) return;
 
-    // Suavizado frecuencia (lineal o logarítmico)
-    if (fabs(_targetFrequency - _currentFrequency) > 0.5f) { // umbral para evitar "bailoteos"
-        // Aquí puedes hacer un paso pequeño hacia la meta
-        float stepFreq = 10.0f; // Hz por llamada, ajustar según sensibilidad
+  // --- Frecuencia ---
+  if (_currentFrequency < _targetFrequency) {
+    _currentFrequency = min(_currentFrequency + FREQ_RAMP_STEP,
+                            _targetFrequency);
+    updateWaveFrequency(_currentFrequency);
+  }
 
-        if (_targetFrequency > _currentFrequency)
-            _currentFrequency += stepFreq;
-        else
-            _currentFrequency -= stepFreq;
-
-        // Evitar sobrepasar
-        if ((_targetFrequency - _currentFrequency) * stepFreq < 0)
-            _currentFrequency = _targetFrequency;
-
-        updateWaveFrequency(_currentFrequency);
-    }
+  // --- Nivel (tu rampa original) ---
+  float diffL = _targetLevel - _level;
+  if (fabs(diffL) < RAMP_STEP) {
+    _level = _targetLevel;
+  } else {
+    _level += (diffL > 0 ? RAMP_STEP : -RAMP_STEP);
+  }
+  _levelInt = uint8_t(_level * 255);
 }
 
 
@@ -141,9 +145,6 @@ void IRAM_ATTR AcousticInjector::onTimer() {
   dac_output_voltage(_instance->_dacChannel, output);
   _instance->_lastDACValue = output;
 }
-
-
-
 
 
 void IRAM_ATTR AcousticInjector::applyPendingDAC() {
@@ -229,31 +230,27 @@ float AcousticInjector::mapLoadToWaveFrequency(float percent) {
 
     return expf(logFreq);
 }
-
-
 void AcousticInjector::updateWaveFrequency(float freqHz) {
     if (!_timer) return;
 
-    // sampleRate fijo
-    const float sampleRate = DEFAULT_SAMPLE_RATE;
-    // suavizado perceptual (logarítmico)
-    float targetFreq = freqHz;
-    float smoothedFreq = powf(10.0f, 0.1f * log10f(_currentFrequency) + 0.9f * log10f(targetFreq));
-    // calcular step en fixed-point: step = freqHz * TABLE_SIZE / sampleRate
-    // representado en (1<<PHASE_FRAC) fraccional
-    double step = (double)smoothedFreq * (double)TABLE_SIZE * (double)(1ULL << PHASE_FRAC) / (double)sampleRate;
-    uint32_t newStep = (uint32_t)round(step);
+    const float sr = DEFAULT_SAMPLE_RATE;       // p.ej. 32000
+    _currentFrequency = freqHz;
 
-    // garantizar que no sea cero (para frecuencias muy bajas)
-    if (newStep == 0) newStep = 1;
+    // cálculo fixed-point para phaseStep
+    double step = freqHz * TABLE_SIZE * (1ULL << PHASE_FRAC) / sr;
+    uint32_t newStep = (step < 1.0) ? 1 : uint32_t(round(step));
 
-    _currentFrequency = smoothedFreq;
+    Serial.printf("UWF ► freq=%.1f Hz  phaseStep=%u  phaseAcc=%llu\n",
+                  freqHz, newStep, (uint64_t)_phaseAcc);
 
     _phaseStep = newStep;
 
-    float periodPerSample = 1e6f / sampleRate;
-    timerAlarmWrite(_timer, static_cast<uint32_t>(periodPerSample), true);
+    // reprograma periodo de timer a sample-period igual
+    float periodUs = 1e6f / sr;
+    timerAlarmWrite(_timer, uint32_t(periodUs), true);
 }
+
+
 
 
 void AcousticInjector::setFrequencyRangeOption(FrequencyRangeOption option) {

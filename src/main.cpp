@@ -17,7 +17,7 @@ constexpr uint8_t PIN_DAC_ACOUSTIC    = 25;
 constexpr uint8_t PIN_PRESSURE_OUT    = 26; // HX710B OUT
 constexpr uint8_t PIN_PRESSURE_SCK    = 27; // HX710B SCK
 constexpr uint8_t PIN_BTS_PWM = 18;   // pin conectado al PWM del BTS
-constexpr uint8_t PWM_CHANNEL_BTS = 0; // canal de ESP32 (0-15)
+constexpr uint8_t PWM_CHANNEL_BTS = 19; // canal de ESP32 (0-15)
 constexpr uint8_t PIN_I2C_SDA         = 21;
 constexpr uint8_t PIN_I2C_SCL         = 22;
 
@@ -46,7 +46,7 @@ void TaskSensorUpdate(void* param) {
   uint16_t rawTPS = sm->readTPSRawCached();
   float voltsMAP = sm->readMAPVolts();
   float voltsTPS = sm->readTPSVolts();
-  ui->printf("MAP=%4u TPS=%4u MAP=%6.3fV TPS=%6.3fV\n", rawMAP, rawTPS, voltsMAP, voltsTPS);
+  //ui->printf("MAP=%4u TPS=%4u MAP=%6.3fV TPS=%6.3fV\n", rawMAP, rawTPS, voltsMAP, voltsTPS);
 
     vTaskDelay(pdMS_TO_TICKS(10));
   }
@@ -157,7 +157,7 @@ void loop() {
 
     actuators.update(tpsLoadPercent, mapLoadPercent);
 
-    if (mapPct >= 100.0f || tpsPct >= 100.0f) {
+    if (mapPct >= 100.0f & tpsPct >= 100.0f) {
       ui->println("[ERROR] Carga 100%, saltando FSM");
     } else {
       fsm.update(

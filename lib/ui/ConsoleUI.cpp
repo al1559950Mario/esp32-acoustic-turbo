@@ -97,7 +97,7 @@ void ConsoleUI::interpretarComando(char c) {
 
     case 'b':  // Iniciar inyección acústica (100%)
       if (!devOnly()) break;
-      actuators->startAcoustic(1.0f);
+      //actuators->startAcoustic(1.0f, 100);
       if (actuators->isAcousticOn())
         actuators->getAcousticInjector().test();
       break;
@@ -194,10 +194,14 @@ void ConsoleUI::interpretarComando(char c) {
 
       if (simulationOnPython) {
         //sensors->getTPS().enableSimulation();
+        sensors->enableSimulacion();
         //sensors->getMAP().enableSimulation();
+        sensors->enableSimulacion();
       } else {
         sensors->getTPS().disableSimulation();
+        sensors->disableSimulacion();
         sensors->getMAP().disableSimulation();
+        sensors->disableSimulacion();
       }
 
       this->printf(">> Modo simulación %s.\n", simulationOnPython ? "ACTIVADO" : "DESACTIVADO");

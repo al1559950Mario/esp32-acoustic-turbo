@@ -13,6 +13,8 @@ struct Thresholds {
     float VORTEX_TPS_ON;
     float VORTEX_MAP_ON;
     float VORTEX_TPS_OFF;
+    float VORTEX_MAP_OFF;
+
 };
 
 class ThresholdManager {

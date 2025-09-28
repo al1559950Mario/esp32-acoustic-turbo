@@ -64,8 +64,14 @@ float SensorManager::representVoltsFromRaw(uint16_t raw) const {
 
 
 void SensorManager::update() {
-  rawMAPCached = ads.readADC_SingleEnded(1);
-  rawTPSCached = ads.readADC_SingleEnded(0); 
+  if (simulacionActiva){
+    rawTPSCached = (mapSensor.getSimulatedRaw() * 5.0f) / 32767.0f;
+    rawMAPCached = (tpsSensor.getSimulatedRaw()* 5.0f) / 32767.0f;
+  } else
+  {
+    rawMAPCached = ads.readADC_SingleEnded(1);
+    rawTPSCached = ads.readADC_SingleEnded(0); 
+  }
 
   // Filtro IIR al raw directamente
   filteredRawMAP = alpha * rawMAPCached + (1 - alpha) * filteredRawMAP;

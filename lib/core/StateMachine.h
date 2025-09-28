@@ -75,7 +75,9 @@ public:
    */
   void debugForceState(SystemState nuevoEstado);
   float getLevel() const;
-  bool readyForInjection( float);
+  bool readyForInjection( float, float);
+  bool readyForVortex( float, float);
+
   float getTPSInitialForInj(){return tpsInitialPercent;};
   float getMAPInitialForInj(){return mapInitialPercent;};
 
@@ -98,12 +100,14 @@ private:
   float _tpsLoadPercent = 0.0f;
   float _mapLoadPercent = 0.0f;
   unsigned long vortexStartMillis = 0;
-  const unsigned long vortexDelayMs = 100;  // Tiempo en ms para esperar antes de activar vortex
+  const unsigned long vortexDelayMs = 200;  // Tiempo en ms para esperar antes de activar vortex
   bool vortexPending = false;  
   float tpsNormalized{0.0f}; 
   float mapNormalized{0.0f}; 
   float lastTPSPercent;   // <— último TPS%
   float lastMAPPercent;   // <— último MAP%
+  uint32_t cooldownStartMillis     = 0;
+  const uint32_t cooldownDurationMs = 1000; // ms mínimos en COOLDOWN
 
 
 };

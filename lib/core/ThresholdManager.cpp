@@ -24,6 +24,8 @@ Thresholds ThresholdManager::getThresholds() const {
     t.VORTEX_TPS_ON      = thresholds.at("VORTEX_TPS_ON");
     t.VORTEX_MAP_ON      = thresholds.at("VORTEX_MAP_ON");
     t.VORTEX_TPS_OFF     = thresholds.at("VORTEX_TPS_OFF");
+    t.VORTEX_MAP_OFF      = thresholds.at("VORTEX_MAP_OFF");
+
     return t;
 }
 
@@ -61,7 +63,7 @@ void ThresholdManager::loadDefaults() {
 
     // Umbrales para activar la inyección acústica
     thresholds["INJ_MAP_ON"]         = 35.0f;   // % MAP mínimo para iniciar
-
+    thresholds["INJ_TPS_ON"]  = 30.0f;   // % TPS mínimo para iniciar  ← añadido
 
     // Umbrales para detener la inyección acústica
     thresholds["INJ_TPS_OFF"]        = 15.0f;    // % TPS para apagar
@@ -73,6 +75,8 @@ void ThresholdManager::loadDefaults() {
 
     // Umbral para apagar el vorte
     thresholds["VORTEX_TPS_OFF"]      = 30.0f;   // % TPS para apagar vortex
+    thresholds["VORTEX_MAP_OFF"]      = 70.0f;   // % TPS para apagar vortex
+
 }
 
 

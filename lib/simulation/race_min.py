@@ -43,8 +43,10 @@ modo_envio_constante = 0  # 0=normal, 1=tps_min, 2=tps_max, 3=map_min, 4=map_max
 
 running = True
 
-def volt_to_adc(volts):
-    return int((volts / 3.3) * 4095)
+def volt_to_adc(volts, vref=5.0):
+    """Convierte un voltaje (0–5 V) al valor ADC esperado por ADS1115 en single-ended."""
+    return int((volts / vref) * 32767)
+
 
 def enviar_comando(ser, cmd):
     """Envía un comando simple al ESP32 (añade newline)."""

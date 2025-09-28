@@ -62,11 +62,29 @@ private:
 
   volatile uint32_t _phaseAcc = 0;
   volatile uint32_t _phaseStep = 0; 
-  static constexpr float FREQ_RAMP_STEP = 1.0f; // Hz por llamada a update()
+  static constexpr float FREQ_RAMP_STEP = 20.0f; // Hz por llamada a update()
   static constexpr float DEFAULT_SAMPLE_RATE = 32000.0f; // tasa de muestreo segura
   FrequencyRangeOption _freqOption = RANGE_3;
   float _freqMin = 5500.0f;
   float _freqMax = 6500.0f;
+  bool _skipSmoothStep = false;
+  void resetInternal() {
+    Serial.printf("[RESET] phaseAcc=%u, index=%u, level=%.2f\n",
+                _phaseAcc, _index, _level);
+  // Barrido
+  _phaseAcc     = 0;
+  _phaseStep    = 0;
+  _index        = 0;
+  // Nivel
+  _level        = 0.0f;
+  _targetLevel  = 0.0f;
+  _levelInt     = 0;
+  _lastDACValue = 128;
+  _skipSmoothStep = false;
+  // Frecuencia (si quieres reiniciar a la última cargada en begin())
+  // _currentFrequency = _freqMin;  
+  // _targetFrequency  = _freqMin;  
+}
 
 
   // Tabla seno 16 muestras para ISR rápido (0-255)
