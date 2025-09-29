@@ -40,10 +40,7 @@ void PressureSensor::begin(uint8_t pinData, uint8_t pinSCK) {
     minReading = 0.0f;
     maxReading = 40.0f;
 
-    Serial.print("Sensor iniciado. Raw base (mediana): ");
-    Serial.print(rawZero);
-    Serial.print(", Scale: "); Serial.print(_scale);
-    Serial.print(", Offset: "); Serial.println(_offset);
+
 }
 
 

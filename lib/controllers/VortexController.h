@@ -38,6 +38,8 @@ public:
 
     bool isOn() const;
     bool isActive() const;
+    float getLastPWM() const { return lastPWM; }
+
 
 private:
     uint8_t pwmPin = 255;

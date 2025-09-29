@@ -154,13 +154,13 @@ void loop() {
   float tau          = sensors.computeTau(0.5f, 12.5f);
   float rate         = sensors.computeEventRate(0.5f, 12.5f);
 
-  Serial.print("Presión: "); Serial.print(rawP, 2); Serial.print(" raw, ");
-   Serial.print("Presión: "); Serial.print(lastPressure, 2); Serial.print(" Buffer, ");
-  Serial.print(lastPercent, 2); Serial.print("%, ");
-  Serial.print(lastPsi, 2); Serial.print(" PSI | ");
-  Serial.print("RMS: "); Serial.print(rms, 2); 
-  Serial.print(" | Tau: "); Serial.print(tau, 2);
-  Serial.print(" ms | EventRate: "); Serial.println(rate, 2);
+  //Serial.print("Presión: "); Serial.print(rawP, 2); Serial.print(" raw, ");
+  //Serial.print("Presión: "); Serial.print(lastPressure, 2); Serial.print(" Buffer, ");
+  //Serial.print(lastPercent, 2); Serial.print("%, ");
+  //Serial.print(lastPsi, 2); Serial.print(" PSI | ");
+  //Serial.print("RMS: "); Serial.print(rms, 2); 
+  //Serial.print(" | Tau: "); Serial.print(tau, 2);
+  //Serial.print(" ms | EventRate: "); Serial.println(rate, 2);
 
 
   bool sistemaActivo = usbConsoleUI.isSistemaActivo() || btConsoleUI.isSistemaActivo();

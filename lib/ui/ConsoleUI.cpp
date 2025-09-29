@@ -238,6 +238,19 @@ void ConsoleUI::interpretarComando(char c) {
       }
       break;
 
+    case 'y':  // Toggle efecto cooldown (amplitude vs pitch+amplitude)
+      if (!devOnly()) break;
+      if (fsm) {
+          bool nuevoEstado = !fsm->isDecayPitchSweepEnabled();
+          fsm->setDecayEffect(nuevoEstado);
+          this->printf(">> Cooldown effect: %s\n",
+                      nuevoEstado ? "Pitch+Amplitude" : "Amplitude only");
+      } else {
+          this->println("⚠️ FSM no disponible para cambiar efecto cooldown.");
+      }
+      break;
+
+
     default:
       if (!simulationOnPython) break;
       this->print("❓ Comando no reconocido: ");
@@ -248,72 +261,60 @@ void ConsoleUI::interpretarComando(char c) {
 }
 
 void ConsoleUI::imprimirDashboard() {
-  if (!fsm || !sensors || !actuators) return;
-  if (millis() < tiempoProximaImpresionHUD) return;
+    if (!fsm || !sensors || !actuators) return;
+    if (millis() < tiempoProximaImpresionHUD) return;
 
-  float tpsV = sensors->readTPSVolts();
-  float tpsPct = sensors->readTPSLoadPercent();
-  float mapPct = sensors->readMAPLoadPercent();
-  float mapV = sensors->readMAPVolts();
-  uint8_t dac = actuators->getAcousticInjector().getCurrentDAC();
-  bool vortexOn = actuators->isTurboOn();
-  bool injOn = actuators->isAcousticOn();
+    float tpsV = sensors->readTPSVolts();
+    float tpsPct = sensors->readTPSLoadPercent();
+    float mapPct = sensors->readMAPLoadPercent();
+    float mapV = sensors->readMAPVolts();
+    uint8_t dac = actuators->getAcousticInjector().getCurrentDAC();
+    bool vortexOn = actuators->isTurboOn();
+    bool injOn = actuators->isAcousticOn();
 
-  // Obtener level y freq actuales
-  float level = actuators->getAcousticInjector().getLevel();
-  float freq = actuators->getAcousticInjector().getFrequency();
+    float level = actuators->getAcousticInjector().getLevel();
+    float freq = actuators->getAcousticInjector().getFrequency();
 
-  SystemState st = fsm->getState();
-  unsigned long elapsed = (millis() - lastTransitionMS) / 1000;
+    // Obtener potencia del turbo (0–100%)
+    float boostLevel = actuators->getVortexController().getLastPWM() * 100.0f;
 
-  auto& calib = CalibrationManager::getInstance();
-  uint16_t tpsMin = calib.getTPSMin();
-  uint16_t tpsMax = calib.getTPSMaxRaw();
-  uint16_t mapMin = calib.getMAPMin();
-  uint16_t mapMax = calib.getMAPMaxRaw();
+    SystemState st = fsm->getState();
+    unsigned long elapsed = (millis() - lastTransitionMS) / 1000;
 
-  static const char* stateNames[] = {
-    "OFF", "SIN_CAL", "CALIB", "IDLE",
-    "BEAM", "BOOST", "DESCAY", "DEBUG", "??"
-  };
-  const char* stName = stateNames[int(st)];
+    static const char* stateNames[] = {
+        "OFF", "SIN_CAL", "CALIB", "IDLE",
+        "BEAM", "BOOST", "DESCAY", "DEBUG", "??"
+    };
+    const char* stName = stateNames[int(st)];
 
-  constexpr float LSB_MV = 0.1875f;  // mV por bit en GAIN_TWOTHIRDS
-  float tpsMinV = (tpsMin * LSB_MV) / 1000.0f;
-  float tpsMaxV = (tpsMax * LSB_MV) / 1000.0f;
-  float mapMinV = (mapMin * LSB_MV) / 1000.0f;
-  float mapMaxV = (mapMax * LSB_MV) / 1000.0f;
+    // HUD en línea
+    this->printf(
+        "\r[%s|%lus] TPS=%.2fV %.0f%% | MAP=%.2fV %.0f%% | DAC=%3u | LVL=%.2f | FRQ=%.0fHz | Boost=%.0f%%  ",
+        stName, elapsed,
+        tpsV, tpsPct,
+        mapV, mapPct,
+        dac,
+        level,
+        freq,
+        boostLevel
+    );
 
-
-// HUD en vivo: actualización en línea
-this->printf(
-    "\r[%s|%lus] TPS=%.2fV(%.2f–%.2fV) %.0f%% | MAP=%.2fV(%.2f–%.2fV) %.0f%% | DAC=%3u | LVL=%.2f | FRQ=%.0fHz | Boost:%c | Beam:%c     ",
-    stName, elapsed,
-    tpsV, tpsMinV, tpsMaxV, tpsPct,
-    mapV, mapMinV, mapMaxV, mapPct,
-    dac,
-    level,
-    freq,
-    vortexOn ? '1' : '0',
-    injOn ? '1' : '0'
-  );
-
-
-  // Detalle en nueva línea si cambió estado
-  if (st != lastState) {
-    lastState = st;
-    this->println("\n\n=== VORTEX SYSTEM DASHBOARD ===");
-    this->printf("Estado motor:      %s\n", stName);
-    this->printf("TPS Voltage:       %.3f V (raw %u–%u)\n", tpsV, tpsMin, tpsMax);
-    this->printf("MAP Voltage:       %.3f V (raw %u–%u)\n", mapV, mapMin, mapMax);
-    this->printf("DAC Output:        %u (PWM)\n", dac);
-    this->printf("Nivel acústico:    %.2f\n", level);
-    this->printf("Frecuencia onda:   %.0f Hz\n", freq);
-    this->printf("Vortex:             %s\n", vortexOn ? "ON" : "OFF");
-    this->printf("Inyector sónico:   %s\n", injOn ? "ON" : "OFF");
-    this->printf("Último cambio:     hace %lu s\n", elapsed);
-    this->println("==============================\n");
-  }
+    // Detalle en nueva línea si cambió estado
+    if (st != lastState) {
+        lastState = st;
+        this->println("\n\n=== VORTEX SYSTEM DASHBOARD ===");
+        this->printf("Estado motor:      %s\n", stName);
+        this->printf("TPS Voltage:       %.3f V\n", tpsV);
+        this->printf("MAP Voltage:       %.3f V\n", mapV);
+        this->printf("DAC Output:        %u\n", dac);
+        this->printf("Nivel acústico:    %.2f\n", level);
+        this->printf("Frecuencia onda:   %.0f Hz\n", freq);
+        this->printf("Vortex:            %s\n", vortexOn ? "ON" : "OFF");
+        this->printf("Boost Level:       %.0f%%\n", boostLevel);
+        this->printf("Inyector sónico:   %s\n", injOn ? "ON" : "OFF");
+        this->printf("Último cambio:     hace %lu s\n", elapsed);
+        this->println("==============================\n");
+    }
 }
 
 
@@ -352,6 +353,9 @@ void ConsoleUI::imprimirHelp() {
     this->println(F("  r  → Borrar calibración actual"));
     this->println(F("  z  → Activar/Desactivar modo simulación"));
     this->println(F("  f  → Alternar rango de frequencia del BEAM"));
+    this->println(F("  y  → Toggle efecto cooldown (amplitude vs pitch+amplitude)"));
+
+    
   }
 }
 

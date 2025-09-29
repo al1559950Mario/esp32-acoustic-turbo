@@ -18,7 +18,7 @@ enum class SystemState {
   IDLE,                  ///< Esperando subida de carga
   BEAM,    ///< Inyección acústica activa
   VORTEX,                 ///< Turbo encendido
-  COOLDOWN,            ///< Turbo descendiendo
+  DECAY,            ///< Turbo descendiendo
   DEBUG,
   UNKNOWN                  ///< Estado de debug (solo con forzar)
 };
@@ -83,7 +83,8 @@ public:
 
   CalibStep currentCalibStep = CalibStep::TPS_MIN;
   unsigned long lastStepTime = 0;
-
+  void setDecayEffect(bool pitchSweepEnabled) { decayPitchSweep = pitchSweepEnabled; }
+  bool isDecayPitchSweepEnabled() const { return decayPitchSweep; }
 
 
 private:
@@ -106,8 +107,9 @@ private:
   float mapNormalized{0.0f}; 
   float lastTPSPercent;   // <— último TPS%
   float lastMAPPercent;   // <— último MAP%
-  uint32_t cooldownStartMillis     = 0;
-  const uint32_t cooldownDurationMs = 1000; // ms mínimos en COOLDOWN
+  uint32_t decayStartMillis     = 0;
+  const uint32_t decayDurationMs = 1000; // ms mínimos en COOLDOWN
 
+  bool decayPitchSweep = false;  // false = solo amplitude, true = amplitude + pitch sweep
 
 };

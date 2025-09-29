@@ -20,7 +20,7 @@ void StateMachine::begin(bool hasCalibration,
 
     vortexPending       = false;
     vortexStartMillis   = 0;
-    cooldownStartMillis = 0;
+    decayStartMillis = 0;
     lastTPSPercent      = 0.0f;
     lastMAPPercent      = 0.0f;
 
@@ -100,7 +100,6 @@ void StateMachine::update(float mapLoadPercent,
             break;
 
         case SystemState::IDLE:
-            // OFF si MAP baja de wakeup, independientemente del TPS
             if (_mapLoadPercent < thresholds.MAP_WAKEUP_PERCENT) {
                 current = SystemState::OFF;
                 if (actuators) {
@@ -110,7 +109,6 @@ void StateMachine::update(float mapLoadPercent,
                 }
                 break;
             }
-            // BEAM si ambos cruzan sus ON thresholds
             if (readyForInjection(_mapLoadPercent, _tpsLoadPercent)) {
                 current = SystemState::BEAM;
                 if (sensors) {
@@ -118,7 +116,7 @@ void StateMachine::update(float mapLoadPercent,
                     mapInitialPercent = sensors->readMAPLoadPercent();
                 }
                 if (actuators) {
-                    actuators->stopAcoustic();            // 1) detiene y resetea el injector
+                    actuators->stopAcoustic();
                     actuators->startAcoustic(0.1f);
                     vortexPending     = true;
                     vortexStartMillis = millis();
@@ -127,45 +125,37 @@ void StateMachine::update(float mapLoadPercent,
             break;
 
         case SystemState::BEAM:
-            // VORTEX si ambos vuelven a ON
             if (readyForVortex(_mapLoadPercent, _tpsLoadPercent)) {
                 current = SystemState::VORTEX;
             }
-            // IDLE si baja cualquiera de los dos sensores
             else if (_mapLoadPercent <= thresholds.INJ_MAP_OFF
                   || _tpsLoadPercent <= thresholds.INJ_TPS_OFF) {
-                current = SystemState::IDLE;
-                if (actuators) {
-                    actuators->stopAcoustic();
-                    actuators->stopVortex();
-                    vortexPending = false;
-                }
+                // MODIFICADO: en vez de ir directo a IDLE, pasamos a COOLDOWN
+                current = SystemState::DECAY;
+                decayStartMillis = millis();
+                vortexPending = false;
+                // no apagamos Acoustic aquí, se apaga al terminar el cooldown
             }
             break;
 
         case SystemState::VORTEX:
-            // COOLDOWN si cae cualquiera por debajo de OFF
             if (_mapLoadPercent < thresholds.VORTEX_MAP_OFF
              || _tpsLoadPercent < thresholds.VORTEX_TPS_OFF) {
-                current = SystemState::COOLDOWN;
-                // no detener Vortex para rampa suave
+                current = SystemState::DECAY;
                 vortexPending       = false;
-                cooldownStartMillis = millis();
+                decayStartMillis = millis();
             }
             break;
 
-        case SystemState::COOLDOWN:
-            // Mantener COOLDOWN el tiempo mínimo
-            if ((millis() - cooldownStartMillis) < cooldownDurationMs) {
+        case SystemState::DECAY:
+            if ((millis() - decayStartMillis) < decayDurationMs) {
                 break;
             }
-            // Reingresar a VORTEX si vuelve a ON ambos
             if (readyForVortex(_mapLoadPercent, _tpsLoadPercent)) {
                 current = SystemState::VORTEX;
                 vortexPending     = true;
                 vortexStartMillis = millis();
             }
-            // Reingresar a BEAM si vuelve a ON inyección
             else if (readyForInjection(_mapLoadPercent, _tpsLoadPercent)) {
                 current = SystemState::BEAM;
                 if (sensors) {
@@ -173,13 +163,12 @@ void StateMachine::update(float mapLoadPercent,
                     mapInitialPercent = sensors->readMAPLoadPercent();
                 }
                 if (actuators) {
-                    actuators->stopAcoustic();            // 1) detiene y resetea el injector
+                    actuators->stopAcoustic();
                     actuators->startAcoustic(0.1f);
                     vortexPending     = true;
                     vortexStartMillis = millis();
                 }
             }
-            // IDLE si baja cualquiera de los dos sensores
             else if (_mapLoadPercent <= thresholds.INJ_MAP_OFF
                   || _tpsLoadPercent <= thresholds.INJ_TPS_OFF) {
                 current = SystemState::IDLE;
@@ -209,7 +198,7 @@ void StateMachine::handleActions() {
 
     if (current == SystemState::BEAM
      || current == SystemState::VORTEX
-     || current == SystemState::COOLDOWN) {
+     || current == SystemState::DECAY) {
         float deltaTPSPercent = sensors->getRelativeTPSLoad(tpsInitialPercent);
         float deltaMAPercent  = sensors->getRelativeMAPLoad(mapInitialPercent);
 
@@ -220,7 +209,6 @@ void StateMachine::handleActions() {
             lastMAPPercent = deltaMAPercent;
         }
 
-        // ==== Turbo escalado relativo ====
         float tpsRel = (sensors->readTPSLoadPercent() - tpsInitialPercent) /
                        (thresholds.VORTEX_TPS_ON - tpsInitialPercent);
         float mapRel = (sensors->readMAPLoadPercent() - mapInitialPercent) /
@@ -229,20 +217,38 @@ void StateMachine::handleActions() {
         tpsRel = constrain(tpsRel, 0.0f, 1.0f);
         mapRel = constrain(mapRel, 0.0f, 1.0f);
 
-        float vortexLevel = tpsRel * mapRel;  // Escalado combinado TPS*MAP
-        // Saturar a 100% si el cálculo excede 1.0
+        float vortexLevel = tpsRel * mapRel;
         vortexLevel = (vortexLevel > 1.0f) ? 1.0f : vortexLevel;
         actuators->setVortexLevel(vortexLevel);
 
-        // Actualizar actuadores generales
         actuators->update(_tpsLoadPercent, _mapLoadPercent);
     }
 
-    // Activar vortex tras delay inicial
-    if (vortexPending && (millis() - vortexStartMillis >= vortexDelayMs)) {
-        actuators->startVortex();
-        vortexPending = false;
+        // MODIFICADO: rampa en COOLDOWN para volver a inicial
+    if (current == SystemState::DECAY) {
+        float elapsed = millis() - decayStartMillis;
+        float progress = constrain(elapsed / (float)decayDurationMs, 0.0f, 1.0f);
+
+        float interpTPS = lastTPSPercent * (1.0f - progress);
+        float interpMAP = lastMAPPercent * (1.0f - progress);
+
+        actuators->setAcousticParameters(interpTPS, interpMAP);
+
+        if (decayPitchSweep) {
+            // También decaer frecuencia suavemente
+            float idleFreq = 4400.0f; // frecuencia “reposo” mínima
+            float targetFreq = mapInitialPercent * (actuators->getAcousticInjector().getFreqMax() - idleFreq) / 100.0f + idleFreq;
+            float sweepFreq = targetFreq * (1.0f - progress) + idleFreq * progress;
+            actuators->getAcousticInjector().updateWaveFrequency(sweepFreq);
+        }
+
+        if (progress >= 1.0f) {
+            actuators->stopAcoustic();
+            actuators->stopVortex();
+            current = SystemState::IDLE;
+        }
     }
+
 }
 
 void StateMachine::debugForceState(SystemState nuevoEstado) {
