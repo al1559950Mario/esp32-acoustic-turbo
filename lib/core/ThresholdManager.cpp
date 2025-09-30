@@ -59,23 +59,23 @@ void ThresholdManager::loadDefaults() {
     thresholds.clear();
 
     // Umbral mínimo de presión (MAP) para pasar de OFF a IDLE
-    thresholds["MAP_WAKEUP_PERCENT"] = 5.0f;
+    thresholds["MAP_WAKEUP_PERCENT"] = 10.0f;
 
     // Umbrales para activar la inyección acústica
-    thresholds["INJ_MAP_ON"]         = 35.0f;   // % MAP mínimo para iniciar
-    thresholds["INJ_TPS_ON"]  = 30.0f;   // % TPS mínimo para iniciar  ← añadido
+    thresholds["INJ_MAP_ON"]         = 50.0f;   // % MAP mínimo para iniciar
+    thresholds["INJ_TPS_ON"]  = 50.0f;   // % TPS mínimo para iniciar  ← añadido
 
     // Umbrales para detener la inyección acústica
-    thresholds["INJ_TPS_OFF"]        = 15.0f;    // % TPS para apagar
-    thresholds["INJ_MAP_OFF"]        = 25.0f;   // % MAP para apagar
+    thresholds["INJ_TPS_OFF"]        = 40.0f;    // % TPS para apagar
+    thresholds["INJ_MAP_OFF"]        = 40.0f;   // % MAP para apagar
 
     // Umbrales para activar el vortex
-    thresholds["VORTEX_TPS_ON"]       = 45.0f;   // % TPS para activar
-    thresholds["VORTEX_MAP_ON"]       = 75.0f;   // % MAP para activar (presión alta)
+    thresholds["VORTEX_TPS_ON"]       = 70.0f;   // % TPS para activar
+    thresholds["VORTEX_MAP_ON"]       = 70.0f;   // % MAP para activar (presión alta)
 
     // Umbral para apagar el vorte
-    thresholds["VORTEX_TPS_OFF"]      = 30.0f;   // % TPS para apagar vortex
-    thresholds["VORTEX_MAP_OFF"]      = 70.0f;   // % TPS para apagar vortex
+    thresholds["VORTEX_TPS_OFF"]      = 60.0f;   // % TPS para apagar vortex
+    thresholds["VORTEX_MAP_OFF"]      = 60.0f;   // % TPS para apagar vortex
 
 }
 

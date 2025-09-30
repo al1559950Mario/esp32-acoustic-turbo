@@ -64,8 +64,23 @@ void StateMachine::update(float mapLoadPercent,
         thresholds = thresholdManager->getThresholds();
     }
 
-    _mapLoadPercent = mapLoadPercent;
-    _tpsLoadPercent = tpsLoadPercent;
+        // Mantener buffer de 3 muestras para TPS y MAP
+    static float tpsBuffer[3] = {0.0f, 0.0f, 0.0f};
+    static float mapBuffer[3] = {0.0f, 0.0f, 0.0f};
+
+    // Desplazar las muestras anteriores
+    tpsBuffer[0] = tpsBuffer[1];
+    tpsBuffer[1] = tpsBuffer[2];
+    tpsBuffer[2] = tpsLoadPercent;
+
+    mapBuffer[0] = mapBuffer[1];
+    mapBuffer[1] = mapBuffer[2];
+    mapBuffer[2] = mapLoadPercent;
+
+    // Aplicar mediana
+    _tpsLoadPercent  = median3(tpsBuffer[0], tpsBuffer[1], tpsBuffer[2]);
+    _mapLoadPercent  = median3(mapBuffer[0], mapBuffer[1], mapBuffer[2]);
+    
     mapNormalized   = mapLoadPercent / 100.0f;
     tpsNormalized   = tpsLoadPercent / 100.0f;
 
@@ -199,6 +214,7 @@ void StateMachine::handleActions() {
     if (current == SystemState::BEAM
      || current == SystemState::VORTEX
      || current == SystemState::DECAY) {
+        
         float deltaTPSPercent = sensors->getRelativeTPSLoad(tpsInitialPercent);
         float deltaMAPercent  = sensors->getRelativeMAPLoad(mapInitialPercent);
 
@@ -209,6 +225,7 @@ void StateMachine::handleActions() {
             lastMAPPercent = deltaMAPercent;
         }
 
+        // Normalización TPS y MAP
         float tpsRel = (sensors->readTPSLoadPercent() - tpsInitialPercent) /
                        (thresholds.VORTEX_TPS_ON - tpsInitialPercent);
         float mapRel = (sensors->readMAPLoadPercent() - mapInitialPercent) /
@@ -217,14 +234,21 @@ void StateMachine::handleActions() {
         tpsRel = constrain(tpsRel, 0.0f, 1.0f);
         mapRel = constrain(mapRel, 0.0f, 1.0f);
 
+        // Cálculo de vortexLevel original
         float vortexLevel = tpsRel * mapRel;
         vortexLevel = (vortexLevel > 1.0f) ? 1.0f : vortexLevel;
-        actuators->setVortexLevel(vortexLevel);
 
+        // 🔹 Aplicar curva exponencial SOLO al level
+        float a = 4.0f; // controla la aceleración al final
+        float curvedLevel = (exp(a * vortexLevel) - 1.0f) / (exp(a) - 1.0f);
+
+        actuators->setVortexLevel(curvedLevel);
+
+        // NOTA: no tocamos la frecuencia
         actuators->update(_tpsLoadPercent, _mapLoadPercent);
     }
 
-        // MODIFICADO: rampa en COOLDOWN para volver a inicial
+    // MODIFICADO: rampa en COOLDOWN para volver a inicial
     if (current == SystemState::DECAY) {
         float elapsed = millis() - decayStartMillis;
         float progress = constrain(elapsed / (float)decayDurationMs, 0.0f, 1.0f);
@@ -248,7 +272,6 @@ void StateMachine::handleActions() {
             current = SystemState::IDLE;
         }
     }
-
 }
 
 void StateMachine::debugForceState(SystemState nuevoEstado) {
