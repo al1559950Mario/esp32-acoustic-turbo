@@ -40,6 +40,10 @@ public:
   float getFrequency() const { return _currentFrequency; }
   float getFreqMin() const { return _freqMin; }
   float getFreqMax() const { return _freqMax; }
+  void startDecay(unsigned long nowMillis) {
+      _decayStartMillis = nowMillis;
+      _lastFrequency = _currentFrequency; // guarda la frecuencia actual
+  }
 
 
 
@@ -56,6 +60,7 @@ private:
   volatile uint8_t _levelInt = 0;  // nivel escalado 0-255 para ISR
   float _currentFrequency = 4400.0f;
   float _targetFrequency = 0.0f;
+  float _lastFrequency = 0.0f;
   static constexpr uint8_t PHASE_FRAC = 16;   
   static_assert((1 << PHASE_FRAC) > 0, "PHASE_FRAC ok");
   bool _active = false;
@@ -83,7 +88,7 @@ private:
   // _currentFrequency = _freqMin;  
   // _targetFrequency  = _freqMin;  
 }
-
+  unsigned long _decayStartMillis; // marca de tiempo al iniciar DECAY
 
   // Tabla seno 16 muestras para ISR rápido (0-255)
   static uint8_t _sineTable[TABLE_SIZE];

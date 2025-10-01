@@ -146,26 +146,26 @@ void StateMachine::update(float mapLoadPercent,
             else if (_mapLoadPercent <= thresholds.INJ_MAP_OFF
                   || _tpsLoadPercent <= thresholds.INJ_TPS_OFF) {
                 // MODIFICADO: en vez de ir directo a IDLE, pasamos a COOLDOWN
+                unsigned long now = millis();   
                 current = SystemState::DECAY;
-                decayStartMillis = millis();
+                decayStartMillis = now;
+                actuators->getAcousticInjector().startDecay(now);
                 vortexPending = false;
-                // no apagamos Acoustic aquí, se apaga al terminar el cooldown
             }
             break;
 
         case SystemState::VORTEX:
             if (_mapLoadPercent < thresholds.VORTEX_MAP_OFF
              || _tpsLoadPercent < thresholds.VORTEX_TPS_OFF) {
+                unsigned long now = millis();   
                 current = SystemState::DECAY;
                 vortexPending       = false;
-                decayStartMillis = millis();
+                decayStartMillis = now;
+                actuators->getAcousticInjector().startDecay(now);
             }
             break;
 
         case SystemState::DECAY:
-            if ((millis() - decayStartMillis) < decayDurationMs) {
-                break;
-            }
             if (readyForVortex(_mapLoadPercent, _tpsLoadPercent)) {
                 current = SystemState::VORTEX;
                 vortexPending     = true;
@@ -212,8 +212,7 @@ void StateMachine::handleActions() {
     if (!sensors || !actuators || !calibMgr) return;
 
     if (current == SystemState::BEAM
-     || current == SystemState::VORTEX
-     || current == SystemState::DECAY) {
+     || current == SystemState::VORTEX) {
         
         float deltaTPSPercent = sensors->getRelativeTPSLoad(tpsInitialPercent);
         float deltaMAPercent  = sensors->getRelativeMAPLoad(mapInitialPercent);
@@ -248,29 +247,22 @@ void StateMachine::handleActions() {
         actuators->update(_tpsLoadPercent, _mapLoadPercent);
     }
 
-    // MODIFICADO: rampa en COOLDOWN para volver a inicial
+        // ──────── DECAY ───────────────────────────────────────────────────
     if (current == SystemState::DECAY) {
-        float elapsed = millis() - decayStartMillis;
-        float progress = constrain(elapsed / (float)decayDurationMs, 0.0f, 1.0f);
+        // 1) Mantén la misma amplitud (vortexLevel) usando los últimos porcentajes
+        actuators->setAcousticParameters(lastTPSPercent, lastMAPPercent);
 
-        float interpTPS = lastTPSPercent * (1.0f - progress);
-        float interpMAP = lastMAPPercent * (1.0f - progress);
+        // 2) Update() avanzará la rampa de frecuencia basada en
+        //    mapLoadToWaveFrequency() que internamente detecta DECAY
+        actuators->update(lastTPSPercent, lastMAPPercent);
 
-        actuators->setAcousticParameters(interpTPS, interpMAP);
-
-        if (decayPitchSweep) {
-            // También decaer frecuencia suavemente
-            float idleFreq = 4400.0f; // frecuencia “reposo” mínima
-            float targetFreq = mapInitialPercent * (actuators->getAcousticInjector().getFreqMax() - idleFreq) / 100.0f + idleFreq;
-            float sweepFreq = targetFreq * (1.0f - progress) + idleFreq * progress;
-            actuators->getAcousticInjector().updateWaveFrequency(sweepFreq);
-        }
-
-        if (progress >= 1.0f) {
+        // 3) Al completar el tiempo de decay, apaga y vuelve a IDLE
+        if (millis() - decayStartMillis >= decayDurationMs) {
             actuators->stopAcoustic();
             actuators->stopVortex();
             current = SystemState::IDLE;
         }
+        return;
     }
 }
 

@@ -85,7 +85,7 @@ public:
   unsigned long lastStepTime = 0;
   void setDecayEffect(bool pitchSweepEnabled) { decayPitchSweep = pitchSweepEnabled; }
   bool isDecayPitchSweepEnabled() const { return decayPitchSweep; }
-
+  SystemState getState() const {return current;}
 
 private:
   Thresholds thresholds;                         ///< Copia local de los umbrales actuales
