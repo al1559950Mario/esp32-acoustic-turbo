@@ -311,12 +311,6 @@ void ConsoleUI::imprimirDashboard() {
         boostLevel
     );
 
-    constexpr float LSB_MV = 0.1875f;  // mV por bit en GAIN_TWOTHIRDS
-    float tpsMinV = (tpsMin * LSB_MV) / 1000.0f;
-    float tpsMaxV = (tpsMax * LSB_MV) / 1000.0f;
-    float mapMinV = (mapMin * LSB_MV) / 1000.0f;
-    float mapMaxV = (mapMax * LSB_MV) / 1000.0f;
-
     // HUD en vivo: actualización en línea
     this->printf(
         "\r[%s|%lus]TPS=%.2fV(%.2f–%.2fV)%.0f%%|MAP=%.2fV(%.2f–%.2fV)%.0f%%|LVL=%.2f|FRQ=%.0fHz|Boost:%.0f%%",

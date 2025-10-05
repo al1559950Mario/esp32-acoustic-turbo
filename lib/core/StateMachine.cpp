@@ -9,19 +9,6 @@ float median3(float a, float b, float c) {
     return c;
 }
 
-
-float median3(float a, float b, float c) {
-    if ((a >= b && a <= c) || (a >= c && a <= b)) return a;
-    if ((b >= a && b <= c) || (b >= c && b <= a)) return b;
-    return c;
-}
-
-
-float median3(float a, float b, float c) {    
-    if ((a >= b && a <= c) || (a >= c && a <= b)) return a;     
-    if ((b >= a && b <= c) || (b >= c && b <= a)) return b;   
-    return c;}
-
 void StateMachine::begin(bool hasCalibration,
                          ActuatorManager* actuatorsPtr,
                          ThresholdManager* thresholdManagerPtr,
