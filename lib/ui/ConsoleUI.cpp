@@ -264,6 +264,12 @@ void ConsoleUI::imprimirDashboard() {
     if (!fsm || !sensors || !actuators) return;
     if (millis() < tiempoProximaImpresionHUD) return;
 
+    auto& calib = CalibrationManager::getInstance();
+    uint16_t tpsMin = calib.getTPSMin();
+    uint16_t tpsMax = calib.getTPSMaxRaw();
+    uint16_t mapMin = calib.getMAPMin();
+    uint16_t mapMax = calib.getMAPMaxRaw();
+
     float tpsV = sensors->readTPSVolts();
     float tpsPct = sensors->readTPSLoadPercent();
     float mapPct = sensors->readMAPLoadPercent();
@@ -298,6 +304,23 @@ void ConsoleUI::imprimirDashboard() {
         freq,
         boostLevel
     );
+
+    constexpr float LSB_MV = 0.1875f;  // mV por bit en GAIN_TWOTHIRDS
+    float tpsMinV = (tpsMin * LSB_MV) / 1000.0f;
+    float tpsMaxV = (tpsMax * LSB_MV) / 1000.0f;
+    float mapMinV = (mapMin * LSB_MV) / 1000.0f;
+    float mapMaxV = (mapMax * LSB_MV) / 1000.0f;
+
+    // HUD en vivo: actualización en línea
+    this->printf(
+        "\r[%s|%lus]TPS=%.2fV(%.2f–%.2fV)%.0f%%|MAP=%.2fV(%.2f–%.2fV)%.0f%%|LVL=%.2f|FRQ=%.0fHz|Boost:%.0f%%",
+        stName, elapsed,
+        tpsV, tpsMinV, tpsMaxV, tpsPct,
+        mapV, mapMinV, mapMaxV, mapPct,
+        level,
+        freq,
+        boostLevel
+      );
 
     // Detalle en nueva línea si cambió estado
     if (st != lastState) {

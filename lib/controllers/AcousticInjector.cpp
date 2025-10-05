@@ -225,47 +225,12 @@ void AcousticInjector::testSimple() {
 float AcousticInjector::mapLoadToWaveFrequency(float percent) {
     percent = constrain(percent, 0.0f, 100.0f);
 
-    float globalStartHz = 2000.0f;
-    float globalEndHz   = _freqMax;
+    float logMin = logf(_freqMin);
+    float logMax = logf(_freqMax);
+    float logFreq = logMin + (percent / 100.0f) * (logMax - logMin);
 
-    float logMin = logf(globalStartHz);
-    float logMax = logf(globalEndHz);
-
-    SystemState state = StateMachine::instance()->getState();
-
-    if (state == SystemState::BEAM) {
-        float logBeamMax = logf(_freqMin);
-        float logFreq = logMin + (percent / 100.0f) * (logBeamMax - logMin);
-        return expf(logFreq);
-
-    } else if (state == SystemState::VORTEX) {
-        float logBeamMax = logf(_freqMin);
-        float logFreq = logBeamMax + (percent / 100.0f) * (logMax - logBeamMax);
-        return expf(logFreq);
-
-    } else if (state == SystemState::DECAY) {
-        // Tiempo transcurrido desde que inició el decay
-        float t = (millis() - _decayStartMillis) / 1000.0f; // en segundos
-
-        // Frecuencia inicial al entrar en DECAY
-        float f0 = _lastFrequency;
-
-        // Frecuencia objetivo (reposo)
-        float fTarget = globalStartHz; // o freqIdle
-
-        // Constante de amortiguamiento (ajustable según "qué tan rápido muere el turbo")
-        float alpha = 4.0f; // mayor = más rápido
-
-        // Modelo de ring-down: f(t) = fTarget + (f0 - fTarget) * exp(-alpha * t)
-        float freq = fTarget + (f0 - fTarget) * expf(-alpha * t);
-
-        return freq;
-    }
-
-
-    return globalStartHz;
+    return expf(logFreq);
 }
-
 
 void AcousticInjector::updateWaveFrequency(float freqHz) {
     if (!_timer) return;
