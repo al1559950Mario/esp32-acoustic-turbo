@@ -299,18 +299,7 @@ void ConsoleUI::imprimirDashboard() {
         "BEAM", "BOOST", "DESCAY", "DEBUG", "??"
     };
     const char* stName = stateNames[int(st)];
-
-    // HUD en línea
-    this->printf(
-        "\r[%s|%lus] TPS=%.2fV(%.1f–%.1fV) %.0f%% | MAP=%.2fV(%.1f–%.1fV) %.0f%%| LVL=%.2f | FRQ=%.0fHz | Boost=%.0f%%  ",
-        stName, elapsed,
-        tpsV, tpsMinV, tpsMaxV, tpsPct,
-        mapV, mapMinV, mapMaxV, mapPct,
-        level,
-        freq,
-        boostLevel
-    );
-
+    
     // HUD en vivo: actualización en línea
     this->printf(
         "\r[%s|%lus]TPS=%.2fV(%.2f–%.2fV)%.0f%%|MAP=%.2fV(%.2f–%.2fV)%.0f%%|LVL=%.2f|FRQ=%.0fHz|Boost:%.0f%%",
