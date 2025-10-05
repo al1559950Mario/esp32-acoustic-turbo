@@ -11,6 +11,7 @@ void CalibrationManager::begin(SensorManager* _sensors) {
   prefs.end();
   sensors = _sensors;
   currentStep = CalibStep::TPS_MIN;
+  calibrationDone = loadCalibration();
 
 }
 
@@ -24,6 +25,7 @@ bool CalibrationManager::loadCalibration() {
   if (!ready) {
     Serial.println(">> No hay datos de calibración. Ejecute calibración.");
     prefs.end();
+    calibrationDone = false;
     return false;
   }
 

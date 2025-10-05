@@ -270,6 +270,13 @@ void ConsoleUI::imprimirDashboard() {
     uint16_t mapMin = calib.getMAPMin();
     uint16_t mapMax = calib.getMAPMaxRaw();
 
+    constexpr float LSB_MV = 0.1875f;  // mV por bit en GAIN_TWOTHIRDS
+    float tpsMinV = (tpsMin * LSB_MV) / 1000.0f;
+    float tpsMaxV = (tpsMax * LSB_MV) / 1000.0f;
+    float mapMinV = (mapMin * LSB_MV) / 1000.0f;
+    float mapMaxV = (mapMax * LSB_MV) / 1000.0f;
+
+
     float tpsV = sensors->readTPSVolts();
     float tpsPct = sensors->readTPSLoadPercent();
     float mapPct = sensors->readMAPLoadPercent();
@@ -295,11 +302,10 @@ void ConsoleUI::imprimirDashboard() {
 
     // HUD en línea
     this->printf(
-        "\r[%s|%lus] TPS=%.2fV %.0f%% | MAP=%.2fV %.0f%% | DAC=%3u | LVL=%.2f | FRQ=%.0fHz | Boost=%.0f%%  ",
+        "\r[%s|%lus] TPS=%.2fV(%.1f–%.1fV) %.0f%% | MAP=%.2fV(%.1f–%.1fV) %.0f%%| LVL=%.2f | FRQ=%.0fHz | Boost=%.0f%%  ",
         stName, elapsed,
-        tpsV, tpsPct,
-        mapV, mapPct,
-        dac,
+        tpsV, tpsMinV, tpsMaxV, tpsPct,
+        mapV, mapMinV, mapMaxV, mapPct,
         level,
         freq,
         boostLevel

@@ -3,6 +3,20 @@
 #include "StateMachine.h"
 #include <Arduino.h>
 
+float median3(float a, float b, float c) {
+    if ((a >= b && a <= c) || (a >= c && a <= b)) return a;
+    if ((b >= a && b <= c) || (b >= c && b <= a)) return b;
+    return c;
+}
+
+
+float median3(float a, float b, float c) {
+    if ((a >= b && a <= c) || (a >= c && a <= b)) return a;
+    if ((b >= a && b <= c) || (b >= c && b <= a)) return b;
+    return c;
+}
+
+
 float median3(float a, float b, float c) {    
     if ((a >= b && a <= c) || (a >= c && a <= b)) return a;     
     if ((b >= a && b <= c) || (b >= c && b <= a)) return b;   
@@ -149,7 +163,7 @@ void StateMachine::update(float mapLoadPercent,
                 current = SystemState::VORTEX;
             }
             else if (_mapLoadPercent <= thresholds.INJ_MAP_OFF
-                  || _tpsLoadPercent <= thresholds.INJ_TPS_OFF) {
+                  && _tpsLoadPercent <= thresholds.INJ_TPS_OFF) {
                 // MODIFICADO: en vez de ir directo a IDLE, pasamos a COOLDOWN
                 unsigned long now = millis();   
                 current = SystemState::DECAY;
@@ -190,7 +204,7 @@ void StateMachine::update(float mapLoadPercent,
                 }
             }
             else if (_mapLoadPercent <= thresholds.INJ_MAP_OFF
-                  || _tpsLoadPercent <= thresholds.INJ_TPS_OFF) {
+                  && _tpsLoadPercent <= thresholds.INJ_TPS_OFF) {
                 current = SystemState::IDLE;
                 if (actuators) {
                     actuators->stopAcoustic();
@@ -278,3 +292,5 @@ void StateMachine::debugForceState(SystemState nuevoEstado) {
         Serial.println(static_cast<int>(nuevoEstado));
     }
 }
+
+
