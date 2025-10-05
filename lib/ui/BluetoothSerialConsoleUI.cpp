@@ -9,7 +9,7 @@ BluetoothSerialConsoleUI::~BluetoothSerialConsoleUI() {
 }
 
 void BluetoothSerialConsoleUI::begin() {
-  if (!SerialBT.begin("VortexAcusticoV1", false)) {  // false = modo esclavo
+  if (!SerialBT.begin("VortexAcusticoV2", false)) {  // false = modo esclavo
     Serial.println("❌ Error al iniciar Bluetooth");
     return;
   }
