@@ -160,9 +160,9 @@ void StateMachine::update(float mapLoadPercent,
                 current = SystemState::DECAY;
                 decayStartMillis = now;
                 actuators->getAcousticInjector().startDecay(now);
-                actuators->getAcousticInjector().setDecayLevel(lastMAPLevel);
-                actuators->getAcousticInjector().setDecayParameters(decayDurationMs, lastMAPLevel);
-                //decayDurationMs = minDecay + (maxDecay - minDecay) * lastMAPLevel;
+                actuators->getAcousticInjector().setDecayLevel(avgMAPLevel);
+                actuators->getAcousticInjector().setDecayParameters(decayDurationMs, avgMAPLevel);
+                //decayDurationMs = minDecay + (maxDecay - minDecay) * avgMAPLevel;
 
                 vortexPending = false;
             }
@@ -180,9 +180,9 @@ void StateMachine::update(float mapLoadPercent,
                 vortexPending       = false;
                 decayStartMillis = now;
                 actuators->getAcousticInjector().startDecay(now);
-                actuators->getAcousticInjector().setDecayLevel(lastMAPLevel);
-                actuators->getAcousticInjector().setDecayParameters(decayDurationMs, lastMAPLevel);
-                //decayDurationMs = minDecay + (maxDecay - minDecay) * lastMAPLevel;
+                actuators->getAcousticInjector().setDecayLevel(avgMAPLevel);
+                actuators->getAcousticInjector().setDecayParameters(decayDurationMs, avgMAPLevel);
+                //decayDurationMs = minDecay + (maxDecay - minDecay) * avgMAPLevel;
 
             }
             break;
@@ -237,6 +237,9 @@ void StateMachine::handleActions() {
         
         float deltaTPSLevel = sensors->getRelativeTPSLoad(tpsInitialPercent);
         float deltaMAPLevel  = sensors->getRelativeMAPLoad(mapInitialPercent);
+        mapSamples++;
+        avgMAPLevel += (deltaMAPLevel - avgMAPLevel) / float(mapSamples);
+
 
         if (abs(deltaTPSLevel - lastTPSLevel) > 0.1f
          || abs(deltaMAPLevel  - lastMAPLevel ) > 0.1f) {

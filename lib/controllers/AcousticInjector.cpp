@@ -325,12 +325,12 @@ AcousticInjector::FrequencyRangeOption AcousticInjector::getFrequencyRangeOption
   return _freqOption;
 }
 
-void AcousticInjector::setDecayParameters(uint32_t durationMs, float lastMAPLevel) {
-  float resFreqHz = _freqMin + (_freqMax - _freqMin) * constrain(lastMAPLevel, 0.0f, 1.0f);
+void AcousticInjector::setDecayParameters(uint32_t durationMs, float MAPLevel) {
+  float resFreqHz = _freqMin + (_freqMax - _freqMin) * constrain(MAPLevel, 0.0f, 1.0f);
   _decayDurationMs = max<uint32_t>(1, durationMs);
 
     // - eased: menos mezcla en cargas bajas, más en altas
-  float mix = 0.4f + 0.6f * powf(lastMAPLevel, 1.8f); // adjust exponent for curve
+  float mix = 0.4f + 0.6f * powf(MAPLevel, 1.8f); // adjust exponent for curve
   _decayMix = constrain(mix, 0.0f, 1.0f);
   _decayResFreq = constrain(resFreqHz, 100.0f, 30000.0f);
 
@@ -344,7 +344,7 @@ void AcousticInjector::setDecayParameters(uint32_t durationMs, float lastMAPLeve
 }
 
 void AcousticInjector::setDecayLevel(float level) {
-  // level esperado 0..1 (ActuatorManager pasa lastMAPLevel)
+  // level esperado 0..1 (ActuatorManager pasa MAPLevel)
   float l = constrain(level, 0.0f, 1.0f);
   // inicializamos envelope (0..255) proporcional al nivel
   noInterrupts();
