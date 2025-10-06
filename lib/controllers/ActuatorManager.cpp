@@ -43,9 +43,8 @@ void ActuatorManager::stopVortex() {
 
 /// Modo manual: fuerza un nivel de PWM [0.0-1.0], ignorando TPS*MAP
 /// @param level: 0.0 = apagado, 1.0 = máxima potencia
-void ActuatorManager::setVortexLevel(float level) {
-    level = constrain(level, 0.0f, 1.0f);
-    vortex.updatePowerLevel(level); // level ya está normalizado 0–1
+void ActuatorManager::setVortexLevel(float levelTPS, float levelMAP) {
+    vortex.updatePowerLevel(levelTPS, levelMAP); // level ya está normalizado 0–1
 }
 
 
@@ -65,12 +64,12 @@ void ActuatorManager::stopAcoustic() {
 }
 
 /// Configura parámetros del Acoustic Injector
-/// @param level: potencia relativa [0-100]
+/// @param level: potencia relativa [0-1]
 /// @param mapLoadPercent: carga MAP para calcular frecuencia
-void ActuatorManager::setAcousticParameters(float level, float mapLoadPercent) {
-    float freq = injector.mapLoadToWaveFrequency(mapLoadPercent);
+void ActuatorManager::setAcousticParameters(float tpsLoadLevel, float mapLoadLevel) {
+    float freq = injector.mapLoadToWaveFrequency(mapLoadLevel);
     injector.setTargetFrequency(freq);
-    injector.setLevel(constrain(level / 100.0f, 0.0f, 1.0f));
+    injector.setLevel(tpsLoadLevel);
 }
 
 /// Estado del Acoustic Injector

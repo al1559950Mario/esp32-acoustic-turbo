@@ -29,14 +29,20 @@ void VortexController::stop() {
     }
 }
 
-void VortexController::updatePowerLevel(float level) {
+void VortexController::updatePowerLevel(float levelTPS, float levelMAP) {
+    float tpsRel = constrain(levelTPS, 0.0f, 1.0f);
+    float mapRel = constrain(levelMAP, 0.0f, 1.0f);
     // Asegurar rango 0–1
-    level = constrain(level, 0.0f, 1.0f);
+    float level = tpsRel * mapRel;
 
-    lastPWM = level;
+    // 🔹 Aplicar curva exponencial SOLO al level
+    float a = 4.0f; // controla la aceleración al final
+    float curvedLevel = (exp(a * level) - 1.0f) / (exp(a) - 1.0f);
+
+    lastPWM = curvedLevel;
 
     if (active) {
-        ledcWrite(pwmChannel, (int)(level * 255));
+        ledcWrite(pwmChannel, (int)(curvedLevel * 255));
     }
 }
 

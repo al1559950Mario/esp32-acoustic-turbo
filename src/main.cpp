@@ -116,11 +116,13 @@ void setup() {
   // Cargar calibración y configurar FSM
   calib.begin(&sensors);
   calibLoaded = calib.loadCalibration();
-  thresholdManagerPtr = new ThresholdManager();
-  if (!thresholdManagerPtr->begin()) {
-    ui->println("❌ Error al iniciar ThresholdManager");
+
+  // Inicializar ThresholdManager usando el singleton
+  bool t_ok = ThresholdManager::getInstance().begin();
+  if (!t_ok) {
+    ui->println("❌ Error al iniciar ThresholdManager (singleton)");
   }
-  fsm.begin(calibLoaded, &actuators, thresholdManagerPtr, &sensors, &calib);
+  fsm.begin(calibLoaded, &actuators, &ThresholdManager::getInstance(), &sensors, &calib);
   actuators.stopAll();
 
   ui->println(

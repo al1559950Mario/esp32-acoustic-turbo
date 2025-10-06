@@ -82,9 +82,6 @@ public:
   float getMAPInitialForInj(){return mapInitialPercent;};
 
   CalibStep currentCalibStep = CalibStep::TPS_MIN;
-  unsigned long lastStepTime = 0;
-  void setDecayEffect(bool pitchSweepEnabled) { decayPitchSweep = pitchSweepEnabled; }
-  bool isDecayPitchSweepEnabled() const { return decayPitchSweep; }
   
 private:
   Thresholds thresholds;                         ///< Copia local de los umbrales actuales
@@ -104,11 +101,10 @@ private:
   bool vortexPending = false;  
   float tpsNormalized{0.0f}; 
   float mapNormalized{0.0f}; 
-  float lastTPSPercent;   // <— último TPS%
-  float lastMAPPercent;   // <— último MAP%
+  float lastTPSLevel;   // <— último TPS%
+  float lastMAPLevel;   // <— último MAP%
   uint32_t decayStartMillis     = 0;
-  const uint32_t decayDurationMs = 1000; // ms mínimos en COOLDOWN
-
-  bool decayPitchSweep = false;  // false = solo amplitude, true = amplitude + pitch sweep
-
+  float decayDurationMs = 1000; // ms mínimos en COOLDOWN
+  float minDecay = 1000.0f;   // ms
+  float maxDecay = 5000.0f;   // ms
 };

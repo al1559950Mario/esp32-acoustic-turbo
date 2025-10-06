@@ -44,7 +44,9 @@ public:
       _decayStartMillis = nowMillis;
       _lastFrequency = _currentFrequency; // guarda la frecuencia actual
   }
-
+  void setDecayParameters(uint32_t durationMs, float resFreqHz);
+  void setDecayLevel(float level);   // nivel base que dispara la resonancia (0..1)
+  void updateDecayState();           // llamados desde loop/task para recalcular envelope/resonator
 
 
   static AcousticInjector* _instance;
@@ -92,5 +94,13 @@ private:
 
   // Tabla seno 16 muestras para ISR rápido (0-255)
   static uint8_t _sineTable[TABLE_SIZE];
+
+  volatile bool _inDecay = false;
+  volatile uint8_t _decayEnvInt = 0;    // envelope 0..255 leído por ISR
+  volatile uint32_t _resPhaseStep = 0; // paso de fase del resonador para la ISR
+  float _decayMix = 0.7f;              // mezcla resonador vs principal (0..1)
+  uint32_t _decayDurationMs = 1200;    // default
+  float _decayResFreq = 4000.0f;       // freq resonante por defecto
+  volatile uint64_t _resPhaseAcc = 0;
   
 };

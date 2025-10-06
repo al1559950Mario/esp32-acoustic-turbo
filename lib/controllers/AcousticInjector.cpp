@@ -93,8 +93,10 @@ void AcousticInjector::stop() {
 }
 
 void AcousticInjector::setLevel(float level) {
-  
-  _targetLevel = constrain(level, 0.0f, 1.0f);
+  level = constrain(level, 0.0f, 1.0f);
+  float a = 8.0f; // controla la aceleración al final
+  float curvedLevel = (exp(a * level) - 1.0f) / (exp(a) - 1.0f);
+  _targetLevel = curvedLevel;
 }
 
 void AcousticInjector::update() {
@@ -123,9 +125,10 @@ void AcousticInjector::update() {
 void IRAM_ATTR AcousticInjector::onTimer() {
   if (!_instance) return;
 
+  // avance de fase principal
   _instance->_phaseAcc += _instance->_phaseStep;
 
-  // Índice entero y siguiente para interpolar
+  // Índice entero y siguiente para interpolar (principal)
   uint32_t idx = (_instance->_phaseAcc >> PHASE_FRAC) & (TABLE_SIZE - 1);
   uint32_t nextIdx = (idx + 1) & (TABLE_SIZE - 1);
 
@@ -138,10 +141,46 @@ void IRAM_ATTR AcousticInjector::onTimer() {
   int16_t delta = (int16_t)sample2 - (int16_t)sample1;
   uint16_t interp = (uint16_t)sample1 + ((delta * frac) >> PHASE_FRAC);
 
-  // Modulación de nivel (0-255)
+  // Modulación de nivel (0-255) — tu lógica intacta
   int16_t centered = (int16_t)interp - 128;
-  int16_t modulated = 128 + ((centered * _instance->_levelInt) >> 8);
-  uint8_t output = (uint8_t)constrain(modulated, 0, 255);
+  int16_t principal = 128 + ((centered * _instance->_levelInt) >> 8);
+
+  // Si no hay decay, comportamiento original
+  if (!_instance->_inDecay) {
+    uint8_t output = (uint8_t)constrain(principal, 0, 255);
+    dac_output_voltage(_instance->_dacChannel, output);
+    _instance->_lastDACValue = output;
+    return;
+  }
+
+  // ---------- DECAY activo: calcular resonador y mezclar ----------
+  // avanzar fase del resonador usando step precomputado
+  _instance->_resPhaseAcc += _instance->_resPhaseStep;
+
+  uint32_t rIdx = (_instance->_resPhaseAcc >> PHASE_FRAC) & (TABLE_SIZE - 1);
+  uint32_t rNext = (rIdx + 1) & (TABLE_SIZE - 1);
+  uint32_t rFrac = _instance->_resPhaseAcc & ((1ULL << PHASE_FRAC) - 1);
+  uint8_t r1 = _instance->_sineTable[rIdx];
+  uint8_t r2 = _instance->_sineTable[rNext];
+  int16_t rDelta = (int16_t)r2 - (int16_t)r1;
+  uint16_t rInterp = (uint16_t)r1 + ((rDelta * rFrac) >> PHASE_FRAC);
+  int16_t centeredR = (int16_t)rInterp - 128;
+
+  // leer envelope atómico (0..255) y normalizar
+  uint8_t env = _instance->_decayEnvInt;
+  float envNorm = float(env) / 255.0f;
+
+  // amplitud del resonador en enteros 0..255 proporcional a envNorm y decayMix
+  uint16_t resAmpInt = uint16_t(envNorm * (_instance->_decayMix * 255.0f));
+  int16_t resonatorVal = 128 + ((centeredR * int32_t(resAmpInt)) >> 8);
+
+  // atenuar la señal principal según mix * envNorm (no la borramos)
+  float principalAttenuation = 1.0f - (_instance->_decayMix * envNorm);
+  int16_t principalMixed = 128 + int16_t(((centered * _instance->_levelInt) >> 8) * principalAttenuation);
+
+  // mezclar y saturar
+  int32_t mixed = int32_t(principalMixed) + int32_t(resonatorVal) - 128;
+  uint8_t output = (uint8_t)constrain(mixed, 0, 255);
 
   dac_output_voltage(_instance->_dacChannel, output);
   _instance->_lastDACValue = output;
@@ -222,12 +261,15 @@ void AcousticInjector::testSimple() {
   Serial.println(F("✅ Test simple finalizado"));
 }
 
-float AcousticInjector::mapLoadToWaveFrequency(float percent) {
-    percent = constrain(percent, 0.0f, 100.0f);
+float AcousticInjector::mapLoadToWaveFrequency(float level) {
+    level = constrain(level, 0.0f, 1.0f);
+    // 🔹 Aplicar curva exponencial SOLO al level
+    float a = 4.0f; // controla la aceleración al final
+    float curvedLevel = (exp(a * level) - 1.0f) / (exp(a) - 1.0f);
 
     float logMin = logf(_freqMin);
     float logMax = logf(_freqMax);
-    float logFreq = logMin + (percent / 100.0f) * (logMax - logMin);
+    float logFreq = logMin + curvedLevel * (logMax - logMin);
 
     return expf(logFreq);
 }
@@ -281,4 +323,55 @@ void AcousticInjector::setFrequencyRangeOption(FrequencyRangeOption option) {
 
 AcousticInjector::FrequencyRangeOption AcousticInjector::getFrequencyRangeOption() const {
   return _freqOption;
+}
+
+void AcousticInjector::setDecayParameters(uint32_t durationMs, float lastMAPLevel) {
+  float resFreqHz = _freqMin + (_freqMax - _freqMin) * constrain(lastMAPLevel, 0.0f, 1.0f);
+  _decayDurationMs = max<uint32_t>(1, durationMs);
+
+    // - eased: menos mezcla en cargas bajas, más en altas
+  float mix = 0.4f + 0.6f * powf(lastMAPLevel, 1.8f); // adjust exponent for curve
+  _decayMix = constrain(mix, 0.0f, 1.0f);
+  _decayResFreq = constrain(resFreqHz, 100.0f, 30000.0f);
+
+  // calcular paso de fase resonador en términos de SAMPLE_RATE / PHASE_FRAC
+  const float sr = (float)SAMPLE_RATE;
+  double step = _decayResFreq * TABLE_SIZE * (1ULL << PHASE_FRAC) / sr;
+  uint32_t newStep = (step < 1.0) ? 1 : uint32_t(round(step));
+  noInterrupts();
+  _resPhaseStep = newStep;
+  interrupts();
+}
+
+void AcousticInjector::setDecayLevel(float level) {
+  // level esperado 0..1 (ActuatorManager pasa lastMAPLevel)
+  float l = constrain(level, 0.0f, 1.0f);
+  // inicializamos envelope (0..255) proporcional al nivel
+  noInterrupts();
+  _decayEnvInt = uint8_t(l * 255.0f);
+  interrupts();
+}
+
+void AcousticInjector::updateDecayState() {
+  if (!_inDecay) return;
+
+  uint32_t now = millis();
+  uint32_t elapsed = (now >= _decayStartMillis) ? (now - _decayStartMillis) : 0;
+  float t = float(elapsed) / float(_decayDurationMs);
+  t = constrain(t, 0.0f, 1.0f);
+
+  // envelope exponencial simple: env = exp(-elapsed / tau), tau = duration/3
+  float tau = float(max<uint32_t>(1, _decayDurationMs)) / 3.0f;
+  float env = expf(-float(elapsed) / tau);
+  // shape perceptual ligeramente (opcional pero probado)
+  env = powf(env, 0.9f);
+
+  uint8_t envInt = uint8_t(constrain(env * 255.0f, 0.0f, 255.0f));
+  noInterrupts();
+  _decayEnvInt = envInt;
+  if (elapsed >= _decayDurationMs) {
+    _inDecay = false;
+    _decayEnvInt = 0;
+  }
+  interrupts();
 }

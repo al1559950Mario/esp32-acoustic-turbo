@@ -20,7 +20,7 @@ public:
   void startVortex();
   void stopVortex();
   bool isTurboOn() const;
-  void setVortexLevel(float level);
+  void setVortexLevel(float, float);
 
   // Control Acoustic Injector
   void startAcoustic(float level);

@@ -27,8 +27,8 @@ void StateMachine::begin(bool hasCalibration,
     vortexPending       = false;
     vortexStartMillis   = 0;
     decayStartMillis = 0;
-    lastTPSPercent      = 0.0f;
-    lastMAPPercent      = 0.0f;
+    lastTPSLevel      = 0.0f;
+    lastMAPLevel      = 0.0f;
 
     if (actuators) {
         actuators->stopAcoustic();
@@ -156,18 +156,24 @@ void StateMachine::update(float mapLoadPercent,
                 current = SystemState::DECAY;
                 decayStartMillis = now;
                 actuators->getAcousticInjector().startDecay(now);
+                actuators->getAcousticInjector().setDecayLevel(lastMAPLevel);
+                actuators->getAcousticInjector().setDecayParameters(decayDurationMs, lastMAPLevel);
                 vortexPending = false;
             }
             break;
 
         case SystemState::VORTEX:
             if (_mapLoadPercent < thresholds.VORTEX_MAP_OFF
-             || _tpsLoadPercent < thresholds.VORTEX_TPS_OFF) {
+             && _tpsLoadPercent < thresholds.VORTEX_TPS_OFF) {
                 unsigned long now = millis();   
                 current = SystemState::DECAY;
                 vortexPending       = false;
                 decayStartMillis = now;
                 actuators->getAcousticInjector().startDecay(now);
+                actuators->getAcousticInjector().setDecayLevel(lastMAPLevel);
+                actuators->getAcousticInjector().setDecayParameters(decayDurationMs, lastMAPLevel);
+                decayDurationMs = minDecay + (maxDecay - minDecay) * lastMAPLevel;
+
             }
             break;
 
@@ -220,49 +226,24 @@ void StateMachine::handleActions() {
     if (current == SystemState::BEAM
      || current == SystemState::VORTEX) {
         
-        float deltaTPSPercent = sensors->getRelativeTPSLoad(tpsInitialPercent);
-        float deltaMAPercent  = sensors->getRelativeMAPLoad(mapInitialPercent);
+        float deltaTPSLevel = sensors->getRelativeTPSLoad(tpsInitialPercent);
+        float deltaMAPLevel  = sensors->getRelativeMAPLoad(mapInitialPercent);
 
-        if (abs(deltaTPSPercent - lastTPSPercent) > 0.1f
-         || abs(deltaMAPercent  - lastMAPPercent ) > 0.1f) {
-            actuators->setAcousticParameters(deltaTPSPercent, deltaMAPercent);
-            lastTPSPercent = deltaTPSPercent;
-            lastMAPPercent = deltaMAPercent;
+        if (abs(deltaTPSLevel - lastTPSLevel) > 0.1f
+         || abs(deltaMAPLevel  - lastMAPLevel ) > 0.1f) {
+            actuators->setAcousticParameters(deltaTPSLevel, deltaMAPLevel);
+            actuators->setVortexLevel(deltaTPSLevel, deltaMAPLevel);
+            lastTPSLevel = deltaTPSLevel;
+            lastMAPLevel = deltaMAPLevel;
         }
-
-        // Normalización TPS y MAP
-        float tpsRel = (sensors->readTPSLoadPercent() - tpsInitialPercent) /
-                       (thresholds.VORTEX_TPS_ON - tpsInitialPercent);
-        float mapRel = (sensors->readMAPLoadPercent() - mapInitialPercent) /
-                       (thresholds.VORTEX_MAP_ON - mapInitialPercent);
-
-        tpsRel = constrain(tpsRel, 0.0f, 1.0f);
-        mapRel = constrain(mapRel, 0.0f, 1.0f);
-
-        // Cálculo de vortexLevel original
-        float vortexLevel = tpsRel * mapRel;
-        vortexLevel = (vortexLevel > 1.0f) ? 1.0f : vortexLevel;
-
-        // 🔹 Aplicar curva exponencial SOLO al level
-        float a = 4.0f; // controla la aceleración al final
-        float curvedLevel = (exp(a * vortexLevel) - 1.0f) / (exp(a) - 1.0f);
-
-        actuators->setVortexLevel(curvedLevel);
-
-        // NOTA: no tocamos la frecuencia
         actuators->update(_tpsLoadPercent, _mapLoadPercent);
     }
 
         // ──────── DECAY ───────────────────────────────────────────────────
     if (current == SystemState::DECAY) {
-        // 1) Mantén la misma amplitud (vortexLevel) usando los últimos porcentajes
-        actuators->setAcousticParameters(lastTPSPercent, lastMAPPercent);
-
-        // 2) Update() avanzará la rampa de frecuencia basada en
-        //    mapLoadToWaveFrequency() que internamente detecta DECAY
-        actuators->update(lastTPSPercent, lastMAPPercent);
-
-        // 3) Al completar el tiempo de decay, apaga y vuelve a IDLE
+        // 1) Update() avanzará la rampa de frecuencia basada 
+        actuators->getAcousticInjector().updateDecayState();
+        // 2) Al completar el tiempo de decay, apaga y vuelve a IDLE
         if (millis() - decayStartMillis >= decayDurationMs) {
             actuators->stopAcoustic();
             actuators->stopVortex();

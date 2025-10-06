@@ -20,6 +20,10 @@ struct Thresholds {
 class ThresholdManager {
 public:
     bool begin();
+    static ThresholdManager& getInstance() {
+        static ThresholdManager inst;
+        return inst;
+        }
 
     Thresholds getThresholds() const;
     bool setThreshold(const std::string& key, float value);
@@ -27,6 +31,8 @@ public:
     bool reset();
 
     std::vector<std::string> listKeys() const;
+
+    void debugDump(const char* prefix = "") const;
 
 private:
     std::map<std::string, float> thresholds;

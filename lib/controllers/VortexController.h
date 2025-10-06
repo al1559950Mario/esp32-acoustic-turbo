@@ -34,7 +34,7 @@ public:
      * @param tpsPct: porcentaje de acelerador (0-100)
      * @param mapLoadPercent: porcentaje de carga MAP (0-100)
      */
-    void updatePowerLevel(float);
+    void updatePowerLevel(float, float);
 
     bool isOn() const;
     bool isActive() const;
