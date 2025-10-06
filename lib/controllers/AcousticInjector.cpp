@@ -311,7 +311,7 @@ void AcousticInjector::setFrequencyRangeOption(FrequencyRangeOption option) {
             _freqMax = 6500.0f;
             break;
         case RANGE_4:
-            _freqMin = 4400.0f;
+            _freqMin = 2000.0f;
             _freqMax = 6500.0f;
             break;            
         default:

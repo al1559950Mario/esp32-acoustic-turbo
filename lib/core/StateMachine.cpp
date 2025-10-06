@@ -158,6 +158,8 @@ void StateMachine::update(float mapLoadPercent,
                 actuators->getAcousticInjector().startDecay(now);
                 actuators->getAcousticInjector().setDecayLevel(lastMAPLevel);
                 actuators->getAcousticInjector().setDecayParameters(decayDurationMs, lastMAPLevel);
+                //decayDurationMs = minDecay + (maxDecay - minDecay) * lastMAPLevel;
+
                 vortexPending = false;
             }
             break;
@@ -172,7 +174,7 @@ void StateMachine::update(float mapLoadPercent,
                 actuators->getAcousticInjector().startDecay(now);
                 actuators->getAcousticInjector().setDecayLevel(lastMAPLevel);
                 actuators->getAcousticInjector().setDecayParameters(decayDurationMs, lastMAPLevel);
-                decayDurationMs = minDecay + (maxDecay - minDecay) * lastMAPLevel;
+                //decayDurationMs = minDecay + (maxDecay - minDecay) * lastMAPLevel;
 
             }
             break;
@@ -196,8 +198,7 @@ void StateMachine::update(float mapLoadPercent,
                     vortexStartMillis = millis();
                 }
             }
-            else if (_mapLoadPercent <= thresholds.INJ_MAP_OFF
-                  && _tpsLoadPercent <= thresholds.INJ_TPS_OFF) {
+            else if (millis() - decayStartMillis >= decayDurationMs) {
                 current = SystemState::IDLE;
                 if (actuators) {
                     actuators->stopAcoustic();
@@ -241,15 +242,7 @@ void StateMachine::handleActions() {
 
         // ──────── DECAY ───────────────────────────────────────────────────
     if (current == SystemState::DECAY) {
-        // 1) Update() avanzará la rampa de frecuencia basada 
         actuators->getAcousticInjector().updateDecayState();
-        // 2) Al completar el tiempo de decay, apaga y vuelve a IDLE
-        if (millis() - decayStartMillis >= decayDurationMs) {
-            actuators->stopAcoustic();
-            actuators->stopVortex();
-            current = SystemState::IDLE;
-        }
-        return;
     }
 }
 

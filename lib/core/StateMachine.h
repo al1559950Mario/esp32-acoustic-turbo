@@ -104,7 +104,7 @@ private:
   float lastTPSLevel;   // <— último TPS%
   float lastMAPLevel;   // <— último MAP%
   uint32_t decayStartMillis     = 0;
-  float decayDurationMs = 1000; // ms mínimos en COOLDOWN
+  float decayDurationMs = 5000; // ms mínimos en COOLDOWN
   float minDecay = 1000.0f;   // ms
   float maxDecay = 5000.0f;   // ms
 };
