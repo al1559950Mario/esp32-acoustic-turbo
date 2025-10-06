@@ -149,8 +149,12 @@ void StateMachine::update(float mapLoadPercent,
             if (readyForVortex(_mapLoadPercent, _tpsLoadPercent)) {
                 current = SystemState::VORTEX;
             }
-            else if (_mapLoadPercent <= thresholds.INJ_MAP_OFF
-                  && _tpsLoadPercent <= thresholds.INJ_TPS_OFF) {
+            float mapDrop = (lastMAPLevel * 100.0f) - _mapLoadPercent;
+            float tpsDrop = (lastTPSLevel * 100.0f) - _tpsLoadPercent;
+            bool dropDetected = (mapDrop >= MAP_DROP_THRESHOLD && tpsDrop >= TPS_DROP_THRESHOLD);
+            bool belowThresholds = (_mapLoadPercent <= thresholds.INJ_MAP_OFF
+                     && _tpsLoadPercent <= thresholds.INJ_TPS_OFF);
+            else if (dropDetected || belowThresholds){
                 // MODIFICADO: en vez de ir directo a IDLE, pasamos a COOLDOWN
                 unsigned long now = millis();   
                 current = SystemState::DECAY;
@@ -165,8 +169,12 @@ void StateMachine::update(float mapLoadPercent,
             break;
 
         case SystemState::VORTEX:
-            if (_mapLoadPercent < thresholds.VORTEX_MAP_OFF
-             && _tpsLoadPercent < thresholds.VORTEX_TPS_OFF) {
+            float mapDrop = (lastMAPLevel * 100.0f) - _mapLoadPercent;
+            float tpsDrop = (lastTPSLevel * 100.0f) - _tpsLoadPercent;
+            bool dropDetected = (mapDrop >= MAP_DROP_THRESHOLD && tpsDrop >= TPS_DROP_THRESHOLD);
+            bool belowThresholds = (_mapLoadPercent <= thresholds.INJ_MAP_OFF
+                     && _tpsLoadPercent <= thresholds.INJ_TPS_OFF);
+            if (dropDetected || belowThresholds) {
                 unsigned long now = millis();   
                 current = SystemState::DECAY;
                 vortexPending       = false;

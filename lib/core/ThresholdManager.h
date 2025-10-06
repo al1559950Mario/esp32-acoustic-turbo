@@ -3,6 +3,8 @@
 #include <map>
 #include <string>
 #include <vector>
+#include "freertos/FreeRTOS.h"
+#include "freertos/portmacro.h"
 
 struct Thresholds {
     float MAP_WAKEUP_PERCENT;
@@ -33,9 +35,12 @@ public:
     std::vector<std::string> listKeys() const;
 
     void debugDump(const char* prefix = "") const;
+    void recalculateOffThresholds();
 
 private:
     std::map<std::string, float> thresholds;
+    portMUX_TYPE thresholdMux = portMUX_INITIALIZER_UNLOCKED;
+
 
     void loadDefaults();
     bool loadFromNVS();

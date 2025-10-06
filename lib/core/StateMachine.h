@@ -107,4 +107,6 @@ private:
   float decayDurationMs = 5000; // ms mínimos en COOLDOWN
   float minDecay = 1000.0f;   // ms
   float maxDecay = 5000.0f;   // ms
+  const float MAP_DROP_THRESHOLD = 10.0f;  // en puntos porcentuales
+  const float TPS_DROP_THRESHOLD = 8.0f;
 };
