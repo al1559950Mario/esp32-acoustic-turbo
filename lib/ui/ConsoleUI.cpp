@@ -207,6 +207,46 @@ void ConsoleUI::interpretarComando(char c) {
       }
       break;
 
+    case 'j':  // Activar logging con modo específico (1–4)
+      if (!devOnly()) break;
+
+      this->println(">> Activar logging con modo específico.");
+      this->println("   Escribe un número del 1 al 4:");
+      this->println("   1 = All ON");
+      this->println("   2 = Acoustic ON, Turbo OFF");
+      this->println("   3 = Acoustic OFF, Turbo ON");
+      this->println("   4 = All OFF");
+
+      {
+        unsigned long start = millis();
+        String line;
+        while (millis() - start < 10000) {
+          if (inputAvailable()) {
+            line = readLine();
+            line.trim();
+            if (line.length()) break;
+          }
+          delay(5);
+        }
+
+        if (line.length() == 0) {
+          this->println("⚠️ Tiempo de entrada agotado. Operación cancelada.");
+          break;
+        }
+
+        int modo = atoi(line.c_str());
+        if (modo < 1 || modo > 4) {
+          this->println("⚠️ Modo inválido. Debe ser 1, 2, 3 o 4.");
+          break;
+        }
+
+        logger->enable(modo);
+        dashboardEnabled = false;  // desactivar HUD para evitar ruido visual
+
+        this->printf(">> Logging ACTIVADO en modo %d.\n", modo);
+      }
+      break;
+
 
     case 'm':  // Mostrar ayuda
       imprimirHelp();
@@ -427,6 +467,7 @@ void ConsoleUI::imprimirHelp() {
     this->println(F("  b  → Probar sonido acústico"));
     this->println(F("  f  → Alternar rango de frecuencia del BEAM"));
     this->println(F("  i  → Cambiar umbrales INJ ON"));
+    this->println(F("  j  → Activar logging"));
     this->println(F("  r  → Borrar calibración actual"));
     this->println(F("  v  → Visualizar curva TPS-MAP (pendiente desarrollo)"));
     this->println(F("  x  → Paro manual, volver a IDLE"));

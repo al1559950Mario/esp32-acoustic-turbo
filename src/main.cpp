@@ -143,32 +143,13 @@ void loop() {
   // Avanzar proceso de calibración si no está completa
   calib.update(ui ? ui->isSimulation() : false);
 
-  // Leer valores cacheados
-  float mapPct = sensors.readMAPLoadPercent();
-  float tpsPct = sensors.readTPSLoadPercent();
-
-  sensors.updatePressure();
-  float rawP = sensors.readPressureRaw();
-  float lastPressure = sensors.getPressureFromBuffer();
-  float lastPercent  = sensors.getPressurePercent();
-  float lastPsi      = sensors.getPressurePSI();
-  float rms          = sensors.computeRMS();
-  float tau          = sensors.computeTau(0.5f, 12.5f);
-  float rate         = sensors.computeEventRate(0.5f, 12.5f);
-
-  //Serial.print("Presión: "); Serial.print(rawP, 2); Serial.print(" raw, ");
-  //Serial.print("Presión: "); Serial.print(lastPressure, 2); Serial.print(" Buffer, ");
-  //Serial.print(lastPercent, 2); Serial.print("%, ");
-  //Serial.print(lastPsi, 2); Serial.print(" PSI | ");
-  //Serial.print("RMS: "); Serial.print(rms, 2); 
-  //Serial.print(" | Tau: "); Serial.print(tau, 2);
-  //Serial.print(" ms | EventRate: "); Serial.println(rate, 2);
-
 
   bool sistemaActivo = usbConsoleUI.isSistemaActivo() || btConsoleUI.isSistemaActivo();
   if (sistemaActivo) {
     float mapLoadPercent = sensors.readMAPLoadPercent();
     float tpsLoadPercent = sensors.readTPSLoadPercent();
+
+    sensors.updatePressure();
 
     actuators.update(tpsLoadPercent, mapLoadPercent);
 
@@ -183,9 +164,30 @@ void loop() {
         calibLoaded,
         debugMgr
       );
+
       fsm.handleActions();
+      
       if (logger.isEnabled()) {
-        logger.log(tpsPct, mapPct);  //agregar más valores en el futuro
+        float acousticFreq   = actuators.getCurrentFrequency();
+        float acousticLevel  = actuators.getAcousticLevel();
+        bool  acousticOn     = actuators.isAcousticOn();
+        float turboLevel    = actuators.getTurboLevel();
+        //float turboAmp  = actuators.getVortexController().getCurrent();  // si tienes medición de corriente
+        float turboAmp = 1.0f;
+        bool  turboOn = actuators.isTurboOn();
+        float deltaP = sensors.computeOscillationAmplitude();
+        float pressure_kPa = sensors.readPressure_kPa();
+        float pressure_pct = sensors.getPressurePercent();
+        float pressure_psi sensors.getPressurePSI();
+        float eventRate = sensors.getEventRate();
+        float tau = sensors.computeTau();
+        float rms = sensors.computeRMS();
+        String& state = fsm.getState();
+        logger.logFull(tpsLoadPercent, mapLoadPercent, pressure_kPa, pressure_pct, pressure_psi,
+              deltaP,  tau,  eventRate,  rms,
+              acousticFreq,  acousticLevel,  turboLevel,  turboAmp,
+              acousticOn, turboOn, String& state, 'main loop');
+
       }
     }
   } else {

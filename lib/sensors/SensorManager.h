@@ -14,12 +14,13 @@ public:
 
   float readVacuum_inHg();
   float readTPSLoadPercent();
+  float readMAPLoadPercent();
+
   uint16_t readMAPRawCached();
   uint16_t readTPSRawCached();
   float readMAPVolts();
   float readTPSVolts();
   bool isTPSValid();
-  float readMAPLoadPercent();
   float representVoltsFromRaw(uint16_t raw) const;
   void enableSimulacion();
   void disableSimulacion();

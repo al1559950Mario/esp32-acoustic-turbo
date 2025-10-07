@@ -86,3 +86,17 @@ VortexController& ActuatorManager::getVortexController() {
 AcousticInjector& ActuatorManager::getAcousticInjector() {
     return injector;
 }
+
+/// 
+float ActuatorManager::getCurrentFrequency() {
+    return injector.getFrequency();
+}
+
+float ActuatorManager::getAcousticLevel() {
+    return injector.getLevel();
+}
+
+float ActuatorManager::getTurboLevel() {
+    //0.0-1.0
+    return vortex.getLastPWM();
+}
