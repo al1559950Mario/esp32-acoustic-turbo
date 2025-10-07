@@ -148,19 +148,19 @@ void loop() {
 
   bool sistemaActivo = usbConsoleUI.isSistemaActivo() || btConsoleUI.isSistemaActivo();
   if (sistemaActivo) {
-    float mapPct = sensors.readMAPLoadPercent();
-    float tpsPct = sensors.readTPSLoadPercent();
+    float mapLoadPercent = sensors.readMAPLoadPercent();
+    float tpsLoadPercent = sensors.readTPSLoadPercent();
 
     sensors.updatePressure();
 
-    actuators.update(tpsPct, mapPct);
+    actuators.update(tpsLoadPercent, mapLoadPercent);
 
-    if (mapPct >= 100.0f && tpsPct >= 100.0f) {
+    if (mapLoadPercent >= 100.0f && tpsLoadPercent >= 100.0f) {
       ui->println("[ERROR] Carga 100%, saltando FSM");
     } else {
       fsm.update(
-        mapPct,
-        tpsPct,
+        mapLoadPercent,
+        tpsLoadPercent,
         usbConsoleUI.getCalibRequest(),
         btConsoleUI.getCalibRequest(),
         calibLoaded,
