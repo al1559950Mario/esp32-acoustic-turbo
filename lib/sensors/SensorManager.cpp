@@ -68,8 +68,8 @@ float SensorManager::representVoltsFromRaw(uint16_t raw) const {
 
 void SensorManager::update() {
   if (simulacionActiva){
-    rawTPSCached = (mapSensor.getSimulatedRaw() * 5.0f) / 32767.0f;
-    rawMAPCached = (tpsSensor.getSimulatedRaw()* 5.0f) / 32767.0f;
+    rawMAPCached = (mapSensor.getSimulatedRaw() * 5.0f) / 32767.0f;
+    rawTPSCached = (tpsSensor.getSimulatedRaw()* 5.0f) / 32767.0f;
   } else
   {
     rawMAPCached = ads.readADC_SingleEnded(1);
@@ -92,6 +92,9 @@ void SensorManager::updatePressure() {
     // Guardar en buffer
     pressureBuffer[bufferIndex++] = pKPa;
     if(bufferIndex >= PRESSURE_BUFFER_SIZE) bufferIndex = 0;
+
+    // Calcula la amplitud de oscilación en cada ciclo
+    amplitudeOscillation = computeOscillationAmplitude();
 
     // Porcentaje relativo a ±40 kPa
     float pPercent = (pKPa / 40.0f) * 100.0f;
@@ -208,3 +211,22 @@ float SensorManager::getPressurePSI() {
     float pKPa = getPressureFromBuffer();
     return pKPa * 0.145038f;
 }
+
+float SensorManager::computeOscillationAmplitude() {
+    float pMax = -1e6f;
+    float pMin =  1e6f;
+
+    for (size_t i = 0; i < PRESSURE_BUFFER_SIZE; i++) {
+        float p = pressureBuffer[i];
+        if (p > pMax) pMax = p;
+        if (p < pMin) pMin = p;
+    }
+
+    // Si no hay variación real, devolvemos 0
+    return (pMax > pMin) ? (pMax - pMin) : 0.0f;
+}
+
+float SensorManager::readOscillationAmplitude() {
+    return amplitudeOscillation;
+}
+

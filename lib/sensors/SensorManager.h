@@ -49,6 +49,8 @@ public:
   size_t getBufferSize() const { return PRESSURE_BUFFER_SIZE; }
   float getPressurePercent();
   float getPressurePSI();
+  float computeOscillationAmplitude();  
+  float readOscillationAmplitude(); 
 
 
   void update(); // 👈 Opcional, si quieres usar una rutina periódica
@@ -58,6 +60,8 @@ private:
   PressureSensor pressureSensor;
 
   float mapLoadPercent = 0.0f;  //
+  float tpsLoadPercent  = 0;
+
   bool simulacionActiva = false;
   float filteredRawTPS = 0;
   float filteredRawMAP = 0;
@@ -67,7 +71,7 @@ private:
 
 
   float vacuum_inHg = 0;
-  float tpsLoadPercent  = 0;
+  float amplitudeOscillation;  // ΔP: Pmax - Pmin
 
     // Buffer para métricas futuras
   static constexpr size_t PRESSURE_BUFFER_SIZE = 800; // 10 s a 80 Hz
