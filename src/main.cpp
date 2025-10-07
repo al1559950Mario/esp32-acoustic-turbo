@@ -153,6 +153,8 @@ void loop() {
 
     sensors.updatePressure();
 
+    sensors.updatePressure();
+
     actuators.update(tpsLoadPercent, mapLoadPercent);
 
     if (mapLoadPercent >= 100.0f && tpsLoadPercent >= 100.0f) {
@@ -167,7 +169,9 @@ void loop() {
         debugMgr
       );
 
+
       fsm.handleActions();
+      
       
       if (logger.isEnabled()) {
         float acousticFreq   = actuators.getCurrentFrequency();
