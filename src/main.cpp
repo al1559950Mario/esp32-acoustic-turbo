@@ -14,8 +14,9 @@
 
 // PIN-OUT
 constexpr uint8_t PIN_DAC_ACOUSTIC    = 25;
-constexpr uint8_t PIN_PRESSURE_OUT    = 26; // HX710B OUT
-constexpr uint8_t PIN_PRESSURE_SCK    = 27; // HX710B SCK
+constexpr uint8_t PIN_PRESSURE_OUT    = 4; // HX710B OUT
+constexpr uint8_t PIN_PRESSURE_SCK    = 23; // HX710B SCK
+constexpr uint8_t PIN_BTS_SENSE = 35; // R_IS -> corriente del motor (ADC1_CH7)
 constexpr uint8_t PIN_BTS_PWM = 18;   // pin conectado al PWM del BTS
 constexpr uint8_t PWM_CHANNEL_BTS = 19; // canal de ESP32 (0-15)
 constexpr uint8_t PIN_I2C_SDA         = 21;
@@ -69,7 +70,8 @@ void setup() {
 
   // Inicialización de sensores y actuadores
   sensors.begin(PIN_PRESSURE_OUT, PIN_PRESSURE_SCK, PIN_I2C_SDA, PIN_I2C_SCL);
-  actuators.begin(PIN_BTS_PWM, PWM_CHANNEL_BTS, PIN_DAC_ACOUSTIC);
+  actuators.begin(PIN_BTS_PWM, PWM_CHANNEL_BTS, PIN_BTS_SENSE, PIN_DAC_ACOUSTIC);
+
 
   // Crear TaskSensorUpdate en Core 1
   xTaskCreatePinnedToCore(

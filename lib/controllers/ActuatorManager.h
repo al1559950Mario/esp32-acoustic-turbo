@@ -10,6 +10,7 @@ public:
 
   // Inicializa ambos actuadores con sus pines respectivos
   void begin( uint8_t turboPwmPin, uint8_t turboPwmChannel,
+                            uint8_t turboSensePin,
                             uint8_t acousticDacPin);
 
   // Actualiza lógica interna (por ejemplo, rampas, timers)
@@ -33,6 +34,8 @@ public:
 
   VortexController& getVortexController();
   AcousticInjector& getAcousticInjector();
+  float readTurboSense();
+
   
 
 private:

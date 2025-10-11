@@ -1,19 +1,24 @@
 #include "VortexController.h"
 
-void VortexController::begin(uint8_t pwmPin_, uint8_t pwmChannel_) {
+void VortexController::begin(uint8_t pwmPin_, uint8_t pwmChannel_, uint8_t sensePin_) {
     pwmPin = pwmPin_;
     pwmChannel = pwmChannel_;
+    sensePin = sensePin_;
 
     pinMode(pwmPin, OUTPUT);
-
-    // Configurar PWM: canal, frecuencia 20 kHz, resolución 8 bits
     ledcSetup(pwmChannel, 20000, 8);
     ledcAttachPin(pwmPin, pwmChannel);
+
+    if (sensePin != 255) {
+        analogSetPinAttenuation(sensePin, ADC_11db);
+        analogReadResolution(12);
+    }
 
     active = false;
     lastPWM = 0.0f;
     ledcWrite(pwmChannel, 0);
 }
+
 
 void VortexController::start() {
     if (!active) {
@@ -53,4 +58,22 @@ bool VortexController::isOn() const {
 
 bool VortexController::isActive() const {
     return active;
+}
+
+
+float VortexController::readCurrentSense(){
+    if (sensePin == 255) return 0.0f;
+
+    int raw = analogRead(sensePin);
+    float voltage = raw * (3.3f / 4095.0f);
+
+    // Ajusta la sensibilidad según el divisor o shunt que uses
+    constexpr float sensitivity = 8.5f; // 1V = 1A por ejemplo
+    float current = voltage * sensitivity;
+
+    // Filtrado básico
+    static float filtered = 0;
+    filtered += (current - filtered) * 0.1f;
+
+    return filtered;
 }

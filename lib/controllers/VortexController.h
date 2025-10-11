@@ -14,7 +14,7 @@ public:
      * @param pwmPin: pin conectado al canal PWM del BTS
      * @param pwmChannel: canal de PWM de ESP32 (0-15)
      */
-    void begin(uint8_t pwmPin, uint8_t pwmChannel);
+    void begin(uint8_t pwmPin_, uint8_t pwmChannel_, uint8_t sensePin_ = 255);
 
     /**
      * start()
@@ -39,11 +39,15 @@ public:
     bool isOn() const;
     bool isActive() const;
     float getLastPWM() const { return lastPWM; }
+    float readCurrentSense(); // ← nueva función
+
 
 
 private:
     uint8_t pwmPin = 255;
     uint8_t pwmChannel = 0;   // canal ESP32 usado en ledcWrite
     bool active = false;
-    float lastPWM = 0.0f;     // nivel actual (0.0 – 1.0)
+    float lastPWM = 0.0f;     // nivel actual (0.0 – 1.0)}
+    uint8_t sensePin;
+
 };

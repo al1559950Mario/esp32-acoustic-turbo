@@ -1,16 +1,21 @@
 #include "ActuatorManager.h"
 #include "AcousticInjector.h"
 
-/// Inicializa actuadores: BTS7960 y Acoustic Injector
+
 void ActuatorManager::begin(uint8_t turboPwmPin, uint8_t turboPwmChannel,
+                            uint8_t turboSensePin,
                             uint8_t acousticDacPin) {
-    vortex.begin(turboPwmPin, turboPwmChannel);
+    // Inicializar VortexController con PWM + canal + pin de corriente
+    vortex.begin(turboPwmPin, turboPwmChannel, turboSensePin);
+
+    // Inicializar Acoustic Injector
     injector.begin(acousticDacPin);
 
     // Apagar ambos al inicio
     vortex.stop();
     injector.stop();
 }
+
 
 /// Actualiza actuadores. Turbo usa TPS*MAP y Acoustic Injector su lógica interna
 /// @param tpsLoadPercent: porcentaje TPS [0-100]
@@ -98,4 +103,7 @@ float ActuatorManager::getAcousticLevel() {
 float ActuatorManager::getTurboLevel() {
     //0.0-1.0
     return vortex.getLastPWM();
+}
+float ActuatorManager::readTurboSense() {
+    return vortex.readCurrentSense(); // llama a la función del controller
 }
