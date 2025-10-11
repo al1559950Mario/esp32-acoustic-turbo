@@ -186,7 +186,7 @@ void loop() {
         float rms = sensors.computeRMS();
         String state = fsm.getStateName();
         String event = "Main_loop";
-        logger.logFull(tpsPct, mapPct, pressure_kPa, pressure_pct, pressure_psi,
+        logger.logFull(tpsLoadPercent, mapLoadPercent, pressure_kPa, pressure_pct, pressure_psi,
               deltaP,  tau,  eventRate,  rms,
               acousticFreq,  acousticLevel,  turboLevel,  turboAmp,
               acousticOn, turboOn, state, event);
