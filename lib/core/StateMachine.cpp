@@ -146,14 +146,14 @@ void StateMachine::update(float mapLoadPercent,
             break;
 
         case SystemState::BEAM:
+            mapDrop = (lastMAPLevel * 100.0f) - _mapLoadPercent;
+            tpsDrop = (lastTPSLevel * 100.0f) - _tpsLoadPercent;
+            dropDetected = (mapDrop >= MAP_DROP_THRESHOLD && tpsDrop >= TPS_DROP_THRESHOLD);
+            belowThresholds = (_mapLoadPercent <= thresholds.INJ_MAP_OFF
+                     && _tpsLoadPercent <= thresholds.INJ_TPS_OFF);
             if (readyForVortex(_mapLoadPercent, _tpsLoadPercent)) {
                 current = SystemState::VORTEX;
             }
-            float mapDrop = (lastMAPLevel * 100.0f) - _mapLoadPercent;
-            float tpsDrop = (lastTPSLevel * 100.0f) - _tpsLoadPercent;
-            bool dropDetected = (mapDrop >= MAP_DROP_THRESHOLD && tpsDrop >= TPS_DROP_THRESHOLD);
-            bool belowThresholds = (_mapLoadPercent <= thresholds.INJ_MAP_OFF
-                     && _tpsLoadPercent <= thresholds.INJ_TPS_OFF);
             else if (dropDetected || belowThresholds){
                 // MODIFICADO: en vez de ir directo a IDLE, pasamos a COOLDOWN
                 unsigned long now = millis();   
@@ -169,10 +169,10 @@ void StateMachine::update(float mapLoadPercent,
             break;
 
         case SystemState::VORTEX:
-            float mapDrop = (lastMAPLevel * 100.0f) - _mapLoadPercent;
-            float tpsDrop = (lastTPSLevel * 100.0f) - _tpsLoadPercent;
-            bool dropDetected = (mapDrop >= MAP_DROP_THRESHOLD && tpsDrop >= TPS_DROP_THRESHOLD);
-            bool belowThresholds = (_mapLoadPercent <= thresholds.INJ_MAP_OFF
+            mapDrop = (lastMAPLevel * 100.0f) - _mapLoadPercent;
+            tpsDrop = (lastTPSLevel * 100.0f) - _tpsLoadPercent;
+            dropDetected = (mapDrop >= MAP_DROP_THRESHOLD && tpsDrop >= TPS_DROP_THRESHOLD);
+            belowThresholds = (_mapLoadPercent <= thresholds.INJ_MAP_OFF
                      && _tpsLoadPercent <= thresholds.INJ_TPS_OFF);
             if (dropDetected || belowThresholds) {
                 unsigned long now = millis();   

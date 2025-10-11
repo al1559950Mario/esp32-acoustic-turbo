@@ -111,4 +111,9 @@ private:
   const float TPS_DROP_THRESHOLD = 8.0f;
   float avgMAPLevel = 0.0f;
   uint32_t mapSamples = 0;
+  float mapDrop = 0.0f;
+  float tpsDrop = 0.0f;
+  bool dropDetected = false;
+  bool belowThresholds = false;
+
 };

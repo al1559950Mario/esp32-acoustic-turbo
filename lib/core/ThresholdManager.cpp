@@ -165,10 +165,10 @@ void ThresholdManager::debugDump(const char* prefix) const {
 void ThresholdManager::recalculateOffThresholds() {
     const float INJ_HYSTERESIS = 10.0f;
     const float VORTEX_HYSTERESIS = 15.0f;
-    taskENTER_CRITICAL(&thresholdMux);
+    portENTER_CRITICAL(&thresholdMux);
     thresholds["INJ_TPS_OFF"]    = thresholds["INJ_TPS_ON"] - INJ_HYSTERESIS;
     thresholds["INJ_MAP_OFF"]    = thresholds["INJ_MAP_ON"] - INJ_HYSTERESIS;
     thresholds["VORTEX_TPS_OFF"] = thresholds["VORTEX_TPS_ON"] - VORTEX_HYSTERESIS;
     thresholds["VORTEX_MAP_OFF"] = thresholds["VORTEX_MAP_ON"] - VORTEX_HYSTERESIS;
-    taskEXIT_CRITICAL(&thresholdMux);
+    portEXIT_CRITICAL(&thresholdMux);
 }

@@ -39,7 +39,7 @@ public:
 
 private:
     std::map<std::string, float> thresholds;
-    portMUX_TYPE thresholdMux = portMUX_INITIALIZER_UNLOCKED;
+    mutable portMUX_TYPE thresholdMux = portMUX_INITIALIZER_UNLOCKED;
 
 
     void loadDefaults();
