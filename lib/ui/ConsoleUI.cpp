@@ -392,9 +392,13 @@ void ConsoleUI::imprimirDashboard() {
 
     float level = actuators->getAcousticInjector().getLevel();
     float freq = actuators->getAcousticInjector().getFrequency();
+    float oscillationAmplitude = sensors->computeOscillationAmplitude();
+    float rms = sensors->computeRMS();
+    float pressurePSI = sensors->getPressurePSI();
 
     // Obtener potencia del turbo (0–100%)
     float boostLevel = actuators->getVortexController().getLastPWM() * 100.0f;
+    float boostSense = actuators->readTurboSense();
 
     SystemState st = fsm->getState();
     unsigned long elapsed = (millis() - lastTransitionMS) / 1000;
@@ -407,13 +411,17 @@ void ConsoleUI::imprimirDashboard() {
 
     // HUD en vivo: actualización en línea
     this->printf(
-        "\r[%s|%lus]TPS=%.2fV(%.2f–%.2fV)%.0f%%|MAP=%.2fV(%.2f–%.2fV)%.0f%%|LVL=%.2f|FRQ=%.0fHz|Boost:%.0f%%",
+        "\r[%s|%lus]TPS=%.1fV(%.1f–%.1fV)%.0f%%|MAP=%.1fV(%.1f–%.1fV)%.0f%%|LVL=%.1f|FRQ=%.0fHz|Boost:%.0f%%|Sense:%.1f%|Peaks:%.1f%|RMS:%.1f%|PSI:%.0f%",
         stName, elapsed,
         tpsV, tpsMinV, tpsMaxV, tpsPct,
         mapV, mapMinV, mapMaxV, mapPct,
         level,
         freq,
-        boostLevel
+        boostLevel, 
+        boostSense,
+        oscillationAmplitude,
+        rms,
+        pressurePSI
       );
 
     // Detalle en nueva línea si cambió estado

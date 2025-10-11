@@ -1,5 +1,7 @@
 #include "SensorManager.h"
-
+#include <vector>
+#include <algorithm>
+#include <cmath>
 
 void SensorManager::begin(uint8_t pinPressureData, uint8_t pinPressureSCK, uint8_t pinSDA, uint8_t pinSCL) {
   Wire.begin(pinSDA, pinSCL);
@@ -213,17 +215,25 @@ float SensorManager::getPressurePSI() {
 }
 
 float SensorManager::computeOscillationAmplitude() {
-    float pMax = -1e6f;
-    float pMin =  1e6f;
+    float low_pct = 0.05f;
+    float high_pct = 0.95f;
+    const size_t n = PRESSURE_BUFFER_SIZE;
+    if (n == 0) return 0.0f;
 
-    for (size_t i = 0; i < PRESSURE_BUFFER_SIZE; i++) {
-        float p = pressureBuffer[i];
-        if (p > pMax) pMax = p;
-        if (p < pMin) pMin = p;
-    }
+    std::vector<float> tmp;
+    tmp.reserve(n);
+    for (size_t i = 0; i < n; ++i) tmp.push_back(pressureBuffer[i]);
 
-    // Si no hay variación real, devolvemos 0
-    return (pMax > pMin) ? (pMax - pMin) : 0.0f;
+    size_t idxLow  = (size_t)floorf(low_pct * (n - 1));
+    size_t idxHigh = (size_t)floorf(high_pct * (n - 1));
+
+    std::nth_element(tmp.begin(), tmp.begin() + idxLow, tmp.end());
+    float lowVal = tmp[idxLow];
+
+    std::nth_element(tmp.begin(), tmp.begin() + idxHigh, tmp.end());
+    float highVal = tmp[idxHigh];
+
+    return (highVal > lowVal) ? (highVal - lowVal) : 0.0f;
 }
 
 float SensorManager::readOscillationAmplitude() {
