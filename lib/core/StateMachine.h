@@ -42,14 +42,6 @@ public:
   void begin(bool hasCalibration, ActuatorManager* actuators, ThresholdManager* thresholdManagerPtr, SensorManager* sensorsPtr, CalibrationManager* calibMgrPtr);
 
   /**
-   * Obtiene el estado actual.
-   * @return Estado activo de la FSM.
-   */
-  SystemState getState() const;
-
-  String getStateName() const;
-
-  /**
    * Realiza la lógica de transición de estados.
    * @param mapLoadPercent Porcentaje de carga MAP normalizado (0% = vacío máximo, 100% = presión atmosférica)
    * @param tpsPct Lectura de TPS en porcentaje [0–100].
@@ -85,6 +77,8 @@ public:
 
   CalibStep currentCalibStep = CalibStep::TPS_MIN;
   unsigned long lastStepTime = 0;
+  SystemState getState() const {return current;}
+  String getStateName () const;
 
 private:
   Thresholds thresholds;                         ///< Copia local de los umbrales actuales

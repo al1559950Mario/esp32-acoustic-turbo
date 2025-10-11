@@ -40,10 +40,6 @@ void StateMachine::begin(bool hasCalibration,
     Serial.println(static_cast<int>(current));
 }
 
-SystemState StateMachine::getState() const {
-    return current;
-}
-
 float StateMachine::getLevel() const {
     return tpsNormalized;
 }

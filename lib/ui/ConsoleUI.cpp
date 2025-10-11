@@ -129,6 +129,124 @@ void ConsoleUI::interpretarComando(char c) {
         }
         break;
 
+    case 'i': // Ajustar umbrales INJ ON desde consola (dev only)
+      if (!devOnly()) break;
+      this->println(">> Cambiar INJ ON: escribe dos valores min 60 max 90: <INJ_MAP_ON> <INJ_TPS_ON> (ej: 60 70)");
+      {
+        Serial.println("[DBG] case 'i' - waiting input");
+        // Espera línea completa usando inputAvailable() y readLine() (timeout 10s)
+        unsigned long start = millis();
+        String line;
+        while (millis() - start < 15000) { // espera hasta 10s
+          if (inputAvailable()) {
+            line = readLine();
+            line.trim();
+            if (line.length()) break;
+          }
+          delay(5);
+        }
+        if (line.length() == 0) {
+          this->println("⚠️ Tiempo de entrada agotado. Operación cancelada.");
+          break;
+        }
+        // Parsear dos floats
+        float mapOn = NAN, tpsOn = NAN;
+        int read = sscanf(line.c_str(), "%f %f", &mapOn, &tpsOn);
+        if (read < 1) {
+          this->println("⚠️ Entrada inválida. Formato: <INJ_MAP_ON> <INJ_TPS_ON>");
+          break;
+        }
+        // Si solamente dio uno, pedimos el otro explícitamente
+        if (read == 1) {
+          this->printf(">> INJ_MAP_ON = %.1f. Ahora escribe INJ_TPS_ON:\n", mapOn);
+          start = millis();
+          String line2;
+          while (millis() - start < 10000) {
+            if (inputAvailable()) {
+              line2 = readLine();
+              line2.trim();
+              if (line2.length()) break;
+            }
+            delay(5);
+          }
+          if (line2.length() == 0) {
+            this->println("⚠️ Tiempo de entrada agotado. Operación cancelada.");
+            break;
+          }
+          if (sscanf(line2.c_str(), "%f", &tpsOn) != 1) {
+            this->println("⚠️ Valor INJ_TPS_ON inválido. Operación cancelada.");
+            break;
+          }
+        } else {
+        }
+
+        // Validaciones simples de rango 0..100
+        // Usamos comprobación NaN-portable
+        auto isNumber = [](float v) { return v == v; }; // false para NaN
+        if (!isNumber(mapOn) || !isNumber(tpsOn) || mapOn < 0.0f || mapOn > 100.0f || tpsOn < 0.0f || tpsOn > 100.0f) {
+          this->println("⚠️ Valores fuera de rango (0..100). Operación cancelada.");
+          break;
+        }
+
+        // Actualizar ThresholdManager y persistir
+        bool okMap = ThresholdManager::getInstance().setThreshold("INJ_MAP_ON", mapOn);
+
+        bool okTps = ThresholdManager::getInstance().setThreshold("INJ_TPS_ON", tpsOn);
+
+        if (okMap && okTps) {
+          bool saved = ThresholdManager::getInstance().save();
+          if (saved) {
+            this->printf(">> Umbrales guardados: INJ_MAP_ON=%.1f, INJ_TPS_ON=%.1f\n", mapOn, tpsOn);
+          } else {
+            this->println("⚠️ Error guardando en NVS.");
+          }
+        } else {
+          this->println("⚠️ Error: claves INJ no encontradas en ThresholdManager.");
+        }
+      }
+      break;
+
+    case 'j':  // Activar logging con modo específico (1–4)
+      if (!devOnly()) break;
+
+      this->println(">> Activar logging con modo específico.");
+      this->println("   Escribe un número del 1 al 4:");
+      this->println("   1 = All ON");
+      this->println("   2 = Acoustic ON, Turbo OFF");
+      this->println("   3 = Acoustic OFF, Turbo ON");
+      this->println("   4 = All OFF");
+
+      {
+        unsigned long start = millis();
+        String line;
+        while (millis() - start < 10000) {
+          if (inputAvailable()) {
+            line = readLine();
+            line.trim();
+            if (line.length()) break;
+          }
+          delay(5);
+        }
+
+        if (line.length() == 0) {
+          this->println("⚠️ Tiempo de entrada agotado. Operación cancelada.");
+          break;
+        }
+
+        int modo = atoi(line.c_str());
+        if (modo < 1 || modo > 4) {
+          this->println("⚠️ Modo inválido. Debe ser 1, 2, 3 o 4.");
+          break;
+        }
+
+        logger->enable(modo);
+        dashboardEnabled = false;  // desactivar HUD para evitar ruido visual
+
+        this->printf(">> Logging ACTIVADO en modo %d.\n", modo);
+      }
+      break;
+
+
     case 'm':  // Mostrar ayuda
       imprimirHelp();
       break;
@@ -348,6 +466,7 @@ void ConsoleUI::imprimirHelp() {
     this->println(F("  b  → Probar sonido acústico"));
     this->println(F("  f  → Alternar rango de frecuencia del BEAM"));
     this->println(F("  i  → Cambiar umbrales INJ ON"));
+    this->println(F("  j  → Activar logging"));
     this->println(F("  r  → Borrar calibración actual"));
     this->println(F("  v  → Visualizar curva TPS-MAP (pendiente desarrollo)"));
     this->println(F("  x  → Paro manual, volver a IDLE"));
