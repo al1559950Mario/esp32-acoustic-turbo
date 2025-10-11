@@ -157,6 +157,7 @@ void StateMachine::update(float mapLoadPercent,
             else if (dropDetected || belowThresholds){
                 // MODIFICADO: en vez de ir directo a IDLE, pasamos a COOLDOWN
                 unsigned long now = millis();   
+
                 current = SystemState::DECAY;
                 decayStartMillis = now;
                 actuators->getAcousticInjector().startDecay(now);
@@ -165,6 +166,7 @@ void StateMachine::update(float mapLoadPercent,
                 //decayDurationMs = minDecay + (maxDecay - minDecay) * avgMAPLevel;
 
                 vortexPending = false;
+                // no apagamos Acoustic aquí, se apaga al terminar el cooldown
             }
             break;
 
@@ -188,6 +190,9 @@ void StateMachine::update(float mapLoadPercent,
             break;
 
         case SystemState::DECAY:
+            if ((millis() - decayStartMillis) < decayDurationMs) {
+                break;
+            }
             if (readyForVortex(_mapLoadPercent, _tpsLoadPercent)) {
                 current = SystemState::VORTEX;
                 vortexPending     = true;
@@ -265,4 +270,18 @@ void StateMachine::debugForceState(SystemState nuevoEstado) {
     }
 }
 
+String StateMachine::getStateName() const {
+    switch (current) {
+        case SystemState::OFF: return "OFF";
+        case SystemState::NO_CALIB: return "NO_CALIB";
+        case SystemState::CALIBRATION: return "CALIBRATION";
+        case SystemState::IDLE: return "IDLE";
+        case SystemState::BEAM: return "BEAM";
+        case SystemState::VORTEX: return "VORTEX";
+        case SystemState::DECAY: return "DECAY";
+        case SystemState::DEBUG: return "DEBUG";
+        case SystemState::UNKNOWN: return "UNKNOWN";
+        default: return "UNKNOWN";
+    }
+}
 

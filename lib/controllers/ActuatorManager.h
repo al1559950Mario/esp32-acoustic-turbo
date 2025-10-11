@@ -27,6 +27,9 @@ public:
   void stopAcoustic();
   void setAcousticParameters(float level, float mapLoadPercent);
   bool isAcousticOn() const;
+  float getCurrentFrequency();
+  float getAcousticLevel();
+  float getTurboLevel();
 
   VortexController& getVortexController();
   AcousticInjector& getAcousticInjector();

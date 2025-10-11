@@ -47,6 +47,8 @@ public:
    */
   SystemState getState() const;
 
+  String getStateName() const;
+
   /**
    * Realiza la lógica de transición de estados.
    * @param mapLoadPercent Porcentaje de carga MAP normalizado (0% = vacío máximo, 100% = presión atmosférica)
@@ -82,7 +84,8 @@ public:
   float getMAPInitialForInj(){return mapInitialPercent;};
 
   CalibStep currentCalibStep = CalibStep::TPS_MIN;
-  
+  unsigned long lastStepTime = 0;
+
 private:
   Thresholds thresholds;                         ///< Copia local de los umbrales actuales
   ThresholdManager* thresholdManager = nullptr;  ///< Puntero al gestor de umbrales
