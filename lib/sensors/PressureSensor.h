@@ -7,14 +7,12 @@ public:
 
     void begin(uint8_t pinData, uint8_t pinSCK);
     long readRaw();
-    float readPressure_kPa();
-    void tare();
+    float getPressure_kPa();
     void setCalibration(float scale, float offset);
 
     // --- Nuevas funciones ---
-    float readPressurePercent();  // porcentaje relativo al rango
-    float readPressure_psi();     // conversión a psi
     void setMinMax(float minVal, float maxVal); // definir rango para %
+    void updateRawCached();
     
 private:
     uint8_t _pinData;
@@ -25,4 +23,8 @@ private:
     // Rango esperado para calcular %
     float minReading = 0;
     float maxReading = 1000000; 
+
+    long _rawCached = 0;
+    long _kpaCached = 0;
+    unsigned long _lastUpdate = 0;
 };

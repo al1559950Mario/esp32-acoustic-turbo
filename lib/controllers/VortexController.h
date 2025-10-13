@@ -39,7 +39,9 @@ public:
     bool isOn() const;
     bool isActive() const;
     float getLastPWM() const { return lastPWM; }
-    float readCurrentSense(); // ← nueva función
+    void updateCurrentSense();   // lectura real + filtrado
+    float getCurrentSense() const;    // lectura cacheada (rápida)
+
 
 
 
@@ -49,5 +51,8 @@ private:
     bool active = false;
     float lastPWM = 0.0f;     // nivel actual (0.0 – 1.0)}
     uint8_t sensePin;
+    float currentCached = 0.0f;
+    unsigned long lastSenseUpdate = 0;
+
 
 };

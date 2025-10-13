@@ -72,14 +72,23 @@ long PressureSensor::readRaw() {
     return value;
 }
 
-float PressureSensor::readPressure_kPa() {
+void PressureSensor::updateRawCached() {
+    long newVal = readRaw();
+    if (newVal != 0) {
+        _rawCached = newVal;
+        _lastUpdate = millis();
+    }
+}
+
+
+float PressureSensor::getPressure_kPa() {
     const int FILTER_N = 5;
     static float buffer[FILTER_N] = {0};
     static uint8_t index = 0;
     static bool filled = false;
 
-    long raw = readRaw();
-    float pressure = (raw * _scale) + _offset;
+    long rawCached = _rawCached;
+    float pressure = (rawCached * _scale) + _offset;
 
     // Limitar al rango físico
     pressure = constrain(pressure, minReading, maxReading);
@@ -94,26 +103,9 @@ float PressureSensor::readPressure_kPa() {
     return sum / count;
 }
 
-void PressureSensor::tare() {
-    long raw = readRaw();
-    _offset = -(raw * _scale);
-}
-
 void PressureSensor::setCalibration(float scale, float offset) {
     _scale  = scale;
     _offset = offset;
-}
-
-float PressureSensor::readPressurePercent() {
-    float p = readPressure_kPa();
-    float pct = (p - minReading) / (maxReading - minReading) * 100.0f;
-    return constrain(pct, 0.0f, 100.0f);
-}
-
-float PressureSensor::readPressure_psi() {
-    float p = readPressure_kPa();
-    float psi = p * 0.145038f;
-    return constrain(psi, minReading * 0.145038f, maxReading * 0.145038f);
 }
 
 void PressureSensor::setMinMax(float minVal, float maxVal) {

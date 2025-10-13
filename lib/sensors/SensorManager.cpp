@@ -16,7 +16,7 @@ void SensorManager::begin(uint8_t pinPressureData, uint8_t pinPressureSCK, uint8
   tpsSensor.begin(0, &ads);  // A0 para TPS
   pressureSensor.begin(pinPressureData, pinPressureSCK);
       // Inicializar buffer
-  for (size_t i = 0; i < PRESSURE_BUFFER_SIZE; i++) pressureBuffer[i] = 0.0f;
+  for (size_t i = 0; i < PRESSURE_BUFFER_SIZE; i++) pressureKPABuffer[i] = 0.0f;
   bufferIndex = 0;
 }
 
@@ -67,8 +67,33 @@ float SensorManager::representVoltsFromRaw(uint16_t raw) const {
   return raw * LSB;
 }
 
+float SensorManager::getRelativeTPSLevel(uint16_t tpsInitial) {
+  if (tpsInitial >= 100) return 0.0f;
+  float norm = ((float)tpsLoadPercent - tpsInitial) / (100.0f - tpsInitial);
+  return constrain(norm, 0.0f, 1.0f);
+}
 
-void SensorManager::update() {
+float SensorManager::getRelativeMAPLevel(uint16_t mapInitialPercent) {
+  if (mapInitialPercent >= 100) return 0.0f;
+  float norm = ((float)mapLoadPercent - mapInitialPercent) / (100.0f - mapInitialPercent);
+  return constrain(norm, 0.0f, 1.0f);
+}
+
+void SensorManager::enableSimulacion() {
+  simulacionActiva = true;
+}
+
+void SensorManager::disableSimulacion() {
+  simulacionActiva = false;
+  mapSensor.disableSimulation();
+  tpsSensor.disableSimulation();
+}
+
+bool SensorManager::isSimulation() {
+  return simulacionActiva;
+}
+
+void SensorManager::updateADS1115() {
   if (simulacionActiva){
     rawMAPCached = (mapSensor.getSimulatedRaw() * 5.0f) / 32767.0f;
     rawTPSCached = (tpsSensor.getSimulatedRaw()* 5.0f) / 32767.0f;
@@ -88,129 +113,41 @@ void SensorManager::update() {
   
 }
 
+
+
 void SensorManager::updatePressure() {
-    float pKPa = pressureSensor.readPressure_kPa();
+    pressureSensor.updateRawCached();
+
+    float pKPa = getPressure_kPa();
 
     // Guardar en buffer
-    pressureBuffer[bufferIndex++] = pKPa;
+    pressureKPABuffer[bufferIndex++] = pKPa;
     if(bufferIndex >= PRESSURE_BUFFER_SIZE) bufferIndex = 0;
 
     // Calcula la amplitud de oscilación en cada ciclo
     amplitudeOscillation = computeOscillationAmplitude();
 
-    // Porcentaje relativo a ±40 kPa
-    float pPercent = (pKPa / 40.0f) * 100.0f;
-
-    // Conversión a PSI
-    float pPsi = pKPa * 0.145038f;
-
 }
 
-
-
-
-void SensorManager::enableSimulacion() {
-  simulacionActiva = true;
-}
-
-void SensorManager::disableSimulacion() {
-  simulacionActiva = false;
-  mapSensor.disableSimulation();
-  tpsSensor.disableSimulation();
-}
-
-bool SensorManager::isSimulation() {
-  return simulacionActiva;
-}
-
-
-float SensorManager::getRelativeTPSLoad(uint16_t tpsInitial) {
-  if (tpsInitial >= 100) return 0.0f;
-  float norm = ((float)tpsLoadPercent - tpsInitial) / (100.0f - tpsInitial);
-  return constrain(norm, 0.0f, 1.0f) * 100.0f;
-}
-
-float SensorManager::getRelativeMAPLoad(uint16_t mapInitialPercent) {
-  if (mapInitialPercent >= 100) return 0.0f;
-  float norm = ((float)mapLoadPercent - mapInitialPercent) / (100.0f - mapInitialPercent);
-  return constrain(norm, 0.0f, 1.0f) * 100.0f;
-}
-
-float SensorManager::readPressure_kPa() {
-    return pressureSensor.readPressure_kPa();
-}
-
-long SensorManager::readPressureRaw() {
-    return pressureSensor.readRaw();
+float SensorManager::getPressure_kPa() {
+    return pressureSensor.getPressure_kPa();
 }
 
 // Último valor del buffer (para UI o logging)
-float SensorManager::getPressureFromBuffer() {
+float SensorManager::getPressureKPAFromBuffer() {
     size_t lastIndex = (bufferIndex == 0) ? PRESSURE_BUFFER_SIZE - 1 : bufferIndex - 1;
-    return pressureBuffer[lastIndex];
+    return pressureKPABuffer[lastIndex];
 }
-
- // Tau: tiempo de decaimiento de picos (>37% del valor máximo del pico)
-float SensorManager::computeTau(float threshold_kPa, float samplingPeriod_ms) {
-    float tauSum = 0.0f;
-    size_t tauCount = 0;
-
-    for (size_t i = 1; i < PRESSURE_BUFFER_SIZE; i++) {
-      float diff = pressureBuffer[i] - pressureBuffer[i-1];
-      if (diff > threshold_kPa) { // inicio de pico válido
-        float peak = pressureBuffer[i];
-        for (size_t j = i+1; j < PRESSURE_BUFFER_SIZE; j++) {
-          if (pressureBuffer[j] <= 0.37f * peak) {
-            tauSum += (j - i) * samplingPeriod_ms;
-            tauCount++;
-            break;
-          }
-        }
-      }
-    }
-
-    return (tauCount > 0) ? (tauSum / tauCount) : 0.0f;
-  }
-
-  // EventRate: cantidad de cambios significativos por segundo
-float SensorManager::computeEventRate(float threshold_kPa , float samplingPeriod_ms ) {
-    size_t events = 0;
-
-    for (size_t i = 1; i < PRESSURE_BUFFER_SIZE; i++) {
-      float diff = pressureBuffer[i] - pressureBuffer[i-1];
-      if (diff > threshold_kPa) events++;
-    }
-
-    // Convertir a eventos por segundo
-    float totalTime_s = (PRESSURE_BUFFER_SIZE * samplingPeriod_ms) / 1000.0f;
-    return (totalTime_s > 0.0f) ? (events / totalTime_s) : 0.0f;
-  }
-
-float SensorManager::computeRMS() {
-    float sumSq = 0.0f;
-    size_t count = 0;
-    float offset = readPressure_kPa(); // usar último valor como referencia
-
-    for (size_t i = 0; i < PRESSURE_BUFFER_SIZE; i++) {
-      float val = pressureBuffer[i] - offset;
-      if (val != 0.0f) { // ignorar ceros iniciales
-        sumSq += val * val;
-        count++;
-      }
-    }
-    return (count > 0) ? sqrt(sumSq / count) : 0.0f;
-  }
-
 
   // Devuelve la presión del buffer como porcentaje relativo a ±40 kPa
 float SensorManager::getPressurePercent() {
-    float pKPa = getPressureFromBuffer();
+    float pKPa = getPressureKPAFromBuffer();
     return (pKPa / 40.0f) * 100.0f;
 }
 
 // Devuelve la presión del buffer en PSI
 float SensorManager::getPressurePSI() {
-    float pKPa = getPressureFromBuffer();
+    float pKPa = getPressureKPAFromBuffer();
     return pKPa * 0.145038f;
 }
 
@@ -222,7 +159,7 @@ float SensorManager::computeOscillationAmplitude() {
 
     std::vector<float> tmp;
     tmp.reserve(n);
-    for (size_t i = 0; i < n; ++i) tmp.push_back(pressureBuffer[i]);
+    for (size_t i = 0; i < n; ++i) tmp.push_back(pressureKPABuffer[i]);
 
     size_t idxLow  = (size_t)floorf(low_pct * (n - 1));
     size_t idxHigh = (size_t)floorf(high_pct * (n - 1));
@@ -240,3 +177,53 @@ float SensorManager::readOscillationAmplitude() {
     return amplitudeOscillation;
 }
 
+ // Tau: tiempo de decaimiento de picos (>37% del valor máximo del pico)
+float SensorManager::computeTau(float threshold_kPa, float samplingPeriod_ms) {
+    float tauSum = 0.0f;
+    size_t tauCount = 0;
+
+    for (size_t i = 1; i < PRESSURE_BUFFER_SIZE; i++) {
+      float diff = pressureKPABuffer[i] - pressureKPABuffer[i-1];
+      if (diff > threshold_kPa) { // inicio de pico válido
+        float peak = pressureKPABuffer[i];
+        for (size_t j = i+1; j < PRESSURE_BUFFER_SIZE; j++) {
+          if (pressureKPABuffer[j] <= 0.37f * peak) {
+            tauSum += (j - i) * samplingPeriod_ms;
+            tauCount++;
+            break;
+          }
+        }
+      }
+    }
+
+    return (tauCount > 0) ? (tauSum / tauCount) : 0.0f;
+  }
+
+  // EventRate: cantidad de cambios significativos por segundo
+float SensorManager::computeEventRate(float threshold_kPa , float samplingPeriod_ms ) {
+    size_t events = 0;
+
+    for (size_t i = 1; i < PRESSURE_BUFFER_SIZE; i++) {
+      float diff = pressureKPABuffer[i] - pressureKPABuffer[i-1];
+      if (diff > threshold_kPa) events++;
+    }
+
+    // Convertir a eventos por segundo
+    float totalTime_s = (PRESSURE_BUFFER_SIZE * samplingPeriod_ms) / 1000.0f;
+    return (totalTime_s > 0.0f) ? (events / totalTime_s) : 0.0f;
+  }
+
+float SensorManager::computeRMS() {
+    float sumSq = 0.0f;
+    size_t count = 0;
+    float offset = getPressureKPAFromBuffer(); // usar último valor como referencia
+
+    for (size_t i = 0; i < PRESSURE_BUFFER_SIZE; i++) {
+      float val = pressureKPABuffer[i] - offset;
+      if (val != 0.0f) { // ignorar ceros iniciales
+        sumSq += val * val;
+        count++;
+      }
+    }
+    return (count > 0) ? sqrt(sumSq / count) : 0.0f;
+  }

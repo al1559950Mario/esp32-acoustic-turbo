@@ -41,7 +41,7 @@ void VortexController::updatePowerLevel(float levelTPS, float levelMAP) {
     float level = tpsRel * mapRel;
 
     // 🔹 Aplicar curva exponencial SOLO al level
-    float a = 4.0f; // controla la aceleración al final
+    float a = 1.0f; // controla la aceleración al final
     float curvedLevel = (exp(a * level) - 1.0f) / (exp(a) - 1.0f);
 
     lastPWM = curvedLevel;
@@ -61,19 +61,18 @@ bool VortexController::isActive() const {
 }
 
 
-float VortexController::readCurrentSense(){
-    if (sensePin == 255) return 0.0f;
+void VortexController::updateCurrentSense() {
+    if (sensePin == 255) return;
 
     int raw = analogRead(sensePin);
     float voltage = raw * (3.3f / 4095.0f);
-
-    // Ajusta la sensibilidad según el divisor o shunt que uses
-    constexpr float sensitivity = 8.5f; // 1V = 1A por ejemplo
+    constexpr float sensitivity = 8.5f; // Ajustar según shunt real
     float current = voltage * sensitivity;
 
-    // Filtrado básico
-    static float filtered = 0;
-    filtered += (current - filtered) * 0.1f;
+    // Filtro exponencial suave
+    currentCached += (current - currentCached) * 0.1f;
+}
 
-    return filtered;
+float VortexController::getCurrentSense() const {
+    return currentCached;
 }

@@ -3,6 +3,11 @@
 #include <math.h>
 #include "StateMachine.h"
 
+// constantes de easing exposicional precalculadas
+static const float a       = 3.0f;      
+static const float expAmin = 1.0f;      
+static const float expA    = expf(a); 
+
 AcousticInjector* AcousticInjector::_instance = nullptr;
 
 // Nuevo:
@@ -94,7 +99,7 @@ void AcousticInjector::stop() {
 
 void AcousticInjector::setLevel(float level) {
   level = constrain(level, 0.0f, 1.0f);
-  float a = 8.0f; // controla la aceleración al final
+  float a = 0.5f; // controla la aceleración al final
   float curvedLevel = (exp(a * level) - 1.0f) / (exp(a) - 1.0f);
   _targetLevel = curvedLevel;
 }
@@ -103,11 +108,13 @@ void AcousticInjector::update() {
   if (!_active) return;
 
   // --- Frecuencia ---
-  if (_currentFrequency < _targetFrequency) {
-    _currentFrequency = min(_currentFrequency + FREQ_RAMP_STEP,
-                            _targetFrequency);
-    updateWaveFrequency(_currentFrequency);
+  float diffF = _targetFrequency - _currentFrequency;
+  if (fabs(diffF) < FREQ_RAMP_STEP) {
+    _currentFrequency = _targetFrequency;
+  } else {
+    _currentFrequency += (diffF > 0 ? FREQ_RAMP_STEP : -FREQ_RAMP_STEP);
   }
+  updateWaveFrequency(_currentFrequency);
 
   // --- Nivel (tu rampa original) ---
   float diffL = _targetLevel - _level;
@@ -118,8 +125,6 @@ void AcousticInjector::update() {
   }
   _levelInt = uint8_t(_level * 255);
 }
-
-
 
 
 void IRAM_ATTR AcousticInjector::onTimer() {
@@ -262,16 +267,13 @@ void AcousticInjector::testSimple() {
 }
 
 float AcousticInjector::mapLoadToWaveFrequency(float level) {
-    level = constrain(level, 0.0f, 1.0f);
-    // 🔹 Aplicar curva exponencial SOLO al level
-    float a = 4.0f; // controla la aceleración al final
-    float curvedLevel = (exp(a * level) - 1.0f) / (exp(a) - 1.0f);
+  level = constrain(level, 0.0f, 1.0f);
+  float curvedLevel = (expf(a * level) - expAmin) / (expA - expAmin);
 
-    float logMin = logf(_freqMin);
-    float logMax = logf(_freqMax);
-    float logFreq = logMin + curvedLevel * (logMax - logMin);
-
-    return expf(logFreq);
+  float logMin  = logf(_freqMin);
+  float logMax  = logf(_freqMax);
+  float logFreq = logMin + curvedLevel * (logMax - logMin);
+  return expf(logFreq);
 }
 
 void AcousticInjector::updateWaveFrequency(float freqHz) {
@@ -325,14 +327,15 @@ AcousticInjector::FrequencyRangeOption AcousticInjector::getFrequencyRangeOption
   return _freqOption;
 }
 
-void AcousticInjector::setDecayParameters(uint32_t durationMs, float MAPLevel) {
-  float resFreqHz = _freqMin + (_freqMax - _freqMin) * constrain(MAPLevel, 0.0f, 1.0f);
+void AcousticInjector::setDecayParameters(uint32_t durationMs, float avgMAPLevel) {
+  float resFreqHz = _freqMin + (_freqMax - _freqMin) * constrain(avgMAPLevel, 0.0f, 1.0f);
   _decayDurationMs = max<uint32_t>(1, durationMs);
 
     // - eased: menos mezcla en cargas bajas, más en altas
-  float mix = 0.4f + 0.6f * powf(MAPLevel, 1.8f); // adjust exponent for curve
+  float mix = 0.4f + 0.6f * powf(avgMAPLevel, 1.8f); // adjust exponent for curve
   _decayMix = constrain(mix, 0.0f, 1.0f);
   _decayResFreq = constrain(resFreqHz, 100.0f, 30000.0f);
+  _currentFrequency = _decayResFreq;
 
   // calcular paso de fase resonador en términos de SAMPLE_RATE / PHASE_FRAC
   const float sr = (float)SAMPLE_RATE;

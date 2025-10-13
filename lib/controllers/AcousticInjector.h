@@ -60,9 +60,9 @@ private:
   dac_channel_t _dacChannel;
   hw_timer_t* _timer = nullptr;
   volatile uint8_t _levelInt = 0;  // nivel escalado 0-255 para ISR
-  float _currentFrequency = 4400.0f;
-  float _targetFrequency = 0.0f;
-  float _lastFrequency = 0.0f;
+  float _currentFrequency = 2000.0f;
+  float _targetFrequency = 2000.0f;
+  float _lastFrequency = 2000.0f;
   static constexpr uint8_t PHASE_FRAC = 16;   
   static_assert((1 << PHASE_FRAC) > 0, "PHASE_FRAC ok");
   bool _active = false;
@@ -72,7 +72,7 @@ private:
   static constexpr float FREQ_RAMP_STEP = 20.0f; // Hz por llamada a update()
   static constexpr float DEFAULT_SAMPLE_RATE = 32000.0f; // tasa de muestreo segura
   FrequencyRangeOption _freqOption = RANGE_3;
-  float _freqMin = 5500.0f;
+  float _freqMin = 2000.0f;
   float _freqMax = 6500.0f;
   bool _skipSmoothStep = false;
   void resetInternal() {

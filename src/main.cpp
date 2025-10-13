@@ -38,11 +38,11 @@ Logger               logger(SerialBT);
 // Indicador de calibración cargada
 bool calibLoaded = false;
 
-// Tarea de sensores (sólo lee ADS1115 y cachea raws y porcentajes)
+// Tarea de sensores (sólo lee ADS1115 y cachea raws y porcentajes)- Falta agregar leer el sensor desde aqui con un timing independiente a otros sensores para mayor control de afinacion.
 void TaskSensorUpdate(void* param) {
   auto* sm = static_cast<SensorManager*>(param);
   for (;;) {
-    sm->update();
+    sm->updateADS1115();
     sm->updatePressure();
     vTaskDelay(pdMS_TO_TICKS(10));
   }
@@ -151,12 +151,6 @@ void loop() {
     float mapLoadPercent = sensors.readMAPLoadPercent();
     float tpsLoadPercent = sensors.readTPSLoadPercent();
 
-    sensors.updatePressure();
-
-    sensors.updatePressure();
-
-    actuators.update(tpsLoadPercent, mapLoadPercent);
-
     if (mapLoadPercent >= 100.0f && tpsLoadPercent >= 100.0f) {
       ui->println("[ERROR] Carga 100%, saltando FSM");
     } else {
@@ -182,7 +176,7 @@ void loop() {
         float turboAmp = 1.0f;
         bool  turboOn = actuators.isTurboOn();
         float deltaP = sensors.computeOscillationAmplitude();
-        float pressure_kPa = sensors.readPressure_kPa();
+        float pressure_kPa = sensors.getPressure_kPa();
         float pressure_pct = sensors.getPressurePercent();
         float pressure_psi = sensors.getPressurePSI();
         float eventRate = sensors.computeEventRate();

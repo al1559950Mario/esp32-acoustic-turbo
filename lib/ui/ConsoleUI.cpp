@@ -398,25 +398,25 @@ void ConsoleUI::imprimirDashboard() {
 
     // Obtener potencia del turbo (0–100%)
     float boostLevel = actuators->getVortexController().getLastPWM() * 100.0f;
-    float boostSense = actuators->readTurboSense();
+    float boostSense = actuators->getTurboSense();
 
     SystemState st = fsm->getState();
     unsigned long elapsed = (millis() - lastTransitionMS) / 1000;
 
     static const char* stateNames[] = {
         "OFF", "SIN_CAL", "CALIB", "IDLE",
-        "BEAM", "BOOST", "DESCAY", "DEBUG", "??"
+        "BEAM", "BOOST", "DECaY", "DEBUG", "??"
     };
     const char* stName = stateNames[int(st)];
 
     // HUD en vivo: actualización en línea
     this->printf(
-        "\r[%s|%lus]TPS=%.1fV(%.1f–%.1fV)%.0f%%|MAP=%.1fV(%.1f–%.1fV)%.0f%%|LVL=%.1f|FRQ=%.0fHz|Boost:%.0f%%|Sense:%.1f%|Peaks:%.1f%|RMS:%.1f%|PSI:%.0f%",
+        "\r[%s|%lus]TPS%.1f(%.1f–%.1f)%.0f%%MAP%.1f(%.1f–%.1f)%.0f%%|L%.1f|%.1fkhz|%.0f%% IS:%.1f%|Pk:%.1f|Rm%.1f|PS:%.0f",
         stName, elapsed,
         tpsV, tpsMinV, tpsMaxV, tpsPct,
         mapV, mapMinV, mapMaxV, mapPct,
         level,
-        freq,
+        freq/1000.0f,
         boostLevel, 
         boostSense,
         oscillationAmplitude,

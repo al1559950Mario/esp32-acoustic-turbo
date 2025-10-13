@@ -30,23 +30,23 @@ public:
   MAPSensor& getMAP();
   TPSSensor& getTPS();
 
-  float getRelativeTPSLoad(uint16_t);
-  float getRelativeMAPLoad(uint16_t);
+  float getRelativeTPSLevel(uint16_t);
+  float getRelativeMAPLevel(uint16_t);
 
-  float readPressure_kPa();
+  float getPressure_kPa();
   long readPressureRaw();
   bool adsReady = false;
 
   Adafruit_ADS1115 ads;
 
-  float getPressureFromBuffer();
+  float getPressureKPAFromBuffer();
   void  updatePressure();
 
   float computeRMS();
   float computeEventRate(float threshold_kPa = 0.5f, float samplingPeriod_ms = 12.5f);
   float computeTau(float threshold_kPa = 0.5f, float samplingPeriod_ms = 12.5f);
 
-  const float* getPressureBuffer() const { return pressureBuffer; }
+  const float* getPressureBuffer() const { return pressureKPABuffer; }
   size_t getBufferSize() const { return PRESSURE_BUFFER_SIZE; }
   float getPressurePercent();
   float getPressurePSI();
@@ -54,7 +54,7 @@ public:
   float readOscillationAmplitude(); 
 
 
-  void update(); // 👈 Opcional, si quieres usar una rutina periódica
+  void updateADS1115(); // 👈 Opcional, si quieres usar una rutina periódica
 private:
   MAPSensor mapSensor;
   TPSSensor tpsSensor;
@@ -76,6 +76,6 @@ private:
 
     // Buffer para métricas futuras
   static constexpr size_t PRESSURE_BUFFER_SIZE = 800; // 10 s a 80 Hz
-  float pressureBuffer[PRESSURE_BUFFER_SIZE];
+  float pressureKPABuffer[PRESSURE_BUFFER_SIZE];
   size_t bufferIndex = 0;
 };

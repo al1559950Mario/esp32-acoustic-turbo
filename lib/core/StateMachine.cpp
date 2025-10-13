@@ -146,7 +146,7 @@ void StateMachine::update(float mapLoadPercent,
             tpsDrop = (lastTPSLevel * 100.0f) - _tpsLoadPercent;
             dropDetected = (mapDrop >= MAP_DROP_THRESHOLD && tpsDrop >= TPS_DROP_THRESHOLD);
             belowThresholds = (_mapLoadPercent <= thresholds.INJ_MAP_OFF
-                     && _tpsLoadPercent <= thresholds.INJ_TPS_OFF);
+                     || _tpsLoadPercent <= thresholds.INJ_TPS_OFF);
             if (readyForVortex(_mapLoadPercent, _tpsLoadPercent)) {
                 current = SystemState::VORTEX;
             }
@@ -171,7 +171,7 @@ void StateMachine::update(float mapLoadPercent,
             tpsDrop = (lastTPSLevel * 100.0f) - _tpsLoadPercent;
             dropDetected = (mapDrop >= MAP_DROP_THRESHOLD && tpsDrop >= TPS_DROP_THRESHOLD);
             belowThresholds = (_mapLoadPercent <= thresholds.INJ_MAP_OFF
-                     && _tpsLoadPercent <= thresholds.INJ_TPS_OFF);
+                     || _tpsLoadPercent <= thresholds.INJ_TPS_OFF);
             if (dropDetected || belowThresholds) {
                 unsigned long now = millis();   
                 current = SystemState::DECAY;
@@ -236,20 +236,20 @@ void StateMachine::handleActions() {
     if (current == SystemState::BEAM
      || current == SystemState::VORTEX) {
         
-        float deltaTPSLevel = sensors->getRelativeTPSLoad(tpsInitialPercent);
-        float deltaMAPLevel  = sensors->getRelativeMAPLoad(mapInitialPercent);
+        float deltaTPSLevel = sensors->getRelativeTPSLevel(tpsInitialPercent);
+        float deltaMAPLevel  = sensors->getRelativeMAPLevel(mapInitialPercent);
         mapSamples++;
         avgMAPLevel += (deltaMAPLevel - avgMAPLevel) / float(mapSamples);
 
 
-        if (abs(deltaTPSLevel - lastTPSLevel) > 0.1f
-         || abs(deltaMAPLevel  - lastMAPLevel ) > 0.1f) {
+        if (abs(deltaTPSLevel - lastTPSLevel) > 0.03f
+         || abs(deltaMAPLevel  - lastMAPLevel ) > 0.03f) {
             actuators->setAcousticParameters(deltaTPSLevel, deltaMAPLevel);
             actuators->setVortexLevel(deltaTPSLevel, deltaMAPLevel);
             lastTPSLevel = deltaTPSLevel;
             lastMAPLevel = deltaMAPLevel;
         }
-        actuators->update(_tpsLoadPercent, _mapLoadPercent);
+        actuators->updateInjector();
     }
 
         // ──────── DECAY ───────────────────────────────────────────────────

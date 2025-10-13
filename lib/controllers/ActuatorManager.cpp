@@ -18,13 +18,7 @@ void ActuatorManager::begin(uint8_t turboPwmPin, uint8_t turboPwmChannel,
 
 
 /// Actualiza actuadores. Turbo usa TPS*MAP y Acoustic Injector su lógica interna
-/// @param tpsLoadPercent: porcentaje TPS [0-100]
-/// @param mapLoadPercent: porcentaje MAP [0-100]
-void ActuatorManager::update(float tpsLoadPercent, float mapLoadPercent) {
-    // Asegurar rango válido
-    tpsLoadPercent = constrain(tpsLoadPercent, 0.0f, 100.0f);
-    mapLoadPercent = constrain(mapLoadPercent, 0.0f, 100.0f);
-
+void ActuatorManager::updateInjector() {
     // Actualiza Acoustic Injector
     injector.update();
 
@@ -70,7 +64,6 @@ void ActuatorManager::stopAcoustic() {
 
 /// Configura parámetros del Acoustic Injector
 /// @param level: potencia relativa [0-1]
-/// @param mapLoadPercent: carga MAP para calcular frecuencia
 void ActuatorManager::setAcousticParameters(float tpsLoadLevel, float mapLoadLevel) {
     float freq = injector.mapLoadToWaveFrequency(mapLoadLevel);
     injector.setTargetFrequency(freq);
@@ -104,6 +97,6 @@ float ActuatorManager::getTurboLevel() {
     //0.0-1.0
     return vortex.getLastPWM();
 }
-float ActuatorManager::readTurboSense() {
-    return vortex.readCurrentSense(); // llama a la función del controller
+float ActuatorManager::getTurboSense() {
+    return vortex.getCurrentSense();
 }

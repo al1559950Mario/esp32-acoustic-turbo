@@ -14,7 +14,7 @@ public:
                             uint8_t acousticDacPin);
 
   // Actualiza lógica interna (por ejemplo, rampas, timers)
-  void update(float tpsLoadPercent, float mapLoadPercent);
+  void updateInjector();
 
   void stopAll();
   // Control Vortex
@@ -34,7 +34,7 @@ public:
 
   VortexController& getVortexController();
   AcousticInjector& getAcousticInjector();
-  float readTurboSense();
+  float getTurboSense();
 
   
 
