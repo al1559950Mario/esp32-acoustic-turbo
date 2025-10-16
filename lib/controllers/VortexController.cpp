@@ -35,21 +35,28 @@ void VortexController::stop() {
 }
 
 void VortexController::updatePowerLevel(float levelTPS, float levelMAP) {
+    // 1) Normalizar niveles
     float tpsRel = constrain(levelTPS, 0.0f, 1.0f);
     float mapRel = constrain(levelMAP, 0.0f, 1.0f);
-    // Asegurar rango 0–1
-    float level = tpsRel * mapRel;
 
-    // 🔹 Aplicar curva exponencial SOLO al level
-    float a = 1.0f; // controla la aceleración al final
+    // 2) Pesos (ajusta tpsWeight alto, mapWeight bajo)
+    const float tpsWeight = 0.8f;  
+    const float mapWeight = 0.2f;  
+
+    // 3) Nivel combinado
+    float level = tpsWeight * tpsRel + mapWeight * mapRel;
+
+    // 4) Curva exponencial (tu easing existente)
+    float a = 0.5f;
     float curvedLevel = (exp(a * level) - 1.0f) / (exp(a) - 1.0f);
 
+    // 5) Aplicar PWM
     lastPWM = curvedLevel;
-
     if (active) {
-        ledcWrite(pwmChannel, (int)(curvedLevel * 255));
+        ledcWrite(pwmChannel, int(curvedLevel * 255));
     }
 }
+
 
 
 bool VortexController::isOn() const {

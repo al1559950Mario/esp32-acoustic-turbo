@@ -235,9 +235,13 @@ void StateMachine::handleActions() {
 
     if (current == SystemState::BEAM
      || current == SystemState::VORTEX) {
+        if (thresholdManager) {
+            thresholds = thresholdManager->getThresholds();
+            }
+
         
-        float deltaTPSLevel = sensors->getRelativeTPSLevel(tpsInitialPercent);
-        float deltaMAPLevel  = sensors->getRelativeMAPLevel(mapInitialPercent);
+        float deltaTPSLevel = sensors->getRelativeTPSLevel(thresholds.INJ_TPS_ON);
+        float deltaMAPLevel  = sensors->getRelativeMAPLevel(thresholds.INJ_MAP_ON);
         mapSamples++;
         avgMAPLevel += (deltaMAPLevel - avgMAPLevel) / float(mapSamples);
 

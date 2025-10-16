@@ -405,7 +405,7 @@ void ConsoleUI::imprimirDashboard() {
 
     static const char* stateNames[] = {
         "OFF", "SIN_CAL", "CALIB", "IDLE",
-        "BEAM", "BOOST", "DECaY", "DEBUG", "??"
+        "BEAM", "BST", "DCAY", "DEBUG", "??"
     };
     const char* stName = stateNames[int(st)];
 

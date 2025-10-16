@@ -67,13 +67,13 @@ float SensorManager::representVoltsFromRaw(uint16_t raw) const {
   return raw * LSB;
 }
 
-float SensorManager::getRelativeTPSLevel(uint16_t tpsInitial) {
+float SensorManager::getRelativeTPSLevel(float tpsInitial) {
   if (tpsInitial >= 100) return 0.0f;
   float norm = ((float)tpsLoadPercent - tpsInitial) / (100.0f - tpsInitial);
   return constrain(norm, 0.0f, 1.0f);
 }
 
-float SensorManager::getRelativeMAPLevel(uint16_t mapInitialPercent) {
+float SensorManager::getRelativeMAPLevel(float mapInitialPercent) {
   if (mapInitialPercent >= 100) return 0.0f;
   float norm = ((float)mapLoadPercent - mapInitialPercent) / (100.0f - mapInitialPercent);
   return constrain(norm, 0.0f, 1.0f);

@@ -30,11 +30,10 @@ public:
   MAPSensor& getMAP();
   TPSSensor& getTPS();
 
-  float getRelativeTPSLevel(uint16_t);
-  float getRelativeMAPLevel(uint16_t);
+  float getRelativeTPSLevel(float);
+  float getRelativeMAPLevel(float);
 
   float getPressure_kPa();
-  long readPressureRaw();
   bool adsReady = false;
 
   Adafruit_ADS1115 ads;
