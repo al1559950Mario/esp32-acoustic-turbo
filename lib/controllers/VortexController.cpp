@@ -35,29 +35,40 @@ void VortexController::stop() {
 }
 
 void VortexController::updatePowerLevel(float levelTPS, float levelMAP) {
-    // 1) Normalizar niveles
+    // 1) Normalizar entradas
     float tpsRel = constrain(levelTPS, 0.0f, 1.0f);
     float mapRel = constrain(levelMAP, 0.0f, 1.0f);
 
-    // 2) Pesos (ajusta tpsWeight alto, mapWeight bajo)
-    const float tpsWeight = 0.8f;  
-    const float mapWeight = 0.2f;  
+    // 2) Pesos ajustables para priorizar TPS en bajos
+    const float tpsWeight = 0.85f;   // incrementar para más respuesta a pedal
+    const float mapWeight = 0.15f;
 
-    // 3) Nivel combinado
+    // 3) Nivel combinado lineal
     float level = tpsWeight * tpsRel + mapWeight * mapRel;
+    level = constrain(level, 0.0f, 1.0f);
 
-    // 4) Curva exponencial (tu easing existente)
-    float a = 0.5f;
-    float curvedLevel = (exp(a * level) - 1.0f) / (exp(a) - 1.0f);
+    // 4) Curva de refuerzo a bajos
+    // Opción A (recomendada): gamma < 1 realza bajos sin saturar
+    const float gammaBoost = 0.20f; // 0.4 - 0.8 prueba para más/menos refuerzo
+    float boosted = pow(level, gammaBoost);
 
-    // 5) Aplicar PWM
-    lastPWM = curvedLevel;
+    // 5) Curva fina exponencial opcional para ajuste fino
+    const float a = 0.4f; // reducir para menos pendiente si usas gammaBoost fuerte
+    float curvedLevel = (exp(a * boosted) - 1.0f) / (exp(a) - 1.0f);
+    curvedLevel = constrain(curvedLevel, 0.0f, 1.0f);
+
+    // 6) Suavizado simple (low-pass) para evitar cambios bruscos
+    const float smoothFactor = 0.08f; // 0 = sin suavizado, 1 = bloqueo total
+    lastPWM = lastPWM + smoothFactor * (curvedLevel - lastPWM);
+
+    lastPWM = constrain(lastPWM, 0.0f, 1.0f);
+
+    // 7) Aplicar PWM
     if (active) {
-        ledcWrite(pwmChannel, int(curvedLevel * 255));
+        int pwmValue = int(lastPWM * 255.0f);
+        ledcWrite(pwmChannel, pwmValue);
     }
 }
-
-
 
 bool VortexController::isOn() const {
     return active;

@@ -59,7 +59,6 @@ void AcousticInjector::begin(uint8_t dacPin) {
 
 }
 
-
 void AcousticInjector::start(float level) {
   // 1) Reinicio total (fase, nivel, índices…)
   resetInternal();
@@ -83,9 +82,6 @@ void AcousticInjector::start(float level) {
   delay(1);
   timerAlarmEnable(_timer);
 }
-
-
-
 
 void AcousticInjector::stop() {
   resetInternal();
@@ -126,71 +122,88 @@ void AcousticInjector::update() {
   _levelInt = uint8_t(_level * 255);
 }
 
-
 void IRAM_ATTR AcousticInjector::onTimer() {
-  if (!_instance) return;
+    if (!_instance) return;
 
-  // avance de fase principal
-  _instance->_phaseAcc += _instance->_phaseStep;
+    // avance de fase principal
+    _instance->_phaseAcc += _instance->_phaseStep;
 
-  // Índice entero y siguiente para interpolar (principal)
-  uint32_t idx = (_instance->_phaseAcc >> PHASE_FRAC) & (TABLE_SIZE - 1);
-  uint32_t nextIdx = (idx + 1) & (TABLE_SIZE - 1);
+    // Índice entero y siguiente para interpolar (principal)
+    uint32_t idx = (_instance->_phaseAcc >> PHASE_FRAC) & (TABLE_SIZE - 1);
+    uint32_t nextIdx = (idx + 1) & (TABLE_SIZE - 1);
 
-  // Fracción para interpolar
-  uint32_t frac = _instance->_phaseAcc & ((1ULL << PHASE_FRAC) - 1);
+    // Fracción para interpolar
+    uint32_t frac = _instance->_phaseAcc & ((1ULL << PHASE_FRAC) - 1);
 
-  uint8_t sample1 = _instance->_sineTable[idx];
-  uint8_t sample2 = _instance->_sineTable[nextIdx];
+    uint8_t sample1 = _instance->_sineTable[idx];
+    uint8_t sample2 = _instance->_sineTable[nextIdx];
 
-  int16_t delta = (int16_t)sample2 - (int16_t)sample1;
-  uint16_t interp = (uint16_t)sample1 + ((delta * frac) >> PHASE_FRAC);
+    int16_t delta = (int16_t)sample2 - (int16_t)sample1;
+    uint16_t interp = (uint16_t)sample1 + ((delta * frac) >> PHASE_FRAC);
 
-  // Modulación de nivel (0-255) — tu lógica intacta
-  int16_t centered = (int16_t)interp - 128;
-  int16_t principal = 128 + ((centered * _instance->_levelInt) >> 8);
+    // Modulación de nivel (0-255) — lógica original
+    int16_t centered = (int16_t)interp - 128;
+    int16_t principal = 128 + ((centered * _instance->_levelInt) >> 8);
 
-  // Si no hay decay, comportamiento original
-  if (!_instance->_inDecay) {
-    uint8_t output = (uint8_t)constrain(principal, 0, 255);
+    // Si no hay decay, salida directa (rápido y seguro)
+    if (!_instance->_inDecay) {
+        uint8_t output = (uint8_t)((principal < 0) ? 0 : (principal > 255) ? 255 : principal);
+        dac_output_voltage(_instance->_dacChannel, output);
+        _instance->_lastDACValue = output;
+        return;
+    }
+
+    // ---------- DECAY activo: resonador y mezcla (enteros 16-bit safe) ----------
+    // avanzar fase del resonador usando step precomputado
+    _instance->_resPhaseAcc += _instance->_resPhaseStep;
+
+    uint32_t rIdx = (_instance->_resPhaseAcc >> PHASE_FRAC) & (TABLE_SIZE - 1);
+    uint32_t rNext = (rIdx + 1) & (TABLE_SIZE - 1);
+    uint32_t rFrac = _instance->_resPhaseAcc & ((1ULL << PHASE_FRAC) - 1);
+    uint8_t r1 = _instance->_sineTable[rIdx];
+    uint8_t r2 = _instance->_sineTable[rNext];
+    int16_t rDelta = (int16_t)r2 - (int16_t)r1;
+    uint16_t rInterp = (uint16_t)r1 + ((rDelta * rFrac) >> PHASE_FRAC);
+    int16_t centeredR = (int16_t)rInterp - 128;
+
+    
+    // Lecturas atómicas/volátiles (una sola lectura por variable)
+    uint32_t env16    = uint32_t(_instance->_decayEnvInt16);   // 0..65535
+    uint32_t levelMul = uint32_t(_instance->_decayLevelMulInt);// 0..65535
+    uint32_t mix16    = uint32_t(_instance->_decayMixInt16);   // 0..65535
+
+    // Resolvedor de amplitud del resonador en 16-bit:
+    // resAmp16 = (mix16 * env16) >> 16  -> rango 0..65535
+    uint32_t resAmp16 = (mix16 * env16) >> 16u;
+
+    // Convertir a 8-bit para multiplicaciones con muestras (0..255)
+    uint8_t resAmp8 = uint8_t((resAmp16 * 255u) >> 16u);
+    if (resAmp8 > 255) resAmp8 = 255;
+
+    // Valor del resonador (0..255 centro 128)
+    int16_t resonatorVal = 128 + ((centeredR * int32_t(resAmp8)) >> 8);
+
+    // Escalado del nivel principal usando levelMul (16-bit)
+    int32_t scaledLevel = (int32_t(_instance->_levelInt) * int32_t(levelMul)) >> 16; // 0..255
+    if (scaledLevel < 0) scaledLevel = 0;
+    if (scaledLevel > 255) scaledLevel = 255;
+    int16_t principalScaled = 128 + ((centered * int(scaledLevel)) >> 8);
+
+    // Atenuación basada en resAmp16 (sin powf): attenuationFactor16 = 65535 - resAmp16
+    // principalMixed = 128 + ((principalScaled - 128) * attenuationFactor16) >> 16
+    uint32_t attenuationFactor16 = 65535u - resAmp16;
+    int32_t principalOffset = int32_t(principalScaled) - 128;
+    int16_t principalMixed = 128 + int16_t((principalOffset * int32_t(attenuationFactor16)) >> 16);
+
+    // Mezclar principal y resonador, saturar y enviar DAC
+    int32_t mixed = int32_t(principalMixed) + int32_t(resonatorVal) - 128;
+    int32_t clipped = (mixed < 0) ? 0 : (mixed > 255) ? 255 : mixed;
+    uint8_t output = uint8_t(clipped);
+
     dac_output_voltage(_instance->_dacChannel, output);
     _instance->_lastDACValue = output;
-    return;
-  }
-
-  // ---------- DECAY activo: calcular resonador y mezclar ----------
-  // avanzar fase del resonador usando step precomputado
-  _instance->_resPhaseAcc += _instance->_resPhaseStep;
-
-  uint32_t rIdx = (_instance->_resPhaseAcc >> PHASE_FRAC) & (TABLE_SIZE - 1);
-  uint32_t rNext = (rIdx + 1) & (TABLE_SIZE - 1);
-  uint32_t rFrac = _instance->_resPhaseAcc & ((1ULL << PHASE_FRAC) - 1);
-  uint8_t r1 = _instance->_sineTable[rIdx];
-  uint8_t r2 = _instance->_sineTable[rNext];
-  int16_t rDelta = (int16_t)r2 - (int16_t)r1;
-  uint16_t rInterp = (uint16_t)r1 + ((rDelta * rFrac) >> PHASE_FRAC);
-  int16_t centeredR = (int16_t)rInterp - 128;
-
-  // leer envelope atómico (0..255) y normalizar
-  uint8_t env = _instance->_decayEnvInt;
-  float envNorm = float(env) / 255.0f;
-
-  // amplitud del resonador en enteros 0..255 proporcional a envNorm y decayMix
-  uint16_t resAmpInt = uint16_t(envNorm * (_instance->_decayMix * 255.0f));
-  int16_t resonatorVal = 128 + ((centeredR * int32_t(resAmpInt)) >> 8);
-
-  // atenuar la señal principal según mix * envNorm (no la borramos)
-  float principalAttenuation = 1.0f - (_instance->_decayMix * envNorm);
-  int16_t principalMixed = 128 + int16_t(((centered * _instance->_levelInt) >> 8) * principalAttenuation);
-
-  // mezclar y saturar
-  int32_t mixed = int32_t(principalMixed) + int32_t(resonatorVal) - 128;
-  uint8_t output = (uint8_t)constrain(mixed, 0, 255);
-
-  dac_output_voltage(_instance->_dacChannel, output);
-  _instance->_lastDACValue = output;
+    
 }
-
 
 void IRAM_ATTR AcousticInjector::applyPendingDAC() {
   uint8_t raw = _sineTable[_index];
@@ -210,7 +223,6 @@ uint8_t AcousticInjector::getCurrentDAC() const {
 bool AcousticInjector::isActive() const {
   return _active;
 }
-
 
 void AcousticInjector::test() {
   Serial.println(F("🔊 Prueba acústica iniciada..."));
@@ -293,9 +305,6 @@ void AcousticInjector::updateWaveFrequency(float freqHz) {
     timerAlarmWrite(_timer, uint32_t(periodUs), true);
 }
 
-
-
-
 void AcousticInjector::setFrequencyRangeOption(FrequencyRangeOption option) {
     _freqOption = option;
 
@@ -327,17 +336,36 @@ AcousticInjector::FrequencyRangeOption AcousticInjector::getFrequencyRangeOption
   return _freqOption;
 }
 
-void AcousticInjector::setDecayParameters(uint32_t durationMs, float avgMAPLevel) {
+void AcousticInjector::startDecay(uint32_t now) {
+  noInterrupts();
+  _inDecay = true;
+  _decayStartMillis = now;
+  _zeroCount = 0;
+  // inicializa env/multiplicador desde el nivel actual para un fade coherente
+  _decayEnvInt16 = uint16_t((_level) * 65535.0f);   // si usas 16-bit
+  _decayLevelMulInt = 65535;                        // sin atenuación inicial
+  interrupts();
+}
+
+
+void AcousticInjector::setDecayParameters(uint32_t durationMs, float avgMAPLevel,
+                                         float gFast, float gSustain, uint32_t tFastMs, uint32_t tSustainMs) {
   float resFreqHz = _freqMin + (_freqMax - _freqMin) * constrain(avgMAPLevel, 0.0f, 1.0f);
   _decayDurationMs = max<uint32_t>(1, durationMs);
 
-    // - eased: menos mezcla en cargas bajas, más en altas
-  float mix = 0.4f + 0.6f * powf(avgMAPLevel, 1.8f); // adjust exponent for curve
+  // mantener mezcla base en resonador
+  float mix = 0.2f + 0.6f * powf(avgMAPLevel, 1.2f);
   _decayMix = constrain(mix, 0.0f, 1.0f);
   _decayResFreq = constrain(resFreqHz, 100.0f, 30000.0f);
   _currentFrequency = _decayResFreq;
 
-  // calcular paso de fase resonador en términos de SAMPLE_RATE / PHASE_FRAC
+  // guardar parámetros adicionales de la nueva lógica
+  _gFast = constrain(gFast, 0.0f, 1.0f);
+  _gSustain = constrain(gSustain, 0.0f, 1.0f);
+  _tFastMs = max<uint32_t>(5, tFastMs);
+  _tSustainMs = max<uint32_t>(10, tSustainMs);
+
+  // precomputar resonator step 
   const float sr = (float)SAMPLE_RATE;
   double step = _decayResFreq * TABLE_SIZE * (1ULL << PHASE_FRAC) / sr;
   uint32_t newStep = (step < 1.0) ? 1 : uint32_t(round(step));
@@ -349,9 +377,11 @@ void AcousticInjector::setDecayParameters(uint32_t durationMs, float avgMAPLevel
 void AcousticInjector::setDecayLevel(float level) {
   // level esperado 0..1 (ActuatorManager pasa MAPLevel)
   float l = constrain(level, 0.0f, 1.0f);
+  uint16_t v = uint16_t(constrain(l * 65535.0f, 0.0f, 65535.0f));
   // inicializamos envelope (0..255) proporcional al nivel
   noInterrupts();
-  _decayEnvInt = uint8_t(l * 255.0f);
+  _decayEnvInt16 = v;
+  _decayLevelMulInt = 65535;
   interrupts();
 }
 
@@ -359,22 +389,83 @@ void AcousticInjector::updateDecayState() {
   if (!_inDecay) return;
 
   uint32_t now = millis();
-  uint32_t elapsed = (now >= _decayStartMillis) ? (now - _decayStartMillis) : 0;
-  float t = float(elapsed) / float(_decayDurationMs);
-  t = constrain(t, 0.0f, 1.0f);
+  uint32_t elapsed = (now >= _decayStartMillis) ? (now - _decayStartMillis) : 0u;
+  float t_global = float(elapsed) / float(max<uint32_t>(1u, _decayDurationMs));
+  t_global = constrain(t_global, 0.0f, 1.0f);
 
-  // envelope exponencial simple: env = exp(-elapsed / tau), tau = duration/3
-  float tau = float(max<uint32_t>(1, _decayDurationMs)) / 3.0f;
-  float env = expf(-float(elapsed) / tau);
-  // shape perceptual ligeramente (opcional pero probado)
-  env = powf(env, 0.9f);
+  // asegurar tipos y valores mínimos seguros
+  float tFastMs = (_tFastMs < 1.0f) ? 1.0f : _tFastMs;
+  float tSustainMs = (_tSustainMs < 1.0f) ? 1.0f : _tSustainMs;
 
-  uint8_t envInt = uint8_t(constrain(env * 255.0f, 0.0f, 255.0f));
-  noInterrupts();
-  _decayEnvInt = envInt;
-  if (elapsed >= _decayDurationMs) {
-    _inDecay = false;
-    _decayEnvInt = 0;
+  // componente rápido (exponencial) para ataque/transitorio
+  float tau_fast = fmaxf(1.0f, tFastMs / 3.0f);
+  float env_fast = expf(-float(elapsed) / tau_fast);
+
+  // componente lento (cola con "masa") — ley de potencia
+  float env_slow = powf(1.0f + float(elapsed) / tSustainMs, -POW_ALPHA);
+
+  // combinar por ganancias (establecidas por setDecayParameters)
+  float mixOut = _gFast * env_fast + _gSustain * env_slow;
+  mixOut = constrain(mixOut, 0.0f, 1.0f);
+
+  // shaping perceptual para romper linealidad
+  float shaped = powf(mixOut, PERCEPT_EXP);
+
+  // soft clipping para evitar picos fuertes
+  float clipped = shaped / (1.0f + SOFTCLIP_BETA * shaped);
+  clipped = constrain(clipped, 0.0f, 1.0f);
+
+  // fade temporal final (suaviza el final del envelope)
+  if (t_global >= FADE_START) {
+    float fadeT = (t_global - FADE_START) / (1.0f - FADE_START);
+    clipped *= expf(-fadeT * 2.0f);    // exponencial para sensación musical
   }
+
+  // calcular target en 16-bit
+  uint16_t target16 = uint16_t(constrain(clipped * 65535.0f, 0.0f, 65535.0f));
+
+  // leer actual 16-bit de forma protegida
+  noInterrupts();
+  uint16_t cur16 = _decayEnvInt16;
   interrupts();
+
+  uint16_t next16 = cur16;
+  if (target16 > cur16) {
+    uint16_t diff = target16 - cur16;
+    uint16_t step = (diff > MAX_STEP_UP16) ? MAX_STEP_UP16 : diff;
+    next16 = cur16 + step;
+  } else if (target16 < cur16) {
+    uint16_t diff = cur16 - target16;
+    uint16_t step = (diff > MAX_STEP_DOWN16) ? MAX_STEP_DOWN16 : diff;
+    next16 = cur16 - step;
+  }
+
+  // escribir 16-bit atómicamente
+  noInterrupts();
+  _decayEnvInt16 = next16;
+  interrupts();
+
+
+  // gestión de apagado: esperar nivel bajo estable o mínimo tail
+  float minTailMs = fmaxf(40.0f, tFastMs * 0.5f);
+  // umbral 16-bit para considerar nivel cercano a cero
+  const uint16_t RES_ZERO_THRESH16 = 64; // ≈0.001 en 0..65535
+  bool levelNearZero = (next16 <= RES_ZERO_THRESH16);
+
+  if (levelNearZero) {
+    _zeroCount = (_zeroCount < 255) ? (_zeroCount + 1) : 255;
+  } else {
+    _zeroCount = 0;
+  }
+
+  if (elapsed >= _decayDurationMs) {
+    if (levelNearZero || (elapsed >= (_decayDurationMs + uint32_t(minTailMs))) || (_zeroCount >= ZERO_COUNT_TO_END)) {
+      noInterrupts();
+      _inDecay = false;
+      _decayEnvInt16 = 0;
+      _zeroCount = 0;
+      interrupts();
+      return;
+    }
+  }
 }

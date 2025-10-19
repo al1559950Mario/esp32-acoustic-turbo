@@ -26,14 +26,14 @@ Thresholds ThresholdManager::getThresholds() const {
     Thresholds t;
     taskENTER_CRITICAL(&thresholdMux);
     t.MAP_WAKEUP_PERCENT = thresholds.at("MAP_WAKEUP_PERCENT");
-    t.INJ_MAP_ON         = thresholds.at("INJ_MAP_ON");
-    t.INJ_TPS_ON         = thresholds.at("INJ_TPS_ON");
-    t.INJ_TPS_OFF        = thresholds.at("INJ_TPS_OFF");
-    t.INJ_MAP_OFF        = thresholds.at("INJ_MAP_OFF");
-    t.VORTEX_TPS_ON      = thresholds.at("VORTEX_TPS_ON");
-    t.VORTEX_MAP_ON      = thresholds.at("VORTEX_MAP_ON");
-    t.VORTEX_TPS_OFF     = thresholds.at("VORTEX_TPS_OFF");
-    t.VORTEX_MAP_OFF     = thresholds.at("VORTEX_MAP_OFF");
+    t.BOOST_MAP_ON         = thresholds.at("BOOST_MAP_ON");
+    t.BOOST_TPS_ON         = thresholds.at("BOOST_TPS_ON");
+    t.BOOST_TPS_OFF        = thresholds.at("BOOST_TPS_OFF");
+    t.BOOST_MAP_OFF        = thresholds.at("BOOST_MAP_OFF");
+    t.BEAM_TPS_ON      = thresholds.at("BEAM_TPS_ON");
+    t.BEAM_MAP_ON      = thresholds.at("BEAM_MAP_ON");
+    t.BEAM_TPS_OFF     = thresholds.at("BEAM_TPS_OFF");
+    t.BEAM_MAP_OFF     = thresholds.at("BEAM_MAP_OFF");
     taskEXIT_CRITICAL(&thresholdMux);
     return t;
 }
@@ -82,23 +82,23 @@ void ThresholdManager::loadDefaults() {
     thresholds.clear();
 
     // 🔧 Margen de histéresis para apagado
-    const float INJ_HYSTERESIS   = 10.0f;
-    const float VORTEX_HYSTERESIS = 15.0f;
+    const float BOOST_HYSTERESIS   = 10.0f;
+    const float BEAM_HYSTERESIS = 15.0f;
 
     // 🟢 Umbral mínimo de presión (MAP) para pasar de OFF a IDLE
     thresholds["MAP_WAKEUP_PERCENT"] = 10.0f;
 
     // 🔊 Inyección acústica
-    thresholds["INJ_TPS_ON"]  = 50.0f;
-    thresholds["INJ_MAP_ON"]  = 50.0f;
-    thresholds["INJ_TPS_OFF"] = thresholds["INJ_TPS_ON"] - INJ_HYSTERESIS;
-    thresholds["INJ_MAP_OFF"] = thresholds["INJ_MAP_ON"] - INJ_HYSTERESIS;
+    thresholds["BOOST_TPS_ON"]  = 10.0f;
+    thresholds["BOOST_MAP_ON"]  = 50.0f;
+    thresholds["BOOST_TPS_OFF"] = thresholds["BOOST_TPS_ON"] - BOOST_HYSTERESIS;
+    thresholds["BOOST_MAP_OFF"] = thresholds["BOOST_MAP_ON"] - BOOST_HYSTERESIS;
 
-    // 🌪️ Vortex
-    thresholds["VORTEX_TPS_ON"]  = 95.0f;
-    thresholds["VORTEX_MAP_ON"]  = 95.0f;
-    thresholds["VORTEX_TPS_OFF"] = thresholds["VORTEX_TPS_ON"] - VORTEX_HYSTERESIS;
-    thresholds["VORTEX_MAP_OFF"] = thresholds["VORTEX_MAP_ON"] - VORTEX_HYSTERESIS;
+    // 🌪️ BEAM
+    thresholds["BEAM_TPS_ON"]  = 85.0f;
+    thresholds["BEAM_MAP_ON"]  = 85.0f;
+    thresholds["BEAM_TPS_OFF"] = thresholds["BEAM_TPS_ON"] - BEAM_HYSTERESIS;
+    thresholds["BEAM_MAP_OFF"] = thresholds["BEAM_MAP_ON"] - BEAM_HYSTERESIS;
 }
 
 
@@ -163,12 +163,12 @@ void ThresholdManager::debugDump(const char* prefix) const {
 }
 
 void ThresholdManager::recalculateOffThresholds() {
-    const float INJ_HYSTERESIS = 10.0f;
-    const float VORTEX_HYSTERESIS = 15.0f;
+    const float BOOST_HYSTERESIS = 10.0f;
+    const float BEAM_HYSTERESIS = 15.0f;
     portENTER_CRITICAL(&thresholdMux);
-    thresholds["INJ_TPS_OFF"]    = thresholds["INJ_TPS_ON"] - INJ_HYSTERESIS;
-    thresholds["INJ_MAP_OFF"]    = thresholds["INJ_MAP_ON"] - INJ_HYSTERESIS;
-    thresholds["VORTEX_TPS_OFF"] = thresholds["VORTEX_TPS_ON"] - VORTEX_HYSTERESIS;
-    thresholds["VORTEX_MAP_OFF"] = thresholds["VORTEX_MAP_ON"] - VORTEX_HYSTERESIS;
+    thresholds["BOOST_TPS_OFF"]    = thresholds["BOOST_TPS_ON"] - BOOST_HYSTERESIS;
+    thresholds["BOOST_MAP_OFF"]    = thresholds["BOOST_MAP_ON"] - BOOST_HYSTERESIS;
+    thresholds["BEAM_TPS_OFF"] = thresholds["BEAM_TPS_ON"] - BEAM_HYSTERESIS;
+    thresholds["BEAM_MAP_OFF"] = thresholds["BEAM_MAP_ON"] - BEAM_HYSTERESIS;
     portEXIT_CRITICAL(&thresholdMux);
 }

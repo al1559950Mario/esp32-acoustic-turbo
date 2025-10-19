@@ -14,7 +14,7 @@ void StateMachine::begin(bool hasCalibration,
                          ThresholdManager* thresholdManagerPtr,
                          SensorManager* sensorsPtr,
                          CalibrationManager* calibMgrPtr) {
-    current           = hasCalibration ? SystemState::OFF : SystemState::NO_CALIB;
+    current           = hasCalibration ? SystemState::IDLE : SystemState::NO_CALIB;
     actuators         = actuatorsPtr;
     sensors           = sensorsPtr;
     thresholdManager  = thresholdManagerPtr;
@@ -27,8 +27,8 @@ void StateMachine::begin(bool hasCalibration,
     vortexPending       = false;
     vortexStartMillis   = 0;
     decayStartMillis = 0;
-    lastTPSLevel      = 0.0f;
-    lastMAPLevel      = 0.0f;
+    lastDeltaTPSLevel      = 0.0f;
+    lastDeltaMAPLevel      = 0.0f;
 
     if (actuators) {
         actuators->stopAcoustic();
@@ -44,14 +44,19 @@ float StateMachine::getLevel() const {
     return tpsNormalized;
 }
 
-bool StateMachine::readyForInjection(float mapLoad, float tpsLoad) {
-    return mapLoad >= thresholds.INJ_MAP_ON
-        && tpsLoad >= thresholds.INJ_TPS_ON;
+bool StateMachine::readyForBOOST(float mapLoad, float tpsLoad) {
+    /*return mapLoad >= thresholds.BOOST_MAP_ON
+        && tpsLoad >= thresholds.BOOST_TPS_ON;
+        */
+    return tpsLoad >= thresholds.BOOST_TPS_ON;
 }
 
-bool StateMachine::readyForVortex(float mapLoad, float tpsLoad) {
-    return mapLoad >= thresholds.VORTEX_MAP_ON
-        && tpsLoad >= thresholds.VORTEX_TPS_ON;
+bool StateMachine::readyForBEAM(float mapLoad, float tpsLoad) {
+    /*return mapLoad >= thresholds.BEAM_MAP_ON
+        && tpsLoad >= thresholds.BEAM_TPS_ON;
+        */
+    return tpsLoad >= thresholds.BEAM_TPS_ON;
+
 }
 
 void StateMachine::update(float mapLoadPercent,
@@ -66,7 +71,7 @@ void StateMachine::update(float mapLoadPercent,
         thresholds = thresholdManager->getThresholds();
     }
 
-        // Mantener buffer de 3 muestras para TPS y MAP
+    // Mantener buffer de 3 muestras para TPS y MAP
     static float tpsBuffer[3] = {0.0f, 0.0f, 0.0f};
     static float mapBuffer[3] = {0.0f, 0.0f, 0.0f};
 
@@ -82,9 +87,15 @@ void StateMachine::update(float mapLoadPercent,
     // Aplicar mediana
     _tpsLoadPercent  = median3(tpsBuffer[0], tpsBuffer[1], tpsBuffer[2]);
     _mapLoadPercent  = median3(mapBuffer[0], mapBuffer[1], mapBuffer[2]);
-    
+
+    currentDeltaTPSLevel = sensors->getRelativeTPSLevel(thresholds.BOOST_TPS_ON);
+    currentDeltaMAPLevel = sensors->getRelativeMAPLevel(thresholds.BOOST_MAP_ON);
+
     mapNormalized   = mapLoadPercent / 100.0f;
     tpsNormalized   = tpsLoadPercent / 100.0f;
+
+    compute_dTPSdt_and_hold(currentDeltaTPSLevel, lastDeltaTPSLevel);
+
 
     switch (current) {
         static uint32_t offStartMillis = 0;
@@ -117,85 +128,94 @@ void StateMachine::update(float mapLoadPercent,
             break;
 
         case SystemState::IDLE:
-            if (_mapLoadPercent < thresholds.MAP_WAKEUP_PERCENT) {
-                current = SystemState::OFF;
-                if (actuators) {
-                    actuators->stopAcoustic();
-                    actuators->stopVortex();
-                    vortexPending = false;
-                }
-                break;
-            }
-            if (readyForInjection(_mapLoadPercent, _tpsLoadPercent)) {
-                current = SystemState::BEAM;
+            if (readyForBOOST(_mapLoadPercent, _tpsLoadPercent)) {
+                current = SystemState::BOOST;
                 if (sensors) {
                     tpsInitialPercent = sensors->readTPSLoadPercent();
                     mapInitialPercent = sensors->readMAPLoadPercent();
                 }
                 if (actuators) {
-                    actuators->stopAcoustic();
-                    actuators->startAcoustic(0.1f);
                     vortexPending     = true;
                     vortexStartMillis = millis();
                 }
             }
             break;
 
-        case SystemState::BEAM:
-            mapDrop = (lastMAPLevel * 100.0f) - _mapLoadPercent;
-            tpsDrop = (lastTPSLevel * 100.0f) - _tpsLoadPercent;
-            dropDetected = (mapDrop >= MAP_DROP_THRESHOLD && tpsDrop >= TPS_DROP_THRESHOLD);
-            belowThresholds = (_mapLoadPercent <= thresholds.INJ_MAP_OFF
-                     || _tpsLoadPercent <= thresholds.INJ_TPS_OFF);
-            if (readyForVortex(_mapLoadPercent, _tpsLoadPercent)) {
-                current = SystemState::VORTEX;
+        case SystemState::BOOST:
+            if (readyForBEAM(_mapLoadPercent, _tpsLoadPercent)) {
+                current = SystemState::BEAM;
+                actuators->stopAcoustic();
+                actuators->startAcoustic(0.1f);
             }
-            else if (dropDetected || belowThresholds){
-                // MODIFICADO: en vez de ir directo a IDLE, pasamos a COOLDOWN
-                unsigned long now = millis();   
-
-                current = SystemState::DECAY;
-                decayStartMillis = now;
-                actuators->getAcousticInjector().startDecay(now);
-                actuators->getAcousticInjector().setDecayLevel(avgMAPLevel);
-                actuators->getAcousticInjector().setDecayParameters(decayDurationMs, avgMAPLevel);
-                //decayDurationMs = minDecay + (maxDecay - minDecay) * avgMAPLevel;
-
-                vortexPending = false;
-                // no apagamos Acoustic aquí, se apaga al terminar el cooldown
+            else if (_tpsLoadPercent <= thresholds.BOOST_TPS_OFF){
+                current = SystemState::IDLE;
             }
             break;
 
-        case SystemState::VORTEX:
-            mapDrop = (lastMAPLevel * 100.0f) - _mapLoadPercent;
-            tpsDrop = (lastTPSLevel * 100.0f) - _tpsLoadPercent;
-            dropDetected = (mapDrop >= MAP_DROP_THRESHOLD && tpsDrop >= TPS_DROP_THRESHOLD);
-            belowThresholds = (_mapLoadPercent <= thresholds.INJ_MAP_OFF
-                     || _tpsLoadPercent <= thresholds.INJ_TPS_OFF);
+        case SystemState::BEAM: {
+            // detectar caída usando derivada suavizada (unidades: nivel/sec)
+            float deriv = _dTPSdtEMA; // ya calculada por compute_dTPSdt_and_hold
+            bool dropDetected = (deriv <= -DERIV_DROP_THRESHOLD);
+            belowThresholds = (_tpsLoadPercent <= thresholds.BOOST_TPS_OFF);
+
             if (dropDetected || belowThresholds) {
-                unsigned long now = millis();   
-                current = SystemState::DECAY;
-                vortexPending       = false;
+                unsigned long now = millis();
+
+                // calcular hold_ms si estuvo activo
+                unsigned long holdMs = 0;
+                if (_holdActive && _holdStartMillis != 0) {
+                    holdMs = now - _holdStartMillis;
+                }
+
+                // normalizar hold
+                float holdNorm = float(min<unsigned long>(holdMs, H_SCALE_MS)) / float(H_SCALE_MS); // 0..1
+
+                // sigmoide para mezcla entre toque y hold
+                float x = (holdNorm - SIGMOID_H0) * SIGMOID_K;
+                float w = 1.0f / (1.0f + expf(-x)); // peso_sustain 0..1
+
+                // g_fast desde derivada negativa
+                float gFastRaw = 0.0f;
+                if (deriv < 0.0f) {
+                    gFastRaw = constrain((-deriv) / DERIV_NORM, 0.0f, 1.0f);
+                }
+
+                // g_sustain desde holdNorm
+                float gSustainRaw = constrain(holdNorm, 0.0f, 1.0f);
+
+                // mezclar gains usando w: w=0 -> todo toque (gFast), w=1 -> todo hold (gSustain)
+                float gFast = (1.0f - w) * gFastRaw;
+                float gSustain = w * gSustainRaw;
+
+                float durationMsF = float(decayDurationMs) * (MIN_SCALE * (1.0f - w) + MAX_SCALE * w);
+                uint32_t durationMs = uint32_t(constrain(durationMsF, 1.0f, 60000.0f)); // limita rango seguro
+
+                // tiempos explícitos que ya usas
+                float tFast = _tFastMs;
+                float tSustain = _tSustainMs;
+
+                // disparar DECAY con parámetros ahora dinámicos
                 decayStartMillis = now;
+                current = SystemState::DECAY;
+                vortexPending = false;
                 actuators->getAcousticInjector().startDecay(now);
-                actuators->getAcousticInjector().setDecayLevel(avgMAPLevel);
-                actuators->getAcousticInjector().setDecayParameters(decayDurationMs, avgMAPLevel);
-                //decayDurationMs = minDecay + (maxDecay - minDecay) * avgMAPLevel;
+                actuators->getAcousticInjector().setDecayLevel(avgTPSLevel);
+                actuators->getAcousticInjector().setDecayParameters(durationMs, avgMAPLevel,
+                                                                    gFast, gSustain, (uint32_t)tFast, (uint32_t)tSustain);
+
+                // reset hold tracker
+                _holdActive = false;
+                _holdStartMillis = 0;
 
             }
+
             break;
+        }
 
         case SystemState::DECAY:
-            if ((millis() - decayStartMillis) < decayDurationMs) {
-                break;
-            }
-            if (readyForVortex(_mapLoadPercent, _tpsLoadPercent)) {
-                current = SystemState::VORTEX;
-                vortexPending     = true;
-                vortexStartMillis = millis();
-            }
-            else if (readyForInjection(_mapLoadPercent, _tpsLoadPercent)) {
-                current = SystemState::BEAM;
+            // Interrumpir decay si readyForBEAM se cumple
+            if (readyForBEAM(_mapLoadPercent, _tpsLoadPercent)) {
+                current = SystemState::BOOST;  // o BEAM si así lo quieres
                 if (sensors) {
                     tpsInitialPercent = sensors->readTPSLoadPercent();
                     mapInitialPercent = sensors->readMAPLoadPercent();
@@ -206,6 +226,12 @@ void StateMachine::update(float mapLoadPercent,
                     vortexPending     = true;
                     vortexStartMillis = millis();
                 }
+                break; // salimos del case para no seguir decay
+            }
+
+            // Mantener lógica original de tiempo
+            if ((millis() - decayStartMillis) < decayDurationMs) {
+                break;
             }
             else if (millis() - decayStartMillis >= decayDurationMs) {
                 current = SystemState::IDLE;
@@ -214,8 +240,10 @@ void StateMachine::update(float mapLoadPercent,
                     actuators->stopVortex();
                     vortexPending = false;
                 }
+
             }
             break;
+
 
         case SystemState::DEBUG:
             break;
@@ -233,32 +261,44 @@ void StateMachine::update(float mapLoadPercent,
 void StateMachine::handleActions() {
     if (!sensors || !actuators || !calibMgr) return;
 
-    if (current == SystemState::BEAM
-     || current == SystemState::VORTEX) {
+    if (current == SystemState::BOOST) {
+    // Solo turbo / vortex
+    if (abs(currentDeltaTPSLevel - lastDeltaTPSLevel) > 0.01f
+        || abs(currentDeltaMAPLevel  - lastDeltaMAPLevel ) > 0.01f) {
+        //Usando solo TPS temporalmente
+        actuators->updateVortexLevel(currentDeltaTPSLevel, currentDeltaTPSLevel);
+        lastDeltaTPSLevel = currentDeltaTPSLevel;
+        lastDeltaMAPLevel = currentDeltaMAPLevel;
+        }
+    }
+
+    if (current == SystemState::BEAM) {
         if (thresholdManager) {
             thresholds = thresholdManager->getThresholds();
             }
-
-        
-        float deltaTPSLevel = sensors->getRelativeTPSLevel(thresholds.INJ_TPS_ON);
-        float deltaMAPLevel  = sensors->getRelativeMAPLevel(thresholds.INJ_MAP_ON);
         mapSamples++;
-        avgMAPLevel += (deltaMAPLevel - avgMAPLevel) / float(mapSamples);
+        tpsSamples++;
+
+        avgMAPLevel += (currentDeltaMAPLevel - avgMAPLevel) / float(mapSamples);
+        avgTPSLevel += (currentDeltaTPSLevel - avgTPSLevel) / float(tpsSamples);
 
 
-        if (abs(deltaTPSLevel - lastTPSLevel) > 0.03f
-         || abs(deltaMAPLevel  - lastMAPLevel ) > 0.03f) {
-            actuators->setAcousticParameters(deltaTPSLevel, deltaMAPLevel);
-            actuators->setVortexLevel(deltaTPSLevel, deltaMAPLevel);
-            lastTPSLevel = deltaTPSLevel;
-            lastMAPLevel = deltaMAPLevel;
+        if (abs(currentDeltaTPSLevel - lastDeltaTPSLevel) > 0.01f
+         || abs(currentDeltaMAPLevel  - lastDeltaMAPLevel ) > 0.01f) {
+            //Usando solo TPS temporalmente
+            actuators->setAcousticParameters(currentDeltaTPSLevel, currentDeltaTPSLevel);
+            actuators->updateVortexLevel(currentDeltaTPSLevel, currentDeltaTPSLevel);
+            lastDeltaTPSLevel = currentDeltaTPSLevel;
+            lastDeltaMAPLevel = currentDeltaMAPLevel;
         }
         actuators->updateInjector();
     }
 
         // ──────── DECAY ───────────────────────────────────────────────────
     if (current == SystemState::DECAY) {
+
         actuators->getAcousticInjector().updateDecayState();
+
     }
 }
 
@@ -276,12 +316,44 @@ String StateMachine::getStateName() const {
         case SystemState::NO_CALIB: return "NO_CALIB";
         case SystemState::CALIBRATION: return "CALIBRATION";
         case SystemState::IDLE: return "IDLE";
+        case SystemState::BOOST: return "BOOST";
         case SystemState::BEAM: return "BEAM";
-        case SystemState::VORTEX: return "VORTEX";
         case SystemState::DECAY: return "DECAY";
         case SystemState::DEBUG: return "DEBUG";
         case SystemState::UNKNOWN: return "UNKNOWN";
         default: return "UNKNOWN";
     }
+}
+
+// Llama a esto cada ciclo de control con los niveles 0..1
+void StateMachine::compute_dTPSdt_and_hold(float currentDeltaTPSLevel, float lastDeltaTPSLevel) {
+  unsigned long now = millis();
+  // primer llamado seguro: inicializar referencia temporal y salir
+  if (_derivLastMillis == 0) {
+    _derivLastMillis = now;
+    _dTPSdtRaw = 0.0f;
+    return;
+  }
+
+  unsigned long dt_ms = now - _derivLastMillis;
+  if (dt_ms == 0) dt_ms = 1; // proteger
+
+  // derivada en unidades por segundo (niveles 0..1)
+  float raw = (currentDeltaTPSLevel - lastDeltaTPSLevel) / (float(dt_ms) / 1000.0f);
+
+  // proteger contra outliers
+  raw = constrain(raw, -10.0f, 10.0f);
+
+  _dTPSdtRaw = raw;
+
+  // EMA para suavizar la derivada
+  _dTPSdtEMA = DERIV_EMA_ALPHA * raw + (1.0f - DERIV_EMA_ALPHA) * _dTPSdtEMA;
+
+  if (!_holdActive && currentDeltaTPSLevel > PRESS_EPS) {
+    _holdActive = true;
+    _holdStartMillis = now;
+  }
+
+  _derivLastMillis = now;
 }
 

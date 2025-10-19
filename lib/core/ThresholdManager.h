@@ -8,14 +8,14 @@
 
 struct Thresholds {
     float MAP_WAKEUP_PERCENT;
-    float INJ_TPS_ON;
-    float INJ_MAP_ON;
-    float INJ_TPS_OFF;
-    float INJ_MAP_OFF;
-    float VORTEX_TPS_ON;
-    float VORTEX_MAP_ON;
-    float VORTEX_TPS_OFF;
-    float VORTEX_MAP_OFF;
+    float BOOST_TPS_ON;
+    float BOOST_MAP_ON;
+    float BOOST_TPS_OFF;
+    float BOOST_MAP_OFF;
+    float BEAM_TPS_ON;
+    float BEAM_MAP_ON;
+    float BEAM_TPS_OFF;
+    float BEAM_MAP_OFF;
 
 };
 

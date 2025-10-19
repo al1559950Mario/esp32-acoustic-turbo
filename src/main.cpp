@@ -151,7 +151,7 @@ void loop() {
     float mapLoadPercent = sensors.readMAPLoadPercent();
     float tpsLoadPercent = sensors.readTPSLoadPercent();
 
-    if (mapLoadPercent >= 100.0f && tpsLoadPercent >= 100.0f) {
+    if (mapLoadPercent >= 100.0f && tpsLoadPercent > 100.0f) {
       ui->println("[ERROR] Carga 100%, saltando FSM");
     } else {
       fsm.update(

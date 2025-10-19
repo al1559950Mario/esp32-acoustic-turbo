@@ -42,7 +42,7 @@ void ActuatorManager::stopVortex() {
 
 /// Modo manual: fuerza un nivel de PWM [0.0-1.0], ignorando TPS*MAP
 /// @param level: 0.0 = apagado, 1.0 = máxima potencia
-void ActuatorManager::setVortexLevel(float levelTPS, float levelMAP) {
+void ActuatorManager::updateVortexLevel(float levelTPS, float levelMAP) {
     vortex.updatePowerLevel(levelTPS, levelMAP); // level ya está normalizado 0–1
 }
 

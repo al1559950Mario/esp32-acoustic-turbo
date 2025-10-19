@@ -19,7 +19,7 @@ float TPSSensor::readNormalized() {
   uint16_t min = CalibrationManager::getInstance().getTPSMin();
   uint16_t max = CalibrationManager::getInstance().getTPSMaxRaw();
 
-  if (max <= min || raw < min || raw > max) return 0.0f;
+  if (max <= min || raw < min) return 0.0f;
 
   return constrain(1.0f - (float)(raw - min) / (max - min), 0.0f, 1.0f);
 }
@@ -46,7 +46,7 @@ float TPSSensor::convertRawToPercent(uint16_t raw) {
   uint16_t min = CalibrationManager::getInstance().getTPSMin();
   uint16_t max = CalibrationManager::getInstance().getTPSMaxRaw();
 
-  if (max <= min || raw < min || raw > max) return 0.0f;
+  if (max <= min || raw < min) return 0.0f;
 
   float norm = (float)(raw - min) / (max - min);
   return constrain(norm, 0.0f, 1.0f) * 100.0f;
