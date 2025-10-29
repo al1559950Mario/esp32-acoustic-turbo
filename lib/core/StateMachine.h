@@ -100,10 +100,14 @@ private:
   bool vortexPending = false;  
   float tpsNormalized{0.0f}; 
   float mapNormalized{0.0f}; 
-  float lastDeltaTPSLevel;   // <— último TPS%
-  float lastDeltaMAPLevel;   // <— último MAP%
-  float currentDeltaTPSLevel;
-  float currentDeltaMAPLevel;
+  float lastDeltaTPSLevelForBOOST;   // <— último TPS%
+  float lastDeltaMAPLevelForBOOST;   // <— último MAP%
+  float lastDeltaTPSLevelForBEAM;   // <— último TPS%
+  float lastDeltaMAPLevelForBEAM;   // <— último MAP%
+  float currentDeltaTPSLevelForBOOST;
+  float currentDeltaMAPLevelForBOOST;
+  float currentDeltaTPSLevelForBEAM;
+  float currentDeltaMAPLevelForBEAM;
   const float MAP_DROP_THRESHOLD = 0.2f;  
   const float TPS_DROP_THRESHOLD = 0.2f;
   float avgMAPLevel = 0.0f;
@@ -116,9 +120,7 @@ private:
   bool belowThresholds = false;
   float tpsMinOnBeam = 100.0f;
   uint32_t decayStartMillis     = 0;     // instante en que se disparó DECAY (ms)
-  float decayDurationMs = 2500;          // **Base nominal** para la duración del DECAY en ms. Se escala con w/hold.
-  float minDecay = 200.0f;               // **Mínimo absoluto** permitido para duración (ms)
-  float maxDecay = 6000.0f;              // **Máximo absoluto** permitido para duración (ms)
+  float decayDurationMs = 1500;          // **Base nominal** para la duración del DECAY en ms. Se escala con w/hold.
 
   // ---------- derivada dTPS/dt (medición y filtrado) ----------
   unsigned long _derivLastMillis = 0;    // timestamp de la última muestra usada para derivada
@@ -132,33 +134,33 @@ private:
   // ---------- mezcla y tiempos de envelope ----------
   float _gFast = 0.0f;                   // peso componente rápido del envelope (0..1)
   float _gSustain = 0.0f;                // peso componente sustain/cola (0..1)
-  float _tFastMs = 40.0f;                // tiempo característico del componente rápido (ms). Valores: 10..200
-  float _tSustainMs = 800.0f;            // tiempo característico del sustain/cola (ms). Valores: 200..5000
+  float _tFastMs = 150.0f;                // tiempo característico del componente rápido (ms). Valores: 10..200
+  float _tSustainMs = 250.0f;            // tiempo característico del sustain/cola (ms). Valores: 200..5000
 
 
   // DERIV_EMA_ALPHA
 // Qué controla: suavizado exponencial de la derivada dTPS/dt.
 // Rango recomendado: 0.02 .. 0.50
 // Ajuste: disminuir para filtrar más ruido; aumentar para respuesta más rápida.
-const float DERIV_EMA_ALPHA = 0.45f;
+const float DERIV_EMA_ALPHA = 0.50f;
 
 // DERIV_NORM
 // Qué controla: normalizador que mapea magnitud de derivada a gFast (0..1).
 // Rango recomendado: 0.5 .. 5.0
 // Ajuste: bajar para que pequeñas caídas activen gFast; subir si hay falsos positivos.
-const float DERIV_NORM = 1.5f;
+const float DERIV_NORM = 0.5f;
 
 // DERIV_DROP_THRESHOLD
 // Qué controla: umbral en unidades nivel/sec para considerar una caída rápida y disparar DECAY.
 // Rango recomendado: 0.5 .. 5.0 (nivel/sec)
 // Ajuste: subir para evitar triggers por jitter; bajar si falta sensibilidad a releases rápidos.
-const float DERIV_DROP_THRESHOLD = 2.0f;
+const float DERIV_DROP_THRESHOLD = 5.0f;
 
 // H_SCALE_MS
 // Qué controla: escala temporal para normalizar holdMs → holdNorm (0..1).
 // Rango recomendado: 200 .. 2000 ms
 // Ajuste: reducir para clasificar como hold más rápido; aumentar para requerir presiones más largas.
-const unsigned long H_SCALE_MS = 700;
+const unsigned long H_SCALE_MS = 200;
 
 // SIGMOID_H0
 // Qué controla: centro de la sigmoide aplicada a holdNorm que define transición tap→hold.
@@ -170,51 +172,54 @@ const float SIGMOID_H0 = 0.3f;
 // Qué controla: pendiente de la sigmoide que suaviza o hace abrupta la transición tap→hold.
 // Rango recomendado: 1.0 .. 12.0
 // Ajuste: aumentar para cambio más brusco; disminuir para transición más gradual.
-const float SIGMOID_K = 6.0f;
+const float SIGMOID_K = 12.0f;
 
 // MIN_SCALE
 // Qué controla: factor mínimo aplicado sobre decayDurationMs para toques rápidos.
 // Rango recomendado: 0.2 .. 1.0
 // Ajuste: bajar para colas muy cortas en taps; no bajar demasiado o el sonido se cortará.
-const float MIN_SCALE = 0.5f;
+const float MIN_SCALE = 0.2f;
 
 // MAX_SCALE
 // Qué controla: factor máximo aplicado sobre decayDurationMs para holds largos.
 // Rango recomendado: 1.0 .. 4.0
 // Ajuste: aumentar para colas más largas en holds; limitar si las colas se vuelven irreales.
-const float MAX_SCALE = 1.5f;
+const float MAX_SCALE = 0.4f;
 
 // SOFTCLIP_BETA
 // Qué controla: agresividad del soft clip en la forma del envelope y control de picos.
 // Rango recomendado: 0.1 .. 1.0
 // Ajuste: bajar para clipping más suave; subir para limitar picos con más fuerza.
-const float SOFTCLIP_BETA = 0.6f;
+const float SOFTCLIP_BETA = 0.3f;
 
 // POW_ALPHA
 // Qué controla: exponente de la ley de potencia que modela la cola lenta (shape de sustain).
 // Rango recomendado: 1.0 .. 2.5
 // Ajuste: incrementar para caída más pronunciada; reducir para cola más larga y suave.
-const float POW_ALPHA = 1.6f;
+const float POW_ALPHA = 4.5f;
 
 // RES_ZERO_THRESH16
 // Qué controla: umbral 16-bit para considerar la envolvente efectivamente cero y terminar DECAY.
 // Rango recomendado: 0 .. 1024 (0..65535 escala)
 // Ajuste: aumentar si el ruido impide llegar a cero; bajar para terminar con niveles más bajos.
-const uint16_t RES_ZERO_THRESH16 = 64;
+const uint16_t RES_ZERO_THRESH16 = 8;
 
 // MIN_TAIL_MS
 // Qué controla: tiempo mínimo de tail que siempre se permite antes de aceptar término del DECAY.
 // Rango recomendado: 10 .. 200 ms
 // Ajuste: aumentar si quieres asegurar un mínimo de decay audible; reducir para finales más cortos.
-const float MIN_TAIL_MS = 40.0f;
+const float MIN_TAIL_MS = 10.0f;
 
 // ZERO_COUNT_TO_END
 // Qué controla: número de frames consecutivos por debajo del umbral requerido para confirmar fin.
 // Rango recomendado: 1 .. 16
 // Ajuste: aumentar para ser más conservador al terminar; disminuir para terminar más rápido.
-const uint8_t ZERO_COUNT_TO_END = 4;
+const uint8_t ZERO_COUNT_TO_END = 1;
 
 // trackear inicio de "hold" (cuando se detecta que hubo presión)
 const float PRESS_EPS = 0.01f;
+
+static constexpr uint32_t MIN_BEAM_DELAY_MS = 1000u; // 1 segundo mínimo antes de permitir BEAM
+
 
 };

@@ -9,7 +9,7 @@ public:
   ActuatorManager() = default;
 
   // Inicializa ambos actuadores con sus pines respectivos
-  void begin( uint8_t turboPwmPin, uint8_t turboPwmChannel,
+  void begin(uint8_t rEnPin, uint8_t turboPwmPin, uint8_t turboPwmChannel,
                             uint8_t turboSensePin,
                             uint8_t acousticDacPin);
 
@@ -24,7 +24,7 @@ public:
   void updateVortexLevel(float, float);
 
   // Control Acoustic Injector
-  void startAcoustic(float level);
+  void startAcoustic(float level, float dt);
   void stopAcoustic();
   void setAcousticParameters(float level, float mapLoadPercent);
   bool isAcousticOn() const;
@@ -35,6 +35,7 @@ public:
   VortexController& getVortexController();
   AcousticInjector& getAcousticInjector();
   float getTurboSense();
+  bool inDecay() const;
 
   
 

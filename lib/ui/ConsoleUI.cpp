@@ -367,7 +367,7 @@ void ConsoleUI::interpretarComando(char c) {
 
 void ConsoleUI::imprimirDashboard() {
     if (!fsm || !sensors || !actuators) return;
-    if (millis() < tiempoProximaImpresionHUD) return;
+    //if (millis() < tiempoProximaImpresionHUD) return;
 
     auto& calib = CalibrationManager::getInstance();
     uint16_t tpsMin = calib.getTPSMin();
@@ -405,7 +405,7 @@ void ConsoleUI::imprimirDashboard() {
 
     static const char* stateNames[] = {
         "OFF", "SIN_CAL", "CALIB", "IDLE",
-        "BEAM", "BST", "DCAY", "DEBUG", "??"
+        "BOOST", "BEAM", "DCAY", "DEBUG", "??"
     };
     const char* stName = stateNames[int(st)];
 

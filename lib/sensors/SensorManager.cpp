@@ -13,7 +13,7 @@ void SensorManager::begin(uint8_t pinPressureData, uint8_t pinPressureSCK, uint8
     Serial.println("✅ ADS1115 listo");
   }
   mapSensor.begin(1, &ads);  // A1 para MAP
-  tpsSensor.begin(0, &ads);  // A0 para TPS
+  tpsSensor.begin(2, &ads);  // A0 para TPS
   pressureSensor.begin(pinPressureData, pinPressureSCK);
       // Inicializar buffer
   for (size_t i = 0; i < PRESSURE_BUFFER_SIZE; i++) pressureKPABuffer[i] = 0.0f;
@@ -110,7 +110,6 @@ void SensorManager::updateADS1115() {
   //Porcentaje absoluto
   mapLoadPercent = mapSensor.convertRawToPercent((uint16_t)filteredRawMAP);
   tpsLoadPercent = tpsSensor.convertRawToPercent((uint16_t)filteredRawTPS);
-  
 }
 
 

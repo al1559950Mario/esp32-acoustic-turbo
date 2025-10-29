@@ -2,11 +2,11 @@
 #include "AcousticInjector.h"
 
 
-void ActuatorManager::begin(uint8_t turboPwmPin, uint8_t turboPwmChannel,
+void ActuatorManager::begin(uint8_t rEnPin, uint8_t turboPwmPin, uint8_t turboPwmChannel,
                             uint8_t turboSensePin,
                             uint8_t acousticDacPin) {
     // Inicializar VortexController con PWM + canal + pin de corriente
-    vortex.begin(turboPwmPin, turboPwmChannel, turboSensePin);
+    vortex.begin(rEnPin, turboPwmPin, turboPwmChannel, turboSensePin);
 
     // Inicializar Acoustic Injector
     injector.begin(acousticDacPin);
@@ -53,8 +53,8 @@ bool ActuatorManager::isTurboOn() const {
 }
 
 /// Enciende Acoustic Injector con nivel [0-1]
-void ActuatorManager::startAcoustic(float level) {
-    injector.start(level);
+void ActuatorManager::startAcoustic(float level, float dTPSdt) {
+    injector.start(level, dTPSdt);
 }
 
 /// Apaga Acoustic Injector
@@ -99,4 +99,8 @@ float ActuatorManager::getTurboLevel() {
 }
 float ActuatorManager::getTurboSense() {
     return vortex.getCurrentSense();
+}
+
+bool ActuatorManager::inDecay() const{
+    return injector.isInDecay();
 }

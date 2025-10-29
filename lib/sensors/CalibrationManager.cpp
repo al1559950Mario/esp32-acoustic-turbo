@@ -4,42 +4,23 @@
 CalibrationManager& CalibrationManager::getInstance() {
   static CalibrationManager inst;
   return inst;
-}
+} 
 
 void CalibrationManager::begin(SensorManager* _sensors) {
-  prefs.begin("calib", false);
-  prefs.end();
+  if (prefsMutex == nullptr) {
+    prefsMutex = xSemaphoreCreateMutex();
+  }
+
+  // Toque rápido al NVS para inicializar partición sin bloquear
+  if (prefsMutex && xSemaphoreTake(prefsMutex, 100 / portTICK_PERIOD_MS) == pdTRUE) {
+    prefs.begin("calib", true); // readonly touch
+    prefs.end();
+    xSemaphoreGive(prefsMutex);
+  }
+
   sensors = _sensors;
   currentStep = CalibStep::TPS_MIN;
   calibrationDone = loadCalibration();
-
-}
-
-// Si no existen las 4 claves, pide calibración
-bool CalibrationManager::loadCalibration() {
-  prefs.begin("calib", false);
-  bool ready = prefs.isKey("map_min")
-            && prefs.isKey("map_max")
-            && prefs.isKey("tps_min")
-            && prefs.isKey("tps_max");
-  if (!ready) {
-    Serial.println(">> No hay datos de calibración. Ejecute calibración.");
-    prefs.end();
-    calibrationDone = false;
-    return false;
-  }
-
-  mapMin = prefs.getUShort("map_min");
-  mapMax = prefs.getUShort("map_max");
-  tpsMin = prefs.getUShort("tps_min");
-  tpsMax = prefs.getUShort("tps_max");
-  prefs.end();
-
-  bool valid = mapMax > mapMin && tpsMax > tpsMin;
-  //Serial.printf(">> Calibración cargada: MAP[%u–%u], TPS[%u–%u] %s\n",
-  //              mapMin, mapMax, tpsMin, tpsMax,
-  //              valid ? "(OK)" : "(inválido)");
-  return valid;
 }
 
 void CalibrationManager::loadDebugCalibration() {
@@ -54,16 +35,55 @@ void CalibrationManager::loadDebugCalibration() {
 
 // Borra NVS y valores en RAM
 void CalibrationManager::clearCalibration() {
+  if (prefsMutex && xSemaphoreTake(prefsMutex, portMAX_DELAY) != pdTRUE) return;
+
   prefs.begin("calib", false);
-  prefs.clear();
+  prefs.remove("map_min");
+  prefs.remove("map_max");
+  prefs.remove("tps_min");
+  prefs.remove("tps_max");
   prefs.end();
-  
+
   mapMin = mapMax = tpsMin = tpsMax = 0;
-  Serial.println(">> Umbrales borrados. Requiere calibración.");
   calibrationDone = false;
   currentStep = CalibStep::TPS_MIN;
 
+  xSemaphoreGive(prefsMutex);
+  Serial.println(">> Umbrales borrados. Requiere calibración.");
 }
+
+// Si no existen las 4 claves, pide calibración
+bool CalibrationManager::loadCalibration() {
+  if (prefsMutex && xSemaphoreTake(prefsMutex, portMAX_DELAY) != pdTRUE) return false;
+
+  prefs.begin("calib", false);
+  bool ready = prefs.isKey("map_min")
+            && prefs.isKey("map_max")
+            && prefs.isKey("tps_min")
+            && prefs.isKey("tps_max");
+
+  if (!ready) {
+    prefs.end();
+    mapMin = mapMax = tpsMin = tpsMax = 0;
+    calibrationDone = false;
+    xSemaphoreGive(prefsMutex);
+    Serial.println(">> No hay datos de calibración. Ejecute calibración.");
+    return false;
+  }
+
+  mapMin = prefs.getUShort("map_min");
+  mapMax = prefs.getUShort("map_max");
+  tpsMin = prefs.getUShort("tps_min");
+  tpsMax = prefs.getUShort("tps_max");
+  prefs.end();
+
+  xSemaphoreGive(prefsMutex);
+
+  bool valid = mapMax > mapMin && tpsMax > tpsMin;
+  calibrationDone = valid;
+  return valid;
+}
+
 
 // Graba los 4 valores actuales
 bool CalibrationManager::saveCalibration() {
@@ -79,6 +99,17 @@ bool CalibrationManager::saveCalibration() {
 
 // Guarda un solo paso inmediatamente
 void CalibrationManager::saveStep(CalibStep step, uint16_t value) {
+  if (prefsMutex && xSemaphoreTake(prefsMutex, portMAX_DELAY) != pdTRUE) return;
+
+  // Actualizar RAM inmediatamente
+  switch(step) {
+    case CalibStep::MAP_MAX: mapMax = value; break;
+    case CalibStep::MAP_MIN: mapMin = value; break;
+    case CalibStep::TPS_MIN: tpsMin = value; break;
+    case CalibStep::TPS_MAX: tpsMax = value; break;
+  }
+
+  // Persistir solo la clave modificada
   prefs.begin("calib", false);
   switch(step) {
     case CalibStep::MAP_MAX: prefs.putUShort("map_max", value); break;
@@ -87,8 +118,11 @@ void CalibrationManager::saveStep(CalibStep step, uint16_t value) {
     case CalibStep::TPS_MAX: prefs.putUShort("tps_max", value); break;
   }
   prefs.end();
+
+  if (prefsMutex) xSemaphoreGive(prefsMutex);
   Serial.printf(">> Paso %d guardado: %u\n", int(step), value);
 }
+
 
 // Función para esperar ENTER y descartar secuencias de escape o caracteres extraños
 bool waitForEnter() {
@@ -185,10 +219,43 @@ bool CalibrationManager::runAutoCalibration(SensorManager& sensors, bool simulac
 }
 
 // Getters
-uint16_t CalibrationManager::getMAPMin() const { return mapMin; }
-uint16_t CalibrationManager::getMAPMaxRaw() const { return mapMax; }
-uint16_t CalibrationManager::getTPSMin() const { return tpsMin; }
-uint16_t CalibrationManager::getTPSMaxRaw() const { return tpsMax; }
+uint16_t CalibrationManager::getMAPMin() const {
+  uint16_t v = 0;
+  if (prefsMutex && xSemaphoreTake(prefsMutex, portMAX_DELAY) == pdTRUE) {
+    v = mapMin;
+    xSemaphoreGive(prefsMutex);
+  } else {
+    v = mapMin; // fallback raro
+  }
+  return v;
+}
+
+uint16_t CalibrationManager::getMAPMaxRaw() const {
+  uint16_t v = 0;
+  if (prefsMutex && xSemaphoreTake(prefsMutex, portMAX_DELAY) == pdTRUE) {
+    v = mapMax;
+    xSemaphoreGive(prefsMutex);
+  } else v = mapMax;
+  return v;
+}
+
+uint16_t CalibrationManager::getTPSMin() const {
+  uint16_t v = 0;
+  if (prefsMutex && xSemaphoreTake(prefsMutex, portMAX_DELAY) == pdTRUE) {
+    v = tpsMin;
+    xSemaphoreGive(prefsMutex);
+  } else v = tpsMin;
+  return v;
+}
+
+uint16_t CalibrationManager::getTPSMaxRaw() const {
+  uint16_t v = 0;
+  if (prefsMutex && xSemaphoreTake(prefsMutex, portMAX_DELAY) == pdTRUE) {
+    v = tpsMax;
+    xSemaphoreGive(prefsMutex);
+  } else v = tpsMax;
+  return v;
+}
 
 void CalibrationManager::update(bool sim) {
   if (calibrationDone || sensors == nullptr) {

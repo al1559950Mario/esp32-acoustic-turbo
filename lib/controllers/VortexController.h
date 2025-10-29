@@ -14,7 +14,7 @@ public:
      * @param pwmPin: pin conectado al canal PWM del BTS
      * @param pwmChannel: canal de PWM de ESP32 (0-15)
      */
-    void begin(uint8_t pwmPin_, uint8_t pwmChannel_, uint8_t sensePin_ = 255);
+    void begin(uint8_t rEnPin, uint8_t pwmPin_, uint8_t pwmChannel_, uint8_t sensePin_ = 255);
 
     /**
      * start()
@@ -47,6 +47,7 @@ public:
 
 private:
     uint8_t pwmPin = 255;
+    uint8_t rEnPin = 255;
     uint8_t pwmChannel = 0;   // canal ESP32 usado en ledcWrite
     bool active = false;
     float lastPWM = 0.0f;     // nivel actual (0.0 – 1.0)}

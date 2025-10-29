@@ -1,6 +1,7 @@
 #pragma once
 #include "SensorManager.h"
 #include <Preferences.h>
+#include "freertos/semphr.h"
 
 class SensorManager;  
 
@@ -44,7 +45,7 @@ private:
   SensorManager* sensors = nullptr;  // <-- Aquí se guarda el puntero recibido
   CalibStep currentStep = CalibStep::TPS_MIN;
 
-
+  mutable SemaphoreHandle_t prefsMutex = nullptr;
 
   uint16_t mapMin = 0, mapMax = 0;
   uint16_t tpsMin = 0, tpsMax = 0;

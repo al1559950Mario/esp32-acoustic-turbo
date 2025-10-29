@@ -82,20 +82,20 @@ void ThresholdManager::loadDefaults() {
     thresholds.clear();
 
     // 🔧 Margen de histéresis para apagado
-    const float BOOST_HYSTERESIS   = 10.0f;
-    const float BEAM_HYSTERESIS = 15.0f;
+    const float BOOST_HYSTERESIS   = 4.0f;
+    const float BEAM_HYSTERESIS = 25.0f;
 
     // 🟢 Umbral mínimo de presión (MAP) para pasar de OFF a IDLE
     thresholds["MAP_WAKEUP_PERCENT"] = 10.0f;
 
-    // 🔊 Inyección acústica
-    thresholds["BOOST_TPS_ON"]  = 10.0f;
-    thresholds["BOOST_MAP_ON"]  = 50.0f;
+    // 🌪️ BOOST
+    thresholds["BOOST_TPS_ON"]  = 12.0f;
+    thresholds["BOOST_MAP_ON"]  = 95.0f;
     thresholds["BOOST_TPS_OFF"] = thresholds["BOOST_TPS_ON"] - BOOST_HYSTERESIS;
     thresholds["BOOST_MAP_OFF"] = thresholds["BOOST_MAP_ON"] - BOOST_HYSTERESIS;
 
-    // 🌪️ BEAM
-    thresholds["BEAM_TPS_ON"]  = 85.0f;
+    // 🔊 BEAM
+    thresholds["BEAM_TPS_ON"]  = 75.0f;
     thresholds["BEAM_MAP_ON"]  = 85.0f;
     thresholds["BEAM_TPS_OFF"] = thresholds["BEAM_TPS_ON"] - BEAM_HYSTERESIS;
     thresholds["BEAM_MAP_OFF"] = thresholds["BEAM_MAP_ON"] - BEAM_HYSTERESIS;
