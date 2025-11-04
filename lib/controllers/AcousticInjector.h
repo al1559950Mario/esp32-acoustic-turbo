@@ -113,16 +113,19 @@ private:
   // miembros a añadir en AcousticInjector (header)
   bool _forceSweep = false;
   uint32_t _sweepStartMs = 0;
+  float _sweepTargetFrequency = FORCE_FINAL_FREQ_MIN;
+  float _postSweepTargetFrequency = FORCE_FINAL_FREQ_MIN;
   uint32_t _levelSweepStartMs = 0;
   uint32_t _preIdleStartMs = 0;
+  bool _postSweepReleasePending = false;
 
 
   bool _levelSweepInitDone = false; // indica que ya hicimos el sweep inicial desde la última activación
 
-  //static constexpr uint32_t FORCE_SWEEP_TIME_MS = 260;    // 30..150 ms, 60 ms = rápido pero estable
   static constexpr float FORCE_SWEEP_START_HZ = 2000.0f;  // inicio fijo del sweep
   static constexpr float FORCE_FINAL_FREQ_MIN = 3500.0f;  // objetivo mínimo final (3.5 kHz)
   static constexpr float FORCE_FINAL_FREQ_MAX = 7000.0f;  // objetivo máximo final (7 kHz)
+  static constexpr uint32_t FORCE_SWEEP_HOLD_MS = 120;     // tiempo extra tras pre-idle antes del sweep (ms)
 
 
   // promedio de frecuencia (uso: smoothing / telemetría)
@@ -145,9 +148,17 @@ private:
     _levelInt     = 0;
     _lastDACValue = 128;
     _skipSmoothStep = false;
+    _forceSweep           = false;
+    _sweepStartMs         = 0;
+    _sweepTargetFrequency = FORCE_FINAL_FREQ_MIN;
+    _postSweepTargetFrequency = FORCE_FINAL_FREQ_MIN;
+    _postSweepReleasePending  = false;
+    _levelSweepInitDone   = false;
+    _levelSweepStartMs    = 0;
+    _preIdleStartMs       = 0;
     // Frecuencia (si quieres reiniciar a la última cargada en begin())
-    // _currentFrequency = _freqMin;  
-    // _targetFrequency  = _freqMin;  
+    // _currentFrequency = _freqMin;
+    // _targetFrequency  = _freqMin;
   }
   unsigned long _decayStartMillis; // marca de tiempo al iniciar DECAY
 
