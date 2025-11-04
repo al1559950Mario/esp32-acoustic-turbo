@@ -121,6 +121,7 @@ private:
   float tpsMinOnBeam = 100.0f;
   uint32_t decayStartMillis     = 0;     // instante en que se disparó DECAY (ms)
   float decayDurationMs = 1500;          // **Base nominal** para la duración del DECAY en ms. Se escala con w/hold.
+  
 
   // ---------- derivada dTPS/dt (medición y filtrado) ----------
   unsigned long _derivLastMillis = 0;    // timestamp de la última muestra usada para derivada

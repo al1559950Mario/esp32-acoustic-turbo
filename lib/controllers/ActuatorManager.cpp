@@ -101,6 +101,6 @@ float ActuatorManager::getTurboSense() {
     return vortex.getCurrentSense();
 }
 
-bool ActuatorManager::inDecay() const{
-    return injector.isInDecay();
+bool ActuatorManager::decayFinished() const{
+    return injector.decayFinished();
 }

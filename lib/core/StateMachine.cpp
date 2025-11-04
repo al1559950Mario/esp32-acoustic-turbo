@@ -149,7 +149,6 @@ void StateMachine::update(float mapLoadPercent,
                 }
                 if (actuators) {
                     actuators->startVortex();
-                    Serial.println("\n Vortex activado\n");
                     vortexPending     = true;
                     vortexStartMillis = millis();
                 }
@@ -246,7 +245,7 @@ void StateMachine::update(float mapLoadPercent,
             }
 
             // Mantener lógica original de tiempo
-            if (!actuators->inDecay()) {
+            if (!actuators->decayFinished()) {
            
                 current = SystemState::IDLE;
                 if (actuators) {

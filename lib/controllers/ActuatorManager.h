@@ -35,7 +35,7 @@ public:
   VortexController& getVortexController();
   AcousticInjector& getAcousticInjector();
   float getTurboSense();
-  bool inDecay() const;
+  bool decayFinished() const;
 
   
 

@@ -83,7 +83,7 @@ void ThresholdManager::loadDefaults() {
 
     // 🔧 Margen de histéresis para apagado
     const float BOOST_HYSTERESIS   = 4.0f;
-    const float BEAM_HYSTERESIS = 25.0f;
+    const float BEAM_HYSTERESIS = 10.0f;
 
     // 🟢 Umbral mínimo de presión (MAP) para pasar de OFF a IDLE
     thresholds["MAP_WAKEUP_PERCENT"] = 10.0f;
