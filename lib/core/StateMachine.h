@@ -222,5 +222,16 @@ const float PRESS_EPS = 0.01f;
 
 static constexpr uint32_t MIN_BEAM_DELAY_MS = 1000u; // 1 segundo mínimo antes de permitir BEAM
 
+  // BEAM_COND_MIN_HOLD_MS
+  // Qué controla: tiempo mínimo que la condición de entrada a BEAM
+  // (readyForBEAM) debe mantenerse verdadera de forma continua antes
+  // de permitir la transición. Ayuda a filtrar falsos positivos.
+  // Rango recomendado: 100 .. 500 ms
+  // Ajuste: aumentar si aún hay falsos positivos; reducir para respuesta más rápida.
+  static constexpr uint32_t BEAM_COND_MIN_HOLD_MS = 500u;
+
+  // Seguimiento de la condición BEAM sostenida
+  uint32_t _beamCondStartMs = 0;   // instante en que se detectó la condición por primera vez
+
 
 };

@@ -156,13 +156,24 @@ void StateMachine::update(float mapLoadPercent,
             break;
 
         case SystemState::BOOST:
-            if (readyForBEAM(_mapLoadPercent, _tpsLoadPercent)) {
-                current = SystemState::BEAM;
-                actuators->stopAcoustic();
-                actuators->startAcoustic(0.005f, _dTPSdtEMA);
+            {
+            bool beamRaw = readyForBEAM(_mapLoadPercent, _tpsLoadPercent);
+            unsigned long now = millis();
+            if (beamRaw) {
+                if (_beamCondStartMs == 0) _beamCondStartMs = now;
+                if ((now - _beamCondStartMs) >= BEAM_COND_MIN_HOLD_MS) {
+                    current = SystemState::BEAM;
+                    _beamCondStartMs = 0; // reset tracker al entrar
+                    actuators->stopAcoustic();
+                    actuators->startAcoustic(0.005f, _dTPSdtEMA);
+                }
+            } else {
+                _beamCondStartMs = 0; // reset si la condición se rompe
             }
-            else if (_tpsLoadPercent <= thresholds.BOOST_TPS_OFF){
+
+            if (_tpsLoadPercent <= thresholds.BOOST_TPS_OFF){
                 current = SystemState::IDLE;
+            }
             }
             break;
 
@@ -227,10 +238,21 @@ void StateMachine::update(float mapLoadPercent,
         }
 
         case SystemState::DECAY:
-            // Interrumpir decay si readyForBEAM se cumple
-            if (readyForBEAM(_mapLoadPercent, _tpsLoadPercent)&&
-                (millis() - decayStartMillis >= MIN_BEAM_DELAY_MS)) {
+            // Interrumpir decay solo si la condición BEAM se mantiene
+            {
+            unsigned long now = millis();
+            bool beamRaw = readyForBEAM(_mapLoadPercent, _tpsLoadPercent);
+            if (beamRaw) {
+                if (_beamCondStartMs == 0) _beamCondStartMs = now;
+            } else {
+                _beamCondStartMs = 0;
+            }
+
+            bool minDelayOk = (now - decayStartMillis >= MIN_BEAM_DELAY_MS);
+            bool holdOk = (_beamCondStartMs != 0) && ((now - _beamCondStartMs) >= BEAM_COND_MIN_HOLD_MS);
+            if (beamRaw && minDelayOk && holdOk) {
                 current = SystemState::BEAM;  // o BEAM si así lo quieres
+                _beamCondStartMs = 0;
                 if (sensors) {
                     tpsInitialPercent = sensors->readTPSLoadPercent();
                     mapInitialPercent = sensors->readMAPLoadPercent();
@@ -239,9 +261,10 @@ void StateMachine::update(float mapLoadPercent,
                     actuators->stopAcoustic();
                     actuators->startAcoustic(0.005f, _dTPSdtEMA);
                     vortexPending     = true;
-                    vortexStartMillis = millis();
+                    vortexStartMillis = now;
                 }
                 break; // salimos del case para no seguir decay
+            }
             }
 
             // Mantener lógica original de tiempo
