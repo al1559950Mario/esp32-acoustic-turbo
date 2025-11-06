@@ -75,13 +75,14 @@ void AcousticInjector::start(float level, float dTPSdt) {
   _levelInt    = uint8_t(_level * 255.0f);
 
   // 2) Configurar inicio y objetivo de frecuencia
-  const float startFreq  = 2000.0f;
-  float       targetFreq = _targetFrequency;
-  _lastUpdateMs = millis();
-  _currentLogFreq = logf(max(1.0f, _currentFrequency)); 
-  _forceSweep = true;
-  _sweepStartMs = millis();
-  
+  uint32_t nowMs = millis();
+  float    targetFreq = _targetFrequency;
+  _lastUpdateMs       = nowMs;
+  _forceSweep         = true;
+  _sweepStartMs       = 0;
+  _preIdleStartMs     = 0;
+  _postSweepReleasePending = false;
+
 
   _dTPSdtEntry = constrain(dTPSdt, -10.0f, 10.0f); // proteger
 
@@ -90,8 +91,20 @@ void AcousticInjector::start(float level, float dTPSdt) {
     targetFreq = _decayResFreq; // fallback a la freq del resonador preconfigurada
     _targetFrequency = targetFreq;
   }
+  _targetFrequency = targetFreq;
+
+  float sweepGoal = (_targetFrequency > 0.0f)
+                        ? _targetFrequency
+                        : mapLoadToWaveFrequency(fmaxf(_targetLevel, 0.01f));
+  if (!(std::isfinite(sweepGoal) && sweepGoal > 0.0f)) {
+    sweepGoal = FORCE_FINAL_FREQ_MIN;
+  }
+  _sweepTargetFrequency      = constrain(sweepGoal, FORCE_FINAL_FREQ_MIN, FORCE_FINAL_FREQ_MAX);
+  _postSweepTargetFrequency  = _sweepTargetFrequency;
+
   _currentFrequency = FORCE_SWEEP_START_HZ;
   _targetFrequency  = targetFreq;
+  _currentLogFreq   = logf(max(1.0f, _currentFrequency));
 
   // 3) Calcular primer phaseStep en startFreq
   updateWaveFrequency(_currentFrequency);
@@ -176,23 +189,67 @@ void AcousticInjector::update() {
   _lastUpdateMs = now;
   float dt = float(elapsedMs) * 0.001f; // segundos
 
-  // ------ determinar desiredFreq (sweep o map) ------
-  float desiredFreq;
+  if (_preIdleStartMs == 0) {
+    _preIdleStartMs = now;
+    _level          = 0.0f;
+  }
+  uint32_t elapsedPreIdle = (now >= _preIdleStartMs) ? (now - _preIdleStartMs) : 0;
+  bool      preIdleActive = elapsedPreIdle < PRE_IDLE_TIME_MS;
+
   if (_forceSweep) {
-    uint32_t elapsedSweep = (now >= _sweepStartMs) ? (now - _sweepStartMs) : 0;
-    float t = constrain(float(elapsedSweep) / float(FORCE_SWEEP_TIME_MS_TUNE), 0.0f, 1.0f);
+    float sweepGoal = (_targetFrequency > 0.0f)
+                          ? _targetFrequency
+                          : mapLoadToWaveFrequency(fmaxf(_targetLevel, _level));
+    if (!(std::isfinite(sweepGoal) && sweepGoal > 0.0f)) {
+      sweepGoal = FORCE_FINAL_FREQ_MIN;
+    }
+    _sweepTargetFrequency     = constrain(sweepGoal, FORCE_FINAL_FREQ_MIN, FORCE_FINAL_FREQ_MAX);
+    _postSweepTargetFrequency = _sweepTargetFrequency;
+  }
 
-    float logStart = logf(FORCE_SWEEP_START_HZ);
-    float logEnd   = logf(FORCE_FINAL_FREQ_MIN);
-    float logTarget = logStart + t * (logEnd - logStart);
-    desiredFreq = expf(logTarget);
+  // ------ determinar desiredFreq (sweep o map) ------
+  float desiredFreq = _currentFrequency;
+  if (_forceSweep) {
+    if (_sweepStartMs == 0) {
+      desiredFreq = FORCE_SWEEP_START_HZ;
+      if (!preIdleActive) {
+        uint32_t sincePreIdleEnd = (elapsedPreIdle > PRE_IDLE_TIME_MS)
+                                       ? (elapsedPreIdle - PRE_IDLE_TIME_MS)
+                                       : 0;
+        if (sincePreIdleEnd >= FORCE_SWEEP_HOLD_MS) {
+          _sweepStartMs = now;
+        }
+      }
+    }
 
-    if (t >= 1.0f) {
-      _forceSweep = false;
-      desiredFreq = FORCE_FINAL_FREQ_MIN;
+    if (_sweepStartMs != 0) {
+      uint32_t elapsedSweep = (now >= _sweepStartMs) ? (now - _sweepStartMs) : 0;
+      float    t            = constrain(float(elapsedSweep) / float(FORCE_SWEEP_TIME_MS_TUNE), 0.0f, 1.0f);
+
+      float logStart  = logf(FORCE_SWEEP_START_HZ);
+      float logEnd    = logf(FORCE_FINAL_FREQ_MIN);
+      float logTarget = logStart + t * (logEnd - logStart);
+      desiredFreq     = expf(logTarget);
+
+      if (t >= 1.0f) {
+        _forceSweep   = false;
+        _sweepStartMs = 0;
+        desiredFreq   = FORCE_FINAL_FREQ_MIN;
+        _postSweepTargetFrequency = _sweepTargetFrequency;
+        _postSweepReleasePending  = true;
+      }
     }
   } else {
-    desiredFreq = (_targetFrequency > 0.0f) ? _targetFrequency : mapLoadToWaveFrequency(_level);
+    float steadyTarget;
+    if (_postSweepReleasePending) {
+      steadyTarget               = _postSweepTargetFrequency;
+      _postSweepReleasePending   = false;
+    } else {
+      steadyTarget = (_targetFrequency > 0.0f)
+                         ? _targetFrequency
+                         : mapLoadToWaveFrequency(_level);
+    }
+    desiredFreq = steadyTarget;
   }
   desiredFreq = max(desiredFreq, 1.0f);
 
@@ -226,21 +283,8 @@ void AcousticInjector::update() {
   }
 
   // ---------------------------------------------------------------
-  // FIX: Inicialización de PRE-IDLE SOLO (no iniciar sweep aquí).
-  // Antes se activaba _levelSweepInitDone y también _levelSweepStartMs aquí,
-  // lo que permitía solapamiento. Ahora, sólo armamos pre-idle si falta.
-  if (_preIdleStartMs == 0) {
-    _level = 0.0f;                // partimos desde 0 en pre-idle
-    _preIdleStartMs = now;        // marcar inicio de pre-idle
-    // NO tocar _levelSweepInitDone aquí
-    // NO tocar _levelSweepStartMs aquí
-  }
-
-  // ---------------------------------------------------------------
   // Lógica de Pre-Idle (solo mientras no termina esta fase)
-  uint32_t elapsedPreIdle = (now >= _preIdleStartMs) ? (now - _preIdleStartMs) : 0;
-
-  if (elapsedPreIdle < PRE_IDLE_TIME_MS) {
+  if (preIdleActive) {
     // Progreso 0.0 → 1.0 durante pre-idle
     float tIdle = float(elapsedPreIdle) / float(PRE_IDLE_TIME_MS);
 
