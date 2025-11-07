@@ -495,6 +495,43 @@ void AcousticInjector::test() {
   Serial.println(F("✅ Prueba finalizada."));
 }
 
+void AcousticInjector::testFloor() {
+  Serial.println(F("[AI] Prueba piso DAC (1 LSB) iniciada..."));
+
+  bool wasActive = _active;
+  if (_timer) {
+    timerAlarmDisable(_timer);
+  }
+
+  const float freq = 6000.0f;
+  const float sampleRate = 64000.0f;
+  const uint8_t bias = 128;
+  const float oneLsbLevel = 1.0f / 127.0f;
+  const float amplitude = 127.0f * oneLsbLevel;
+  const float dPhase = 2.0f * PI * freq / sampleRate;
+
+  float phase = 0.0f;
+  const uint32_t durationMs = 2000;
+  const uint32_t samples = uint32_t((durationMs / 1000.0f) * sampleRate);
+
+  for (uint32_t i = 0; i < samples; ++i) {
+    float value = bias + amplitude * sinf(phase);
+    int v = constrain(int(value + 0.5f), 0, 255);
+    dac_output_voltage(_dacChannel, uint8_t(v));
+    phase += dPhase;
+    if (phase >= 2.0f * PI) phase -= 2.0f * PI;
+    delayMicroseconds(15);
+  }
+
+  dac_output_voltage(_dacChannel, bias);
+  if (_timer && wasActive) {
+    timerWrite(_timer, 0);
+    timerAlarmEnable(_timer);
+  }
+
+  Serial.println(F("[AI] Prueba piso DAC finalizada."));
+}
+
 void AcousticInjector::emitResonant(float level) {
   Serial.println(F("🌼 Emitiendo señal resonante por fase acumulada (5s)..."));
 

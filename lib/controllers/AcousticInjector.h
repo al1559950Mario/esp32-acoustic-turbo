@@ -33,6 +33,7 @@ public:
   bool isActive() const;
   static void IRAM_ATTR onTimer();
   void test();  // Prueba rápida del sonido acústico
+  void testFloor(); // Prueba del nivel mínimo audible (1 LSB)
   void emitResonant(float level); // Señal por fase acumulada
   void testSimple();
   void setTargetFrequency(float freq) {
