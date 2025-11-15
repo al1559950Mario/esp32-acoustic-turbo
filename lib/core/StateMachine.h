@@ -99,7 +99,9 @@ private:
   const unsigned long vortexDelayMs = 200;  // Tiempo en ms para esperar antes de activar vortex
   bool vortexPending = false;  
   float tpsNormalized{0.0f}; 
-  float mapNormalized{0.0f}; 
+  float mapNormalized{0.0f};
+  float _beamVortexLevel = 0.0f;
+  uint32_t _beamVortexLastUpdateMs = 0;
   float lastDeltaTPSLevelForBOOST;   // <— último TPS%
   float lastDeltaMAPLevelForBOOST;   // <— último MAP%
   float lastDeltaTPSLevelForBEAM;   // <— último TPS%
@@ -215,10 +217,17 @@ const float MIN_TAIL_MS = 10.0f;
 // Qué controla: número de frames consecutivos por debajo del umbral requerido para confirmar fin.
 // Rango recomendado: 1 .. 16
 // Ajuste: aumentar para ser más conservador al terminar; disminuir para terminar más rápido.
-const uint8_t ZERO_COUNT_TO_END = 1;
+  const uint8_t ZERO_COUNT_TO_END = 1;
 
-// trackear inicio de "hold" (cuando se detecta que hubo presión)
-const float PRESS_EPS = 0.01f;
+  // trackear inicio de "hold" (cuando se detecta que hubo presión)
+  const float PRESS_EPS = 0.01f;
+
+  // --- Dinámica de MAF (antes TPS) para clasificar ataques ---
+  static constexpr float MAF_ATTACK_SLOW_DTPS = 0.02f;   // nivel/sec considerado subida lenta
+  static constexpr float MAF_ATTACK_FAST_DTPS = 0.15f;   // nivel/sec considerado ataque rápido
+  static constexpr float MAF_ATTACK_MIN_GAIN  = 0.75f;   // factor aplicado al power cuando el ataque es muy lento
+  static constexpr float MAF_ATTACK_MAX_GAIN  = 1.25f;   // factor cuando el ataque es muy rápido
+  static constexpr float MAF_RELEASE_REF_DTPS = -0.12f;  // referencia (nivel/sec) para detectar soltado rápido
 
 static constexpr uint32_t MIN_BEAM_DELAY_MS = 1000u; // 1 segundo mínimo antes de permitir BEAM
 
@@ -228,10 +237,17 @@ static constexpr uint32_t MIN_BEAM_DELAY_MS = 1000u; // 1 segundo mínimo antes 
   // de permitir la transición. Ayuda a filtrar falsos positivos.
   // Rango recomendado: 100 .. 500 ms
   // Ajuste: aumentar si aún hay falsos positivos; reducir para respuesta más rápida.
-  static constexpr uint32_t BEAM_COND_MIN_HOLD_MS = 500u;
+  static constexpr uint32_t BEAM_COND_MIN_HOLD_MS = 300u;
+  static constexpr float BEAM_VORTEX_ENTRY_LEVEL      = 0.85f;
+  static constexpr float BEAM_VORTEX_RAMP_TAU_FAST_MS = 60.0f;
+  static constexpr float BEAM_VORTEX_RAMP_TAU_SLOW_MS = 260.0f;
 
   // Seguimiento de la condición BEAM sostenida
   uint32_t _beamCondStartMs = 0;   // instante en que se detectó la condición por primera vez
 
 
+  void resetBeamVortexRamp(float seedLevel);
+  float updateBeamVortexRamp(float mafPower);
+
 };
+

@@ -166,6 +166,7 @@ void StateMachine::update(float mapLoadPercent,
                     _beamCondStartMs = 0; // reset tracker al entrar
                     actuators->stopAcoustic();
                     actuators->startAcoustic(0.005f, _dTPSdtEMA);
+                    resetBeamVortexRamp(currentDeltaTPSLevelForBEAM);
                 }
             } else {
                 _beamCondStartMs = 0; // reset si la condición se rompe
@@ -260,6 +261,7 @@ void StateMachine::update(float mapLoadPercent,
                 if (actuators) {
                     actuators->stopAcoustic();
                     actuators->startAcoustic(0.005f, _dTPSdtEMA);
+                    resetBeamVortexRamp(currentDeltaTPSLevelForBEAM);
                     vortexPending     = true;
                     vortexStartMillis = now;
                 }
@@ -275,12 +277,9 @@ void StateMachine::update(float mapLoadPercent,
                     actuators->stopAcoustic();
                     actuators->stopVortex();
                     vortexPending = false;
-
-
+                }
             }
             break;
-        }
-
         case SystemState::DEBUG:
             break;
 
@@ -318,14 +317,31 @@ void StateMachine::handleActions() {
         avgMAPLevel += (currentDeltaMAPLevelForBEAM - avgMAPLevel) / float(mapSamples);
         avgTPSLevel += (currentDeltaTPSLevelForBEAM - avgTPSLevel) / float(tpsSamples);
 
-        if (abs(currentDeltaTPSLevelForBEAM - lastDeltaTPSLevelForBEAM) > 0.01f
-         || abs(currentDeltaMAPLevelForBEAM  - lastDeltaMAPLevelForBEAM ) > 0.01f) {
-            //Usando solo TPS temporalmente
-            actuators->setAcousticParameters(currentDeltaTPSLevelForBEAM, currentDeltaTPSLevelForBEAM);
-            actuators->updateVortexLevel(currentDeltaTPSLevelForBEAM, currentDeltaTPSLevelForBEAM);
+        // Dinámica de MAF (antes TPS): ajustar potencia según rapidez
+        float powerInput = currentDeltaTPSLevelForBEAM;
+        float attackNorm = ( _dTPSdtEMA - MAF_ATTACK_SLOW_DTPS )
+                         / (MAF_ATTACK_FAST_DTPS - MAF_ATTACK_SLOW_DTPS);
+        attackNorm = constrain(attackNorm, 0.0f, 1.0f);
+        float attackGain = MAF_ATTACK_MIN_GAIN
+                         + attackNorm * (MAF_ATTACK_MAX_GAIN - MAF_ATTACK_MIN_GAIN);
+        float power = powerInput * attackGain;
+        if (_dTPSdtEMA < 0.0f) {
+            float releaseNorm = constrain(_dTPSdtEMA / MAF_RELEASE_REF_DTPS, 0.0f, 1.0f);
+            power *= (1.0f - 0.5f * releaseNorm); // reduce hasta 50 % en soltados rápidos
+        }
+        power = constrain(power, 0.0f, 1.0f);
+
+        bool levelChanged = (abs(currentDeltaTPSLevelForBEAM - lastDeltaTPSLevelForBEAM) > 0.01f
+                          || abs(currentDeltaMAPLevelForBEAM  - lastDeltaMAPLevelForBEAM ) > 0.01f);
+
+        if (levelChanged) {
+            actuators->setAcousticParameters(power, power);
             lastDeltaTPSLevelForBEAM = currentDeltaTPSLevelForBEAM;
             lastDeltaMAPLevelForBEAM = currentDeltaMAPLevelForBEAM;
         }
+
+        float vortexLevel = updateBeamVortexRamp(power);
+        actuators->updateVortexLevel(vortexLevel, vortexLevel);
         actuators->updateInjector();
     }
 
@@ -336,6 +352,36 @@ void StateMachine::handleActions() {
 
     }
 }
+
+void StateMachine::resetBeamVortexRamp(float seedLevel) {
+  float seeded = constrain(seedLevel, 0.0f, 1.0f);
+  _beamVortexLevel = max(BEAM_VORTEX_ENTRY_LEVEL, seeded);
+  _beamVortexLastUpdateMs = millis();
+}
+
+float StateMachine::updateBeamVortexRamp(float mafPower) {
+  mafPower = constrain(mafPower, 0.0f, 1.0f);
+  uint32_t now = millis();
+  if (_beamVortexLastUpdateMs == 0) {
+    _beamVortexLastUpdateMs = now;
+  }
+  float dtMs = float(now - _beamVortexLastUpdateMs);
+  _beamVortexLastUpdateMs = now;
+
+  float tauFast = BEAM_VORTEX_RAMP_TAU_FAST_MS;
+  float tauSlow = BEAM_VORTEX_RAMP_TAU_SLOW_MS;
+  float tau = tauFast + (1.0f - mafPower) * (tauSlow - tauFast);
+  tau = max(tau, 1.0f);
+
+  float alpha = 1.0f - expf(-dtMs / tau);
+  _beamVortexLevel += (1.0f - _beamVortexLevel) * alpha;
+  if (_beamVortexLevel < BEAM_VORTEX_ENTRY_LEVEL) {
+    _beamVortexLevel = BEAM_VORTEX_ENTRY_LEVEL;
+  }
+
+  return constrain(_beamVortexLevel, 0.0f, 1.0f);
+}
+
 
 void StateMachine::debugForceState(SystemState nuevoEstado) {
     if (current == SystemState::DEBUG) {
@@ -391,4 +437,6 @@ void StateMachine::compute_dTPSdt_and_hold(float currentDeltaTPSLevel, float las
 
   _derivLastMillis = now;
 }
+
+
 
