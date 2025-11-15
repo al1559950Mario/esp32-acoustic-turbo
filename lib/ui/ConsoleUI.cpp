@@ -98,8 +98,7 @@ void ConsoleUI::interpretarComando(char c) {
     case 'b':  // Iniciar inyección acústica (100%)
       if (!devOnly()) break;
       //actuators->startAcoustic(1.0f, 100);
-      if (actuators->isAcousticOn())
-        actuators->getAcousticInjector().test();
+      //actuators->getAcousticInjector().testLevelSR();
       break;
 
     case 'c':  // Solicitar calibración por consola
@@ -411,7 +410,7 @@ void ConsoleUI::imprimirDashboard() {
 
     // HUD en vivo: actualización en línea
     this->printf(
-        "\r[%s|%lus]TPS%.1f(%.1f–%.1f)%.0f%%MAP%.1f(%.1f–%.1f)%.0f%%|L%.1f|%.1fkhz|%.0f%% IS:%.1f%|Pk:%.1f|Rm%.1f|PS:%.0f",
+        "\r[%s|%lus]TPS%.1f(%.1f–%.1f)%.0f%%MAP%.1f(%.1f–%.1f)%.0f%%|L%.3f|%.1fkhz|%.0f%% IS:%.1f%|Pk:%.1f|Rm%.1f|PS:%.0f",
         stName, elapsed,
         tpsV, tpsMinV, tpsMaxV, tpsPct,
         mapV, mapMinV, mapMaxV, mapPct,

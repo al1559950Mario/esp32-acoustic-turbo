@@ -99,8 +99,8 @@ void SensorManager::updateADS1115() {
     rawTPSCached = (tpsSensor.getSimulatedRaw()* 5.0f) / 32767.0f;
   } else
   {
-    rawMAPCached = ads.readADC_SingleEnded(1);
-    rawTPSCached = ads.readADC_SingleEnded(0); 
+    //rawMAPCached = ads.readADC_SingleEnded(1);
+    rawTPSCached = ads.readADC_SingleEnded(3); 
   }
   //updatePressure();
   // Filtro IIR al raw directamente

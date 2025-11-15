@@ -95,7 +95,7 @@ void ThresholdManager::loadDefaults() {
     thresholds["BOOST_MAP_OFF"] = thresholds["BOOST_MAP_ON"] - BOOST_HYSTERESIS;
 
     // 🔊 BEAM
-    thresholds["BEAM_TPS_ON"]  = 75.0f;
+    thresholds["BEAM_TPS_ON"]  = 60.0f;
     thresholds["BEAM_MAP_ON"]  = 85.0f;
     thresholds["BEAM_TPS_OFF"] = thresholds["BEAM_TPS_ON"] - BEAM_HYSTERESIS;
     thresholds["BEAM_MAP_OFF"] = thresholds["BEAM_MAP_ON"] - BEAM_HYSTERESIS;

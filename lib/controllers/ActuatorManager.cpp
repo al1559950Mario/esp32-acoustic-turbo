@@ -64,10 +64,16 @@ void ActuatorManager::stopAcoustic() {
 
 /// Configura parámetros del Acoustic Injector
 /// @param level: potencia relativa [0-1]
-void ActuatorManager::setAcousticParameters(float tpsLoadLevel, float mapLoadLevel) {
-    float freq = injector.mapLoadToWaveFrequency(mapLoadLevel);
-    injector.setTargetFrequency(freq);
+void ActuatorManager::setAcousticParameters(float tpsLoadLevel, float /*mapLoadLevel*/) {
     injector.setLevel(tpsLoadLevel);
+
+    // Debug compacto (rate limit ~200 ms)
+    static uint32_t _amLastLogMs = 0;
+    uint32_t _amNow = millis();
+    if (_amNow - _amLastLogMs >= 200) {
+        _amLastLogMs = _amNow;
+        Serial.printf("[AM] maf=%.3f\n", double(tpsLoadLevel));
+    }
 }
 
 /// Estado del Acoustic Injector
