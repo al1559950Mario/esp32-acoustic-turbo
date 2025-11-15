@@ -54,7 +54,7 @@ public:
   bool isInDecay() const;
 
   // Getter público para la FSM
-  bool AcousticInjector::decayFinished() const {
+  bool decayFinished() const {
       return _decayFinished;
   }
 
@@ -65,6 +65,7 @@ private:
   uint8_t  _index = 0;      // índice para tabla seno (solo para modo tabla)
   float    _level = 0.0f;
   float    _targetLevel = 0.0f;
+  float    _levelAtSweepStart = 0.0f;
   uint8_t  _lastDACValue = 128;
   dac_channel_t _dacChannel;
   hw_timer_t* _timer = nullptr;
@@ -104,29 +105,47 @@ private:
   // RAMP_STEP: cuanto cambia _level por llamada a update().
   // Ajuste empírico: 0.005..0.02 = suave; >0.02 = respuesta más rápida.
   static constexpr float LEVEL_RAMP_STEP = 0.005f;
+  static constexpr float LEVEL_SMOOTH_TAU_MS = 120.0f;
   float _lastTargetLevel = 0.0f;
 
   FrequencyRangeOption _freqOption = RANGE_3;
 
-  float _freqMin = 3500.0f;
-  float _freqMax = 6500.0f;
+  float _freqMin = 5500.0f;
+  float _freqMax = 7000.0f;
 
   // miembros a añadir en AcousticInjector (header)
   bool _forceSweep = false;
   uint32_t _sweepStartMs = 0;
   float _sweepTargetFrequency = FORCE_FINAL_FREQ_MIN;
   float _postSweepTargetFrequency = FORCE_FINAL_FREQ_MIN;
+  bool _levelSweepInitDone = false;
   uint32_t _levelSweepStartMs = 0;
   uint32_t _preIdleStartMs = 0;
   bool _postSweepReleasePending = false;
 
-
-  bool _levelSweepInitDone = false; // indica que ya hicimos el sweep inicial desde la última activación
+  // Estado del disparo sónico (transiciones 2 kHz <-> 3.5 kHz)
+  bool _sonicShotActive = false;
+  bool _sonicShotDirectionUp = true;
+  uint32_t _sonicShotStartMs = 0;
+  uint32_t _sonicShotLastMs = 0;
 
   static constexpr float FORCE_SWEEP_START_HZ = 2000.0f;  // inicio fijo del sweep
-  static constexpr float FORCE_FINAL_FREQ_MIN = 3500.0f;  // objetivo mínimo final (3.5 kHz)
-  static constexpr float FORCE_FINAL_FREQ_MAX = 7000.0f;  // objetivo máximo final (7 kHz)
+  static constexpr float FORCE_FINAL_FREQ_MIN = 5500.0f;  // objetivo mínimo final (Hz)
+  static constexpr float FORCE_FINAL_FREQ_MAX = 7000.0f;  // objetivo máximo final (Hz)
   static constexpr uint32_t FORCE_SWEEP_HOLD_MS = 120;     // tiempo extra tras pre-idle antes del sweep (ms)
+  static constexpr uint32_t FORCE_SWEEP_TIME_MS = 800u;    // duración del barrido inicial (ms)
+  static constexpr float FORCE_SWEEP_SHAPE_EXP = 0.65f;    // <1 = ataque inmediato, >1 = suave
+  static constexpr float FORCE_SWEEP_STEP_LIMIT_HZ = 90.0f; // delta Hz base fuera de la zona de 2 kHz
+  static constexpr float FORCE_SWEEP_NEAR_START_GAIN = 60.0f; // multiplicador (0..n) para acelerar cerca de 2 kHz
+  static constexpr float FORCE_SWEEP_EXIT_TOL_HZ = 250.0f;    // tolerancia para salir del sweep anticipadamente
+  static constexpr uint32_t SONIC_SHOT_DURATION_MS = 90u;   // duración del disparo
+  static constexpr uint32_t SONIC_SHOT_COOLDOWN_MS = 140u;  // mínima separación entre disparos
+  static constexpr float SONIC_SHOT_ZONE_HZ = 180.0f;       // ventana alrededor de 2 kHz / 3.5 kHz para armar disparo
+  static constexpr float SONIC_SHOT_MIN_DELTA_HZ = 550.0f;  // delta requerido para considerar transición real
+  static constexpr float SONIC_SHOT_LEVEL_PEAK = 0.0125f;   // nivel máximo durante el disparo
+  static constexpr float SONIC_SHOT_EASE_EXP = 0.35f;       // curva del envolvente del disparo
+  static constexpr float SONIC_SHOT_OVERSHOOT_HZ = 180.0f;  // sobretiro ligero para enfatizar el chasquido
+  static constexpr float SONIC_SHOT_MIN_LEVEL = 0.040f;     // nivel mínimo para habilitar el disparo
 
 
   // promedio de frecuencia (uso: smoothing / telemetría)
@@ -149,6 +168,7 @@ private:
     _levelInt     = 0;
     _lastDACValue = 128;
     _skipSmoothStep = false;
+    _levelAtSweepStart = PRE_IDLE_MIN_LEVEL;
     _forceSweep           = false;
     _sweepStartMs         = 0;
     _sweepTargetFrequency = FORCE_FINAL_FREQ_MIN;
@@ -157,6 +177,9 @@ private:
     _levelSweepInitDone   = false;
     _levelSweepStartMs    = 0;
     _preIdleStartMs       = 0;
+    _sonicShotActive      = false;
+    _sonicShotStartMs     = 0;
+    _sonicShotLastMs      = 0;
     // Frecuencia (si quieres reiniciar a la última cargada en begin())
     // _currentFrequency = _freqMin;
     // _targetFrequency  = _freqMin;
@@ -251,7 +274,8 @@ static constexpr uint32_t PRE_IDLE_TIME_MS = 2000;
 
 // Nivel máximo audible durante pre-idle (0.02–0.10 típico)
 // Efecto: mayor → más audible; menor → más sutil
-static constexpr float PRE_IDLE_MAX = 0.001f;
+static constexpr float PRE_IDLE_MAX = 0.02f;
+static constexpr float PRE_IDLE_MIN_LEVEL = 0.005f;
 
 // Exponente de curva inicial (1.5–4.0 recomendado)
 // Efecto: mayor → arranque más silencioso y sube tarde; menor → sube más lineal
@@ -261,11 +285,50 @@ static constexpr float PRE_IDLE_CURVE_EXP = 4.0f;
 // Efecto: variaciones tipo compresión; mayores = más notoria vibración
 static constexpr float PRE_IDLE_WOBBLE_STRENGTH = 0.08f;
 
-// Velocidad del wobble (rads/seg) — 4–14 típico
+// Velocidad del wobble (rads/seg) – 4–14 típico
 // Efecto: menor = vibración lenta grave; mayor = vibración rápida
 static constexpr float PRE_IDLE_WOBBLE_SPEED = 8.0f;
 
-// --- Peak capture during BEAM ---
+  // Sweep inicial (sin pre-idle)
+  static constexpr float SWEEP_LOW_START_LEVEL   = 0.005f;
+  static constexpr float SWEEP_LOW_END_LEVEL     = 0.015f;
+  static constexpr float SWEEP_LOW_TIME_FRACTION = 0.65f;
+  static constexpr float SWEEP_LOW_EXP           = 3.0f;
+  static constexpr float SWEEP_HIGH_EXP          = 1.2f;
+  static constexpr float SWEEP_FREQ_LOW_END_LEVEL = 0.015f;
+  static constexpr float SWEEP_FREQ_LOW_EXP       = 0.45f;
+  static constexpr float SWEEP_FREQ_HIGH_EXP      = 0.8f;
+
+  // -------- Par�metros base del DECAY / resonador ----------
+  static constexpr float DECAY_MIN_ENERGY_BASE  = 0.005f;
+  static constexpr float DECAY_MIN_ENERGY_TIGHT = 0.0050f;
+  static constexpr float DECAY_ZP_BASE = 0.35f;
+  static constexpr float DECAY_ZP_POWER_EXP = 1.3f;
+  static constexpr float DECAY_ZP_LOG_SCALE = 0.20f;
+  static constexpr float DECAY_GAMMA = 1.4f;
+  static constexpr float DECAY_SHOULDER_FRAC = 0.35f;
+  static constexpr float DECAY_SOFT_BEND_DEPTH = 0.20f;
+  static constexpr float DECAY_SOFT_BEND_TIME_MS = 350.0f;
+  static constexpr float DECAY_REBOUND_A = 0.08f;
+  static constexpr float DECAY_REBOUND_DAMP = 12.0f;
+  static constexpr float DECAY_REBOUND_FREQ_HZ = 15.0f;
+  static constexpr float DECAY_REBOUND_WINDOW_FRAC = 0.5f;
+  static constexpr float DECAY_END_FREQ_RATIO = 0.30f;
+  static constexpr float DECAY_MIN_FREQ_HZ = 2500.0f;
+  static constexpr float DECAY_FREQ_COUPLE_EXP = 0.6f;
+  static constexpr uint16_t DECAY_ENVELOPE_EXIT_THRESHOLD = 64u;
+  static constexpr uint32_t DECAY_CONTROL_PERIOD_MS = 20u;
+  static constexpr float DECAY_SLEW_HIGH_FREQ_DELTA_HZ = 40.0f;
+  static constexpr float DECAY_SLEW_LOW_FREQ_EXTRA_HZ = 240.0f;
+  static constexpr uint32_t DECAY_MIN_SWEEP_MS = 50u;
+  static constexpr uint32_t DECAY_MAX_SWEEP_MS = 500u;
+  static constexpr float DECAY_RES_SWEEP_MULT = 5.5f;
+  static constexpr float DECAY_ENERGY_K = 0.85f;
+  static constexpr uint32_t DECAY_SLEW_TAIL_MAX_STEP = 128u;
+  static constexpr float DECAY_TAIL_FREEZE_PROGRESS = 0.85f;
+  static constexpr float DECAY_TAIL_FREEZE_RATIO = 0.30f;
+  static constexpr float DECAY_FADE_START_PROGRESS = 0.90f;
+  static constexpr uint32_t DECAY_FADE_MS = 160u;  // --- Peak capture during BEAM ---
 float _peakLevelDuringBeam = 0.0f;       // Máximo level alcanzado en BEAM (0.0 - 1.0)
 float _peakFreqDuringBeam = 0.0f;        // Máxima frecuencia alcanzada en BEAM (Hz)
 uint32_t _lastDecayPrintMs = 0;
@@ -273,3 +336,5 @@ uint32_t _lastDecayPrintMs = 0;
 
 
 };
+
+

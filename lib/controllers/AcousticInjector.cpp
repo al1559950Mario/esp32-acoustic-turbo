@@ -71,36 +71,35 @@ void AcousticInjector::start(float level, float dTPSdt) {
   _active      = true;
   _inDecay = false;
   _targetLevel = constrain(level, 0.0f, 1.0f);
-  _level       = _targetLevel;
+  if (_targetLevel < SWEEP_LOW_START_LEVEL) _targetLevel = SWEEP_LOW_START_LEVEL;
+  _level       = SWEEP_LOW_START_LEVEL;
+  _levelAtSweepStart = SWEEP_LOW_START_LEVEL;
   _levelInt    = uint8_t(_level * 255.0f);
 
   // 2) Configurar inicio y objetivo de frecuencia
   uint32_t nowMs = millis();
-  float    targetFreq = _targetFrequency;
+  float    targetFreq = mapLoadToWaveFrequency(_targetLevel);
   _lastUpdateMs       = nowMs;
   _forceSweep         = true;
-  _sweepStartMs       = 0;
-  _preIdleStartMs     = 0;
+  _sweepStartMs       = nowMs;
+  _preIdleStartMs     = nowMs;
   _postSweepReleasePending = false;
+  _levelSweepInitDone = true;
+  _levelSweepStartMs  = nowMs;
 
 
   _dTPSdtEntry = constrain(dTPSdt, -10.0f, 10.0f); // proteger
 
-  // Si el caller no inicializó _targetFrequency, usar un fallback razonable
   if (!(std::isfinite(targetFreq) && targetFreq > 0.0f)) {
-    targetFreq = _decayResFreq; // fallback a la freq del resonador preconfigurada
-    _targetFrequency = targetFreq;
+    targetFreq = max(_freqMin, FORCE_FINAL_FREQ_MIN);
   }
   _targetFrequency = targetFreq;
 
-  float sweepGoal = (_targetFrequency > 0.0f)
-                        ? _targetFrequency
-                        : mapLoadToWaveFrequency(fmaxf(_targetLevel, 0.01f));
-  if (!(std::isfinite(sweepGoal) && sweepGoal > 0.0f)) {
-    sweepGoal = FORCE_FINAL_FREQ_MIN;
-  }
-  _sweepTargetFrequency      = constrain(sweepGoal, FORCE_FINAL_FREQ_MIN, FORCE_FINAL_FREQ_MAX);
-  _postSweepTargetFrequency  = _sweepTargetFrequency;
+  float sweepGoal = max(_freqMin, FORCE_SWEEP_START_HZ);
+  sweepGoal = constrain(sweepGoal, FORCE_FINAL_FREQ_MIN, FORCE_FINAL_FREQ_MAX);
+  float postGoal = constrain(targetFreq, FORCE_FINAL_FREQ_MIN, FORCE_FINAL_FREQ_MAX);
+  _sweepTargetFrequency      = sweepGoal;
+  _postSweepTargetFrequency  = postGoal;
 
   _currentFrequency = FORCE_SWEEP_START_HZ;
   _targetFrequency  = targetFreq;
@@ -137,31 +136,13 @@ void AcousticInjector::stop() {
 void AcousticInjector::setLevel(float level) {
   level = constrain(level, 0.0f, 1.0f);
 
-  // Curva global original (tu mapeo exponencial suave)
-  float a = 0.5f;
-  float expA = expf(a);
-  float expAmin = 1.0f; // exp(a*0)=1
-  float curvedLevel = (expf(a * level) - expAmin) / (expA - expAmin);
+  _targetLevel = constrain(max(level, SWEEP_LOW_START_LEVEL), 0.0f, 1.0f);
 
-  // Zona inicial lenta: 0.0 .. 0.2 mapea más despacio
-  const float slowCut = 0.2f;     // final de la zona lenta
-  const float slopeSlow = 0.25f;  // factor de reducción en la zona lenta (0..1). Menor = más lento
-  if (level <= slowCut) {
-    // Interpolamos linealmente dentro de la zona lenta usando factor slopeSlow,
-    // y luego aplicamos la misma curvatura exponencial sobre el valor reducido.
-    float t = level / slowCut;          // 0..1 dentro de la zona lenta
-    float slowed = t * slopeSlow;       // 0..slopeSlow
-    // Reconstruir curvedLevel basado en slowed para mantener continuidad con la curva fuera de la zona lenta
-    curvedLevel = (expf(a * slowed) - expAmin) / (expA - expAmin);
-  } else {
-    // Si estamos fuera de la zona lenta, queremos que la curva continúe desde el punto donde terminó la zona lenta.
-    // Normalizamos level remapeando [slowCut..1.0] -> [slopeSlow..1.0] para continuidad.
-    float t = (level - slowCut) / (1.0f - slowCut); // 0..1
-    float mapped = slopeSlow + t * (1.0f - slopeSlow); // slopeSlow..1.0
-    curvedLevel = (expf(a * mapped) - expAmin) / (expA - expAmin);
+  float mappedFreq = mapLoadToWaveFrequency(_targetLevel);
+  if (std::isfinite(mappedFreq) && mappedFreq > 0.0f) {
+    _targetFrequency          = mappedFreq;
+    _postSweepTargetFrequency = mappedFreq;
   }
-
-  _targetLevel = constrain(curvedLevel, 0.0f, 1.0f);
 }
 
 void AcousticInjector::update() {
@@ -172,16 +153,8 @@ void AcousticInjector::update() {
     return;
   }
 
-  // slopeNorm usado en otros ajustes
-  float slopeNorm = constrain((_dTPSdtEntry + 10.0f) / 20.0f, 0.0f, 1.0f);
-
-  // Duración total del sweep forzado en milisegundos.
-  //  Menor = barrido más rápido; mayor = más suave y menos clicks.
-  static constexpr uint32_t FORCE_SWEEP_TIME_MS_TUNE = 2000; // cambiar a 200 para empezar
-
-  // Límite de cambio de frecuencia por llamada a update() durante el sweep (Hz).
-  // Menor = pasos por frame más pequeños (suave); mayor = cambio por frame mayor (más rápido, riesgo clicks).
-  static constexpr float SWEEP_STEP_LIMIT_HZ_TUNE = 10.0f; 
+  // Parámetros del sweep inicial
+  const uint32_t forceSweepTimeMs = FORCE_SWEEP_TIME_MS;
 
   // ------ calcular dt ------
   uint32_t now = millis();
@@ -189,151 +162,239 @@ void AcousticInjector::update() {
   _lastUpdateMs = now;
   float dt = float(elapsedMs) * 0.001f; // segundos
 
-  if (_preIdleStartMs == 0) {
-    _preIdleStartMs = now;
-    _level          = 0.0f;
-  }
-  uint32_t elapsedPreIdle = (now >= _preIdleStartMs) ? (now - _preIdleStartMs) : 0;
-  bool      preIdleActive = elapsedPreIdle < PRE_IDLE_TIME_MS;
+  const float sweepStepLimitHz = FORCE_SWEEP_STEP_LIMIT_HZ;
+  const float sweepPivotSpan   = max(1.0f, FORCE_FINAL_FREQ_MIN - FORCE_SWEEP_START_HZ);
+  const bool  beamRangeActive  = !_inDecay;
+  const float dynamicMinHz     = beamRangeActive ? max(_freqMin, FORCE_FINAL_FREQ_MIN)
+                                                 : FORCE_SWEEP_START_HZ;
+  const float dynamicMaxHz     = beamRangeActive ? min(_freqMax, FORCE_FINAL_FREQ_MAX)
+                                                 : FORCE_FINAL_FREQ_MAX;
+  auto computeMaxDeltaPerUpdate = [&](float freqHz, float baseStepHz) -> float {
+    float normalized = 1.0f - ((freqHz - FORCE_SWEEP_START_HZ) / sweepPivotSpan);
+    normalized = constrain(normalized, 0.0f, 1.0f);
+    float boostedHz = baseStepHz * (1.0f + normalized * FORCE_SWEEP_NEAR_START_GAIN);
+    return boostedHz * dt;
+  };
+
+  uint32_t elapsedPreIdle = PRE_IDLE_TIME_MS;
+  bool      preIdleActive = false;
 
   if (_forceSweep) {
-    float sweepGoal = (_targetFrequency > 0.0f)
-                          ? _targetFrequency
-                          : mapLoadToWaveFrequency(fmaxf(_targetLevel, _level));
-    if (!(std::isfinite(sweepGoal) && sweepGoal > 0.0f)) {
-      sweepGoal = FORCE_FINAL_FREQ_MIN;
-    }
-    _sweepTargetFrequency     = constrain(sweepGoal, FORCE_FINAL_FREQ_MIN, FORCE_FINAL_FREQ_MAX);
-    _postSweepTargetFrequency = _sweepTargetFrequency;
+  float sweepGoal = max(_freqMin, FORCE_SWEEP_START_HZ);
+  if (!(std::isfinite(sweepGoal) && sweepGoal > 0.0f)) {
+    sweepGoal = dynamicMinHz;
+  }
+  _sweepTargetFrequency     = constrain(sweepGoal, dynamicMinHz, dynamicMaxHz);
+  _postSweepTargetFrequency = _targetFrequency;
   }
 
   // ------ determinar desiredFreq (sweep o map) ------
-  float desiredFreq = _currentFrequency;
+  float demandFreq = _currentFrequency;
+  float sweepDynamicStep = sweepStepLimitHz;
   if (_forceSweep) {
     if (_sweepStartMs == 0) {
-      desiredFreq = FORCE_SWEEP_START_HZ;
-      if (!preIdleActive) {
-        uint32_t sincePreIdleEnd = (elapsedPreIdle > PRE_IDLE_TIME_MS)
-                                       ? (elapsedPreIdle - PRE_IDLE_TIME_MS)
-                                       : 0;
-        if (sincePreIdleEnd >= FORCE_SWEEP_HOLD_MS) {
-          _sweepStartMs = now;
-        }
-      }
+      _sweepStartMs = now;
     }
+    uint32_t elapsedSweep = (now >= _sweepStartMs) ? (now - _sweepStartMs) : 0;
+    float rawT = constrain(float(elapsedSweep) / float(forceSweepTimeMs), 0.0f, 1.0f);
+    float t = powf(rawT, FORCE_SWEEP_SHAPE_EXP);
 
-    if (_sweepStartMs != 0) {
-      uint32_t elapsedSweep = (now >= _sweepStartMs) ? (now - _sweepStartMs) : 0;
-      float    t            = constrain(float(elapsedSweep) / float(FORCE_SWEEP_TIME_MS_TUNE), 0.0f, 1.0f);
+    float freqTarget = FORCE_SWEEP_START_HZ;
+    float sweepSpan  = _sweepTargetFrequency - FORCE_SWEEP_START_HZ;
+    float accel = powf(t, 1.25f);
+    if (fabsf(sweepSpan) > 1.0f) {
+      freqTarget = FORCE_SWEEP_START_HZ + accel * sweepSpan;
+    } else {
+      freqTarget = _sweepTargetFrequency;
+    }
+    freqTarget = constrain(freqTarget, FORCE_SWEEP_START_HZ, dynamicMaxHz);
+    float dynamicStep = sweepStepLimitHz * (1.0f - accel) + 15.0f * accel;
+    sweepDynamicStep = dynamicStep;
+    demandFreq = freqTarget;
 
-      float logStart  = logf(FORCE_SWEEP_START_HZ);
-      float logEnd    = logf(FORCE_FINAL_FREQ_MIN);
-      float logTarget = logStart + t * (logEnd - logStart);
-      desiredFreq     = expf(logTarget);
-
-      if (t >= 1.0f) {
-        _forceSweep   = false;
-        _sweepStartMs = 0;
-        desiredFreq   = FORCE_FINAL_FREQ_MIN;
-        _postSweepTargetFrequency = _sweepTargetFrequency;
-        _postSweepReleasePending  = true;
-      }
+    bool sweepTargetReached = (fabsf(_currentFrequency - _sweepTargetFrequency) <= FORCE_SWEEP_EXIT_TOL_HZ) ||
+                              (fabsf(freqTarget - _sweepTargetFrequency) <= FORCE_SWEEP_EXIT_TOL_HZ) ||
+                              (freqTarget >= (_freqMin - FORCE_SWEEP_EXIT_TOL_HZ));
+    if (t >= 1.0f || sweepTargetReached) {
+      _forceSweep = false;
+      _sweepStartMs = 0;
+      _postSweepTargetFrequency = _targetFrequency;
+      _postSweepReleasePending  = true;
+      _currentLogFreq = logf(max(_currentFrequency, 1.0f));
     }
   } else {
     float steadyTarget;
     if (_postSweepReleasePending) {
       steadyTarget               = _postSweepTargetFrequency;
       _postSweepReleasePending   = false;
+    } else if (_targetFrequency > 0.0f) {
+      steadyTarget = _targetFrequency;
+    } else if (beamRangeActive) {
+      float levelForFreq = max(_targetLevel, _level);
+      steadyTarget = mapLoadToWaveFrequency(levelForFreq);
     } else {
-      steadyTarget = (_targetFrequency > 0.0f)
-                         ? _targetFrequency
-                         : mapLoadToWaveFrequency(_level);
+      steadyTarget = mapLoadToWaveFrequency(_level);
     }
-    desiredFreq = steadyTarget;
+    demandFreq = steadyTarget;
   }
-  desiredFreq = max(desiredFreq, 1.0f);
+  if (_forceSweep &&
+      (fabsf(_currentFrequency - _sweepTargetFrequency) <= FORCE_SWEEP_EXIT_TOL_HZ ||
+       _currentFrequency >= (_freqMin - FORCE_SWEEP_EXIT_TOL_HZ))) {
+    _forceSweep = false;
+    _sweepStartMs = 0;
+    _postSweepTargetFrequency = _targetFrequency;
+    _postSweepReleasePending  = true;
+  }
+
+  if (beamRangeActive) {
+    demandFreq = constrain(demandFreq, dynamicMinHz, dynamicMaxHz);
+  } else {
+    demandFreq = max(demandFreq, 1.0f);
+  }
+
+  float sonicShotLevelTarget = 0.0f;
+  auto applySonicShot = [&](float& freqTarget, float& levelTarget) -> bool {
+    bool overriding = false;
+    const float pivotLow  = FORCE_SWEEP_START_HZ;
+    const float pivotHigh = dynamicMinHz;
+    float delta = freqTarget - _currentFrequency;
+    bool wantsUp = (delta >= SONIC_SHOT_MIN_DELTA_HZ) &&
+                   (fabsf(_currentFrequency - pivotLow) <= SONIC_SHOT_ZONE_HZ);
+    bool wantsDown = (-delta >= SONIC_SHOT_MIN_DELTA_HZ) &&
+                     (fabsf(_currentFrequency - pivotHigh) <= SONIC_SHOT_ZONE_HZ);
+    bool cooldownReady = (now - _sonicShotLastMs) >= SONIC_SHOT_COOLDOWN_MS;
+    bool levelEligible = (_targetLevel >= SONIC_SHOT_MIN_LEVEL);
+
+    if (!_sonicShotActive && cooldownReady && (wantsUp || wantsDown) && levelEligible) {
+      _sonicShotActive = true;
+      _sonicShotDirectionUp = wantsUp;
+      _sonicShotStartMs = now;
+      _sonicShotLastMs = now;
+    }
+
+    if (_sonicShotActive) {
+      float elapsed = float(now - _sonicShotStartMs);
+      float duration = float(SONIC_SHOT_DURATION_MS);
+      float tShot = (duration > 0.0f) ? constrain(elapsed / duration, 0.0f, 1.0f) : 1.0f;
+      float shaped = 1.0f - powf(1.0f - tShot, SONIC_SHOT_EASE_EXP);
+      float origin = _sonicShotDirectionUp ? pivotLow : pivotHigh;
+      float pivotTarget = _sonicShotDirectionUp ? pivotHigh : pivotLow;
+      float overshoot = (_sonicShotDirectionUp ? 1.0f : -1.0f) * SONIC_SHOT_OVERSHOOT_HZ;
+      float shotTarget = pivotTarget + overshoot;
+      shotTarget = constrain(shotTarget, FORCE_SWEEP_START_HZ, dynamicMaxHz);
+      freqTarget = origin + (shotTarget - origin) * shaped;
+      levelTarget = max(levelTarget,
+                        SWEEP_LOW_START_LEVEL
+                          + shaped * (SONIC_SHOT_LEVEL_PEAK - SWEEP_LOW_START_LEVEL));
+      overriding = true;
+      if (tShot >= 1.0f) {
+        _sonicShotActive = false;
+      }
+    }
+    return overriding;
+  };
+
+  bool sonicShotOverride = false;
+  if (beamRangeActive) {
+    sonicShotOverride = applySonicShot(demandFreq, sonicShotLevelTarget);
+  } else {
+    _sonicShotActive = false;
+  }
+
+  float desiredFreq = demandFreq;
+  if (_forceSweep && !sonicShotOverride) {
+    float maxDelta = computeMaxDeltaPerUpdate(_currentFrequency, sweepDynamicStep);
+    float delta = desiredFreq - _currentFrequency;
+    delta = constrain(delta, -maxDelta, maxDelta);
+    desiredFreq = _currentFrequency + delta;
+  }
 
   // ------ SLEW en log-domain (one-pole) ------
-  float tauFreq = SLEW_TAU_MS * 0.001f;
-  float alphaFreq = expf(-dt / max(1e-6f, tauFreq));
-  float targetLog = logf(desiredFreq);
-  _currentLogFreq = targetLog + alphaFreq * (_currentLogFreq - targetLog);
-  _currentFrequency = expf(_currentLogFreq);
-  updateWaveFrequency(_currentFrequency);
-
-  // ----- LEVEL: compresión base con sweep inicial (sin ramping durante el sweep) -----
-  const float slowCut  = 0.50f;
-  const float slopeSlow = 0.0005f;
-  const float slowExp  = 6.0f;
-
-  // Duración del barrido inicial de LEVEL
-  static constexpr uint32_t LEVEL_SWEEP_TIME_MS = 2000;
-
-  float tLevel = constrain(_targetLevel, 0.0f, 1.0f);
-
-  // cálculo normal del targetLevelScaled
-  float targetLevelScaled;
-  if (tLevel <= slowCut) {
-    float u = tLevel / slowCut;
-    float uCurved = powf(u, slowExp);
-    targetLevelScaled = uCurved * slopeSlow;
+  float finalFreq = _currentFrequency;
+  if (sonicShotOverride) {
+    finalFreq = constrain(desiredFreq, FORCE_SWEEP_START_HZ, dynamicMaxHz);
+    _currentLogFreq = logf(fmaxf(finalFreq, 1.0f));
+  } else if (beamRangeActive) {
+    float tauFreq = SLEW_TAU_MS * 0.001f;
+    float alphaFreq = expf(-dt / max(1e-6f, tauFreq));
+    float targetLog = logf(max(desiredFreq, 1.0f));
+    _currentLogFreq = targetLog + alphaFreq * (_currentLogFreq - targetLog);
+    finalFreq = expf(_currentLogFreq);
+    if (finalFreq < dynamicMinHz) {
+      finalFreq = dynamicMinHz;
+      _currentLogFreq = logf(dynamicMinHz);
+    } else if (finalFreq > dynamicMaxHz) {
+      finalFreq = dynamicMaxHz;
+      _currentLogFreq = logf(dynamicMaxHz);
+    }
   } else {
-    float u = (tLevel - slowCut) / (1.0f - slowCut);
-    targetLevelScaled = slopeSlow + u * (1.0f - slopeSlow);
+    finalFreq = max(desiredFreq, 1.0f);
+    _currentLogFreq = logf(max(finalFreq, 1.0f));
   }
+  _currentFrequency = finalFreq;
+  updateWaveFrequency(finalFreq);
 
-  // ---------------------------------------------------------------
-  // Lógica de Pre-Idle (solo mientras no termina esta fase)
+  // ----- LEVEL transitions -----
+  static constexpr uint32_t LEVEL_SWEEP_TIME_MS = 2000;
+  float tLevel = constrain(_targetLevel, 0.0f, 1.0f);
+  float sweepLogProgress = 0.0f;
+  bool  sweepLoggingActive = false;
+
   if (preIdleActive) {
-    // Progreso 0.0 → 1.0 durante pre-idle
     float tIdle = float(elapsedPreIdle) / float(PRE_IDLE_TIME_MS);
-
-    // Curva de subida lenta con exponente
-    float baseIdle = powf(tIdle, PRE_IDLE_CURVE_EXP) * PRE_IDLE_MAX;
-
-    // Generamos wobble usando seno
-    float wobble = sinf(tIdle * PRE_IDLE_WOBBLE_SPEED * 2.0f * PI) 
-                  * PRE_IDLE_WOBBLE_STRENGTH * baseIdle;
-
-    // Nivel final antes del sweep
-    _level = constrain(baseIdle + wobble, 0.0f, PRE_IDLE_MAX);
-
-    // Salir: nadie más toca _level en esta fase
+    float baseIdle = PRE_IDLE_MIN_LEVEL
+                   + powf(tIdle, PRE_IDLE_CURVE_EXP) * (PRE_IDLE_MAX - PRE_IDLE_MIN_LEVEL);
+    float wobble = sinf(tIdle * PRE_IDLE_WOBBLE_SPEED * 2.0f * PI)
+                   * PRE_IDLE_WOBBLE_STRENGTH * baseIdle;
+    _level = constrain(baseIdle + wobble, PRE_IDLE_MIN_LEVEL, PRE_IDLE_MAX);
     _levelInt = uint8_t(_level * 255.0f);
     return;
   }
 
-  // ---------------------------------------------------------------
-  // FIX: Iniciar SWEEP de LEVEL inmediatamente DESPUÉS de Pre-Idle,
-  // y SOLO una vez.
-  if (!_levelSweepInitDone) {
-    _levelSweepInitDone = true;
-    // Partimos del valor que dejó pre-idle para continuidad auditiva.
-    // Si quisieras un arranque más presente, podrías max(_level, PRE_IDLE_MAX).
-    _levelSweepStartMs = now;     // iniciar cronómetro del sweep aquí
-  }
-
-  // calcular progreso del sweep (desde que terminó pre-idle)
-  uint32_t elapsedLevelSweep = (now >= _levelSweepStartMs) ? (now - _levelSweepStartMs) : 0;
-  float tSweep = constrain(float(elapsedLevelSweep) / float(LEVEL_SWEEP_TIME_MS), 0.0f, 1.0f);
-
-  // FIX (audibilidad): curva del sweep para ataque más reconocible
-  // <1 = más rápido al principio; >1 = más lento al principio
-  float tSweepShaped = powf(tSweep, 0.7f);
-
-  // Durante el sweep forzamos _level al sweptTarget directamente (no rampStep)
-  float sweptTarget = targetLevelScaled * tSweepShaped;
-  if (tSweep < 1.0f) {
-    _level = sweptTarget;         // forzar progresión suave y continua
+  if (_forceSweep) {
+    float spanHz = max(1.0f, max(_freqMin, FORCE_SWEEP_START_HZ) - FORCE_SWEEP_START_HZ);
+    float freqProgress = (_currentFrequency - FORCE_SWEEP_START_HZ) / spanHz;
+    freqProgress = constrain(freqProgress, 0.0f, 1.0f);
+    _level = SWEEP_LOW_START_LEVEL
+           + freqProgress * (SWEEP_LOW_END_LEVEL - SWEEP_LOW_START_LEVEL);
+    _level = constrain(_level, SWEEP_LOW_START_LEVEL, SWEEP_LOW_END_LEVEL);
+    _levelInt = uint8_t(constrain(_level * 255.0f, 0.0f, 255.0f));
+    if (_levelInt < 1) _levelInt = 1;
+    sweepLogProgress = freqProgress;
+    sweepLoggingActive = true;
   } else {
-    // sweep terminado: usar ramping normal hacia targetLevelScaled
-    float diffL = targetLevelScaled - _level;
-    const float rampStep = LEVEL_RAMP_STEP;
-    if (fabsf(diffL) < rampStep) _level = targetLevelScaled;
-    else _level += (diffL > 0.0f ? rampStep : -rampStep);
+    float levelTau = LEVEL_SMOOTH_TAU_MS * 0.001f;
+    float alphaLevel = 1.0f - expf(-dt / max(1e-4f, levelTau));
+    _level += (tLevel - _level) * alphaLevel;
+    _level = constrain(_level, 0.0f, 1.0f);
+    _levelInt = uint8_t(constrain(_level * 255.0f, 0.0f, 255.0f));
   }
-  _levelInt = uint8_t(constrain(_level * 255.0f, 0.0f, 255.0f));
 
+  if (sonicShotLevelTarget > 0.0f) {
+    float boosted = constrain(sonicShotLevelTarget, 0.0f, 1.0f);
+    if (boosted > _level) {
+      _level = boosted;
+      _levelInt = uint8_t(constrain(_level * 255.0f, 0.0f, 255.0f));
+      if (_levelInt < 1) _levelInt = 1;
+    }
+  }
+  /*
+  static uint32_t _sweepDbgLast = 0;
+  if (sweepLoggingActive) {
+    uint32_t nowDbg = millis();
+    if (nowDbg - _sweepDbgLast >= 20) {
+      _sweepDbgLast = nowDbg;
+      Serial.printf("[AI:SWEEP] t=%lu L=%.4f tgt=%.4f freq=%.1f sweepT=%.2f\n",
+                    (unsigned long)nowDbg,
+                    double(_level),
+                    double(_targetLevel),
+                    double(_currentFrequency),
+                    double(sweepLogProgress));
+    }
+  }
+
+  */
+  
   // --- DECAY MIX / ENVELOPE (igual que antes) ---
   float A = constrain(_level, 0.0f, 1.0f);
   float energy = A * A;
@@ -408,7 +469,6 @@ void IRAM_ATTR AcousticInjector::onTimer() {
 
   // Salidas y estado compartido: leer copias atómicas de volátiles
   uint16_t env16_local      = _instance->_decayEnvInt16;
-  uint16_t mix16_local      = _instance->_decayMixInt16;
   uint16_t levelMul16_local = _instance->_decayLevelMulInt;
   uint8_t  level8_local     = _instance->_levelInt;
   uint32_t resPhaseAcc_local = _instance->_resPhaseAcc;
@@ -570,25 +630,30 @@ void AcousticInjector::testSimple() {
   Serial.println(F("✅ Test simple finalizado"));
 }
 
-// mapLoadToWaveFrequency: mapea level (0..1) a frecuencia.
-// Comportamiento:
-// 1) Si currentFrequency está por debajo de dynamicFreqMin -> fuerza un sweep exponencial rápido desde 2kHz a dynamicFreqMin.
-// 2) Cuando >= dynamicFreqMin, mapea level exponencialmente entre dynamicFreqMin y _freqMax.
-// dynamicFreqMin se calcula según _dTPSdtEntry igual que antes.
-float AcousticInjector::mapLoadToWaveFrequency(float level) {
-  level = constrain(level, 0.0f, 1.0f);
+// mapLoadToWaveFrequency: convierte la potencia (0..1) en una frecuencia de barrido acoplada perceptualmente.
+float AcousticInjector::mapLoadToWaveFrequency(float power) {
+  power = constrain(power, SWEEP_LOW_START_LEVEL, 1.0f);
 
-  // aplica tu curva perceptual si la tienes; aquí uso una curva ligera
-  const float a = 0.5f;
-  const float expA = expf(a);
-  const float expAmin = 1.0f;
-  float curvedLevel = (expf(a * level) - expAmin) / (expA - expAmin);
+  const float levelFreqStart = SWEEP_LOW_START_LEVEL; // 0.005 -> 2 kHz
+  const float levelFreqMin   = 0.015f;               // 0.015 -> freqMin (~5.5 kHz)
 
-  // mapea exponencial entre FORCE_FINAL_FREQ_MIN y FORCE_FINAL_FREQ_MAX
-  float logMin = logf(FORCE_FINAL_FREQ_MIN);
-  float logMax = logf(FORCE_FINAL_FREQ_MAX);
-  float logFreq = logMin + curvedLevel * (logMax - logMin);
-  return expf(logFreq);
+  const float freqStart = FORCE_SWEEP_START_HZ;
+  const float freqMin   = max(_freqMin, FORCE_SWEEP_START_HZ);
+  const float freqMax   = min(_freqMax, FORCE_FINAL_FREQ_MAX);
+
+  if (power <= levelFreqStart) {
+    return freqStart;
+  }
+
+  if (power <= levelFreqMin) {
+    float t = (power - levelFreqStart) / (levelFreqMin - levelFreqStart);
+    t = powf(constrain(t, 0.0f, 1.0f), SWEEP_FREQ_LOW_EXP);
+    return freqStart + t * (freqMin - freqStart);
+  }
+
+  float t = (power - levelFreqMin) / (1.0f - levelFreqMin);
+  t = powf(constrain(t, 0.0f, 1.0f), SWEEP_FREQ_HIGH_EXP);
+  return freqMin + t * (freqMax - freqMin);
 }
 
 void AcousticInjector::updateWaveFrequency(float freqHz) {
@@ -651,7 +716,6 @@ AcousticInjector::FrequencyRangeOption AcousticInjector::getFrequencyRangeOption
 void AcousticInjector::startDecay(uint32_t now) {
   // snapshots locales primero (sin bloquear largo tiempo)
   uint16_t env_snapshot;
-  uint16_t mix_snapshot;
   uint32_t phaseAcc_snapshot;
   uint32_t phaseStep_snapshot;
 
@@ -723,7 +787,6 @@ void AcousticInjector::setDecayParameters(uint32_t durationMs, float avgTPSLevel
   _decayMixInt16 = uint16_t(constrain(_decayMix * 65535.0f, 0.0f, 65535.0f));
   interrupts();
   // justo después de interrupts() final en setDecayParameters
-uint16_t mix16 = uint16_t(constrain(_decayMix * 65535.0f, 0.0f, 65535.0f));
 /*
 Serial.printf("DBG:setDecay dur=%u TPSf=%0.3f mix=%0.4f mix16=%u freq=%0.1f newStep=%u\n",
               _decayDurationMs,
@@ -747,58 +810,22 @@ void AcousticInjector::updateDecayState() {
   uint16_t mix16_copy    = _decayMixInt16;
   uint16_t mixSnapshot16 = _decayMixSnapshot16;
   uint32_t curStepAtomic = _resPhaseStep;
-  uint32_t decayDurCopy  = _decayDurationMs;
-  uint32_t localStartMs  = _decayStartMillis;
   interrupts();
   // =========================================================
   // ===== FEATURE SWITCHES (todas desactivadas por defecto) ==
   // =========================================================
-  const bool USE_SHOULDER      = false;//
+  const bool USE_SHOULDER      = true;//
   const bool USE_SOFT_BEND     = false;//
-  const bool USE_REBOUND       = false;//
-  const bool USE_FREQ_SWEEP    = false;// 
+  const bool USE_REBOUND       = true;//
   const bool USE_TAIL_FREEZE   = false;//
-  const bool USE_SLEW_CONTROL  = false;
-  const bool USE_FADE_OUT      = false;//
+  const bool USE_FADE_OUT      = true;//
   const bool USE_MIX_SNAPSHOT  = true;
-  const bool USE_ENERGY_FLOOR  = false;//
+  const bool USE_ENERGY_FLOOR  = true;//
 
   // ===========================================
   // ===== PARÁMETROS BASE / DEFAULTS ==========
   // ===========================================
-  const float MIN_ENERGY_F_BASE  = 0.0005f;
-  const float MIN_ENERGY_F_TIGHT = 0.0010f;
-  const float MIN_ENERGY_F_REAL  = USE_ENERGY_FLOOR ? MIN_ENERGY_F_TIGHT : MIN_ENERGY_F_BASE;
-
-  const float ZP_BASE       = 0.35f;
-  const float ZP_POWER_EXP  = 1.3f;
-  const float ZP_LOG_SCALE  = 0.20f;
-  const float GAMMA_ZP      = 1.4f;
-  const float SHOULDER_FRAC_ZP = 0.35f;
-
-  const float SOFT_BEND_DEPTH   = 0.20f;
-  const float SOFT_BEND_TIME_MS = 350.0f;
-
-  const float REBOUND_A        = 0.06f;
-  const float REBOUND_DAMP     = 8.0f;
-  const float REBOUND_FREQ_HZ  = 12.0f;
-  const float REBOUND_WINDOW_F = 0.4f;
-
-  const float END_FREQ_RATIO_ZP   = 0.30f;
-  const float MIN_FREQ_HZ_LOCAL   = 2000.0f;
-
-  const uint32_t CONTROL_PERIOD_MS = 20u;
-  const uint32_t MIN_SWEEP_MS       = 50u;
-  const uint32_t MAX_SWEEP_MS       = 500u;
-  const float    RES_SWEEP_MULT     = 5.5f;
-  const float    ENERGY_K           = 0.85f;
-  const uint32_t SLEW_TAIL_MAX_STEP = 128u;
-
-  const float TAIL_FREEZE_PROGRESS = 0.85f;
-  const float TAIL_FREEZE_RATIO    = 0.30f;
-
-  const float   FADE_START_PROGRESS = 0.90f;
-  const uint32_t FADE_MS            = 160u;
+  const float MIN_ENERGY_F_REAL  = USE_ENERGY_FLOOR ? DECAY_MIN_ENERGY_TIGHT : DECAY_MIN_ENERGY_BASE;
 
   float tSinceStart = float(millis() - _decayStartMillis);
   float envF = float(env16_copy) / 65535.0f;
@@ -808,17 +835,18 @@ void AcousticInjector::updateDecayState() {
                        : envF;
   if (lastLevelF < MIN_ENERGY_F_REAL) lastLevelF = MIN_ENERGY_F_REAL;
 
-  float duration_sec = ZP_BASE
-                     + 5.1f * powf(lastLevelF, ZP_POWER_EXP)
-                     + ZP_LOG_SCALE * log2f(lastLevelF + 1.0f);
-  uint32_t totalMs = uint32_t(max<float>(0.001f, duration_sec) * 1000.0f);
+  float duration_sec_formula = DECAY_ZP_BASE
+                     + 5.1f * powf(lastLevelF, DECAY_ZP_POWER_EXP)
+                     + DECAY_ZP_LOG_SCALE * log2f(lastLevelF + 1.0f);
+  uint32_t totalMsFormula = uint32_t(max<float>(0.001f, duration_sec_formula) * 1000.0f);
+  uint32_t totalMs = max<uint32_t>(_decayDurationMs, totalMsFormula);
 
   // ===========================================
   // ===== PROGRESS & SHOULDER BLOCK ===========
   // ===========================================
   float progress = 0.0f;
   if (USE_SHOULDER) {
-    uint32_t shoulderMs = uint32_t(float(totalMs) * SHOULDER_FRAC_ZP);
+    uint32_t shoulderMs = uint32_t(float(totalMs) * DECAY_SHOULDER_FRAC);
     uint32_t activeMs   = (totalMs > shoulderMs) ? (totalMs - shoulderMs) : 1u;
     progress = (tSinceStart <= shoulderMs)
                  ? 0.0f
@@ -833,7 +861,7 @@ void AcousticInjector::updateDecayState() {
   // ===== MAIN EXPONENTIAL DECAY BLOCK ========
   // ===========================================
   float lambda        = -logf(MIN_ENERGY_F_REAL / lastLevelF);
-  float shaped        = powf(progress, GAMMA_ZP);
+  float shaped        = powf(progress, DECAY_GAMMA);
   float expo          = expf(-lambda * shaped);
   float clipped_main  = lastLevelF * expo;
   if (clipped_main < MIN_ENERGY_F_REAL) clipped_main = MIN_ENERGY_F_REAL;
@@ -845,7 +873,7 @@ void AcousticInjector::updateDecayState() {
   float bendProgress   = 0.0f;
   float b              = 0.0f;
   if (USE_SOFT_BEND) {
-    bendProgress = constrain(tSinceStart / SOFT_BEND_TIME_MS, 0.0f, 1.0f);
+    bendProgress = constrain(tSinceStart / DECAY_SOFT_BEND_TIME_MS, 0.0f, 1.0f);
     if (bendProgress < 0.5f) {
       float x = bendProgress * 2.0f;
       b = 0.5f * (x * x * (3.0f - 2.0f * x));
@@ -853,8 +881,8 @@ void AcousticInjector::updateDecayState() {
       float x = (bendProgress - 0.5f) * 2.0f;
       b = 0.5f + 0.5f * (1.0f - ((1.0f - x) * (1.0f - x) * (3.0f - 2.0f * (1.0f - x))));
     }
-    softBendFactor = (bendProgress < 1.0f) ? (1.0f - SOFT_BEND_DEPTH * b)
-                                           : (1.0f - SOFT_BEND_DEPTH);
+    softBendFactor = (bendProgress < 1.0f) ? (1.0f - DECAY_SOFT_BEND_DEPTH * b)
+                                           : (1.0f - DECAY_SOFT_BEND_DEPTH);
   }
 
   // ===========================================
@@ -862,11 +890,11 @@ void AcousticInjector::updateDecayState() {
   // ===========================================
   float rebound = 0.0f;
   if (USE_REBOUND) {
-    if (tSinceStart < (totalMs * REBOUND_WINDOW_F)) {
+    if (tSinceStart < (totalMs * DECAY_REBOUND_WINDOW_FRAC)) {
       float tS    = tSinceStart / 1000.0f;
-      float A     = REBOUND_A * lastLevelF;
-      float omega = 2.0f * 3.14159265f * REBOUND_FREQ_HZ;
-      float damp  = expf(-REBOUND_DAMP * tS);
+      float A     = DECAY_REBOUND_A * lastLevelF;
+      float omega = 2.0f * 3.14159265f * DECAY_REBOUND_FREQ_HZ;
+      float damp  = expf(-DECAY_REBOUND_DAMP * tS);
       rebound     = A * damp * cosf(omega * tS);
       if (fabsf(rebound) < 0.0005f) rebound = 0.0f;
     }
@@ -876,31 +904,28 @@ void AcousticInjector::updateDecayState() {
   // ===== COMBINED LEVEL BLOCK ================
   // ===========================================
   float clipped_combined = clipped_main * softBendFactor + rebound;
-  clipped_combined = constrain(clipped_combined, MIN_ENERGY_F_REAL, 1.0f);
+  float smoothLevel = _level * 0.85f + clipped_combined * 0.15f;
+  clipped_combined = constrain(smoothLevel, MIN_ENERGY_F_REAL, 1.0f);
 
   // ===========================================
   // ===== FREQUENCY BLOCK =====================
   // ===========================================
-  float topFreqHz = (_decayResFreq > 0.0f) ? _decayResFreq : MIN_FREQ_HZ_LOCAL;
-  float targetFreqHz = topFreqHz;
-
-  if (USE_FREQ_SWEEP) {
-    float endFreqHz = topFreqHz * END_FREQ_RATIO_ZP;
-    float freqEase  = 1.0f - (1.0f - progress) * (1.0f - progress);
-    float bendFreqFactor = 1.0f;
-    if (USE_SOFT_BEND) {
-      float bendFreqDrop = SOFT_BEND_DEPTH * 0.10f;
-      bendFreqFactor = 1.0f - (bendProgress < 1.0f ? (bendFreqDrop * b) : 0.0f);
-    }
-    targetFreqHz = (topFreqHz + (endFreqHz - topFreqHz) * freqEase) * bendFreqFactor;
-    if (targetFreqHz < MIN_FREQ_HZ_LOCAL) targetFreqHz = MIN_FREQ_HZ_LOCAL;
+  float topFreqHz = (_decayResFreq > 0.0f) ? _decayResFreq : DECAY_MIN_FREQ_HZ;
+  float energyFactor = powf(constrain(clipped_combined, 0.0f, 1.0f), DECAY_FREQ_COUPLE_EXP);
+  float baseFreqHz = DECAY_MIN_FREQ_HZ + (topFreqHz - DECAY_MIN_FREQ_HZ) * energyFactor;
+  float targetFreqHz = baseFreqHz;
+  if (USE_SOFT_BEND) {
+    float bendFreqDrop = DECAY_SOFT_BEND_DEPTH * 0.15f;
+    float bendFactor = 1.0f - bendFreqDrop * b;
+    bendFactor = constrain(bendFactor, 0.2f, 1.0f);
+    targetFreqHz *= bendFactor;
   }
 
   if (USE_TAIL_FREEZE) {
       static bool tailLocked = false;
       static float frozenFreq = 0.0f;
 
-      if (progress >= TAIL_FREEZE_PROGRESS && !tailLocked) {
+      if (progress >= DECAY_TAIL_FREEZE_PROGRESS && !tailLocked) {
           tailLocked = true;
           frozenFreq = targetFreqHz;  // keep the current natural freq
       }
@@ -914,43 +939,42 @@ void AcousticInjector::updateDecayState() {
 
 
   const double sr = double(SAMPLE_RATE);
+  const double stepToHz = sr / (double(TABLE_SIZE) * double(1ULL << PHASE_FRAC));
   double stepFloat = double(targetFreqHz) * double(TABLE_SIZE) * double(1ULL << PHASE_FRAC) / sr;
   uint32_t computedTarget = (stepFloat < 1.0) ? 1u : uint32_t(round(stepFloat));
-  uint32_t minStep = uint32_t(round(double(MIN_FREQ_HZ_LOCAL) * double(TABLE_SIZE) * double(1ULL << PHASE_FRAC) / sr));
+  uint32_t minStep = uint32_t(round(double(DECAY_MIN_FREQ_HZ) * double(TABLE_SIZE) * double(1ULL << PHASE_FRAC) / sr));
   if (computedTarget < minStep) computedTarget = minStep;
 
   uint32_t targetStep = computedTarget;
   uint32_t nextStep   = curStepAtomic;
 
-  if (USE_SLEW_CONTROL) {
-    if (curStepAtomic != targetStep) {
-      uint32_t diff = (curStepAtomic > targetStep) ? (curStepAtomic - targetStep)
-                                                   : (targetStep - curStepAtomic);
-      uint32_t baseSweep = uint32_t(float(totalMs) * RES_SWEEP_MULT);
-      if (baseSweep < MIN_SWEEP_MS) baseSweep = MIN_SWEEP_MS;
+  if (curStepAtomic != targetStep) {
+    uint32_t diff = (curStepAtomic > targetStep) ? (curStepAtomic - targetStep)
+                                                 : (targetStep - curStepAtomic);
+    float currentFreqHz = float(double(curStepAtomic) * stepToHz);
+    float freqSpan = max(1.0f, topFreqHz - DECAY_MIN_FREQ_HZ);
+    float normalized = (currentFreqHz - DECAY_MIN_FREQ_HZ) / freqSpan;
+    normalized = constrain(normalized, 0.0f, 1.0f);
+    float maxDeltaHz = DECAY_SLEW_HIGH_FREQ_DELTA_HZ
+                     + (1.0f - normalized) * DECAY_SLEW_LOW_FREQ_EXTRA_HZ;
+    double maxDeltaStepD = double(maxDeltaHz) / stepToHz;
+    uint32_t maxDeltaStep = uint32_t(max(1.0, maxDeltaStepD));
+    if (maxDeltaStep > diff) maxDeltaStep = diff;
 
-      uint32_t sweepMs = uint32_t(float(baseSweep) / (1.0f + ENERGY_K * envF));
-      sweepMs = constrain(sweepMs, MIN_SWEEP_MS, MAX_SWEEP_MS);
-      uint32_t updatesEstimate = max<uint32_t>(1u, sweepMs / CONTROL_PERIOD_MS);
-      uint32_t stepDelta = (diff / updatesEstimate) + 1u;
-      if (progress >= 0.8f || clipped_combined < 0.06f)
-        if (stepDelta > SLEW_TAIL_MAX_STEP) stepDelta = SLEW_TAIL_MAX_STEP;
-      if (curStepAtomic > targetStep) {
-        if (stepDelta > diff) stepDelta = diff;
-        nextStep = curStepAtomic - stepDelta;
-      } else {
-        if (stepDelta > diff) stepDelta = diff;
-        nextStep = curStepAtomic + stepDelta;
-      }
+    if (curStepAtomic > targetStep) {
+      nextStep = curStepAtomic - maxDeltaStep;
+    } else {
+      nextStep = curStepAtomic + maxDeltaStep;
     }
-  } else {
-    nextStep = targetStep;
   }
 
+  float appliedFreqHz = float(double(nextStep) * stepToHz);
+
   if (USE_FADE_OUT) {
-    if (progress >= FADE_START_PROGRESS) {
+    if (progress >= DECAY_FADE_START_PROGRESS) {
       float remain = 1.0f - progress;
-      float fade = remain <= 0.0f ? 0.0f : remain / (1.0f - FADE_START_PROGRESS);
+      float fade = remain <= 0.0f ? 0.0f : remain / (1.0f - DECAY_FADE_START_PROGRESS);
+      fade = powf(fade, 1.3f);
       fade = constrain(fade, 0.0f, 1.0f);
       clipped_combined *= fade;
     }
@@ -968,7 +992,7 @@ void AcousticInjector::updateDecayState() {
   noInterrupts();
   _resPhaseStep     = nextStep;
   _resTargetStep    = targetStep;
-  _currentFrequency = targetFreqHz;
+  _currentFrequency = appliedFreqHz;
   _decayLevelMulInt = levelMulTarget16;
   _levelInt         = levelInt8Target;
   _level            = clipped_combined;
@@ -982,20 +1006,13 @@ void AcousticInjector::updateDecayState() {
   // ===========================================
   // ===== SALIDA CONDICIONAL POR FEATURES =====
   // ===========================================
-  bool levelNearZero = (_level <= MIN_ENERGY_F_REAL);
+  bool levelNearZero = (_decayEnvInt16 <= DECAY_ENVELOPE_EXIT_THRESHOLD);
   bool reboundDead   = (fabsf(rebound) < 0.001f);
   bool envelopeDone  = (progress >= 1.0f);
-  bool freqAtMin     = (targetFreqHz <= MIN_FREQ_HZ_LOCAL + 1.0f);
+  bool freqAtMin     = (appliedFreqHz <= DECAY_MIN_FREQ_HZ + 1.0f);
 
-  bool readyToEnd = false;
-
-  // Evaluación dependiente de features
-  if (envelopeDone) readyToEnd = true;
+  bool readyToEnd = envelopeDone && levelNearZero && freqAtMin;
   if (USE_REBOUND) readyToEnd = readyToEnd && reboundDead;
-  if (USE_FREQ_SWEEP) readyToEnd = readyToEnd && freqAtMin;
-  if (USE_FADE_OUT || USE_SOFT_BEND) readyToEnd = readyToEnd && levelNearZero;
-  if (!USE_REBOUND && !USE_FREQ_SWEEP && !USE_FADE_OUT && !USE_SOFT_BEND)
-      readyToEnd = (envelopeDone || (levelNearZero && reboundDead));
 
   // Acumulador de estabilidad
   if (readyToEnd) {
@@ -1037,7 +1054,7 @@ void AcousticInjector::updateDecayState() {
         double(_currentFrequency),
         (unsigned int)_decayEnvInt16,
         (unsigned int)_zeroCount,
-        (int)_inDecay
+        (int)_decayFinished
       );
   }
 
@@ -1063,3 +1080,13 @@ float AcousticInjector::freqGainFactor(float hz) {
     return g2 + t * (g3 - g2);
   }
 }
+
+
+
+
+
+
+
+
+
+
