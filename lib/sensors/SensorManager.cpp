@@ -13,7 +13,7 @@ void SensorManager::begin(uint8_t pinPressureData, uint8_t pinPressureSCK, uint8
     Serial.println("✅ ADS1115 listo");
   }
   mapSensor.begin(1, &ads);  // A1 para MAP
-  tpsSensor.begin(2, &ads);  // A0 para TPS
+  mafSensor.begin(2, &ads);  // A0 para MAF
   pressureSensor.begin(pinPressureData, pinPressureSCK);
       // Inicializar buffer
   for (size_t i = 0; i < PRESSURE_BUFFER_SIZE; i++) pressureKPABuffer[i] = 0.0f;
@@ -25,36 +25,36 @@ float SensorManager::readVacuum_inHg() {
   return vacuum_inHg;
 }
 
-float SensorManager::readTPSLoadPercent() {
-  return tpsLoadPercent;
+float SensorManager::readMAFLoadPercent() {
+  return mafLoadPercent;
 }
 
 uint16_t SensorManager::readMAPRawCached() {
   return rawMAPCached;
 }
 
-uint16_t SensorManager::readTPSRawCached() {
-  return rawTPSCached;
+uint16_t SensorManager::readMAFRawCached() {
+  return rawMAFCached;
 }
 
 float SensorManager::readMAPVolts() {
   return representVoltsFromRaw(rawMAPCached);
 }
 
-float SensorManager::readTPSVolts() {
-  return representVoltsFromRaw(rawTPSCached);
+float SensorManager::readMAFVolts() {
+  return representVoltsFromRaw(rawMAFCached);
 }
 
-bool SensorManager::isTPSValid() {
-  return tpsSensor.isValidReading();
+bool SensorManager::isMAFValid() {
+  return mafSensor.isValidReading();
 }
 
 MAPSensor& SensorManager::getMAP() {
   return mapSensor;
 }
 
-TPSSensor& SensorManager::getTPS() {
-  return tpsSensor;
+MAFSensor& SensorManager::getMAF() {
+  return mafSensor;
 }
 
 float SensorManager::readMAPLoadPercent() {
@@ -67,9 +67,9 @@ float SensorManager::representVoltsFromRaw(uint16_t raw) const {
   return raw * LSB;
 }
 
-float SensorManager::getRelativeTPSLevel(float tpsInitial) {
-  if (tpsInitial >= 100) return 0.0f;
-  float norm = ((float)tpsLoadPercent - tpsInitial) / (100.0f - tpsInitial);
+float SensorManager::getRelativeMAFLevel(float mafInitial) {
+  if (mafInitial >= 100) return 0.0f;
+  float norm = ((float)mafLoadPercent - mafInitial) / (100.0f - mafInitial);
   return constrain(norm, 0.0f, 1.0f);
 }
 
@@ -86,7 +86,7 @@ void SensorManager::enableSimulacion() {
 void SensorManager::disableSimulacion() {
   simulacionActiva = false;
   mapSensor.disableSimulation();
-  tpsSensor.disableSimulation();
+  mafSensor.disableSimulation();
 }
 
 bool SensorManager::isSimulation() {
@@ -96,20 +96,20 @@ bool SensorManager::isSimulation() {
 void SensorManager::updateADS1115() {
   if (simulacionActiva){
     rawMAPCached = (mapSensor.getSimulatedRaw() * 5.0f) / 32767.0f;
-    rawTPSCached = (tpsSensor.getSimulatedRaw()* 5.0f) / 32767.0f;
+    rawMAFCached = (mafSensor.getSimulatedRaw()* 5.0f) / 32767.0f;
   } else
   {
-    //rawMAPCached = ads.readADC_SingleEnded(1);
-    rawTPSCached = ads.readADC_SingleEnded(3); 
+    rawMAPCached = ads.readADC_SingleEnded(0);
+    rawMAFCached = ads.readADC_SingleEnded(3); 
   }
   //updatePressure();
   // Filtro IIR al raw directamente
   filteredRawMAP = alpha * rawMAPCached + (1 - alpha) * filteredRawMAP;
-  filteredRawTPS = alpha * rawTPSCached + (1 - alpha) * filteredRawTPS;
+  filteredRawMAF = alpha * rawMAFCached + (1 - alpha) * filteredRawMAF;
 
   //Porcentaje absoluto
   mapLoadPercent = mapSensor.convertRawToPercent((uint16_t)filteredRawMAP);
-  tpsLoadPercent = tpsSensor.convertRawToPercent((uint16_t)filteredRawTPS);
+  mafLoadPercent = mafSensor.convertRawToPercent((uint16_t)filteredRawMAF);
 }
 
 

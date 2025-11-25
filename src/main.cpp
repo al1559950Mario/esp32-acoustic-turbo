@@ -152,14 +152,14 @@ void loop() {
   bool sistemaActivo = usbConsoleUI.isSistemaActivo() || btConsoleUI.isSistemaActivo();
   if (sistemaActivo) {
     float mapLoadPercent = sensors.readMAPLoadPercent();
-    float tpsLoadPercent = sensors.readTPSLoadPercent();
+    float mafLoadPercent = sensors.readMAFLoadPercent();
 
-    if (mapLoadPercent >= 100.0f && tpsLoadPercent > 100.0f) {
+    if (mapLoadPercent >= 100.0f && mafLoadPercent > 100.0f) {
       ui->println("[ERROR] Carga 100%, saltando FSM");
     } else {
       fsm.update(
         mapLoadPercent,
-        tpsLoadPercent,
+        mafLoadPercent,
         usbConsoleUI.getCalibRequest(),
         btConsoleUI.getCalibRequest(),
         calibLoaded,
@@ -187,7 +187,7 @@ void loop() {
         float rms = sensors.computeRMS();
         String state = fsm.getStateName();
         String event = "Main_loop";
-        logger.logFull(tpsLoadPercent, mapLoadPercent, pressure_kPa, pressure_pct, pressure_psi,
+        logger.logFull(mafLoadPercent, mapLoadPercent, pressure_kPa, pressure_pct, pressure_psi,
               deltaP,  tau,  eventRate,  rms,
               acousticFreq,  acousticLevel,  turboLevel,  turboAmp,
               acousticOn, turboOn, state, event);

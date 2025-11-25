@@ -21,12 +21,12 @@ public:
   void startVortex();
   void stopVortex();
   bool isTurboOn() const;
-  void updateVortexLevel(float, float);
+  void updateVortexLevel(float mafLevel, float mapLevel);
 
   // Control Acoustic Injector
-  void startAcoustic(float level, float dt);
+  void startAcoustic(float level, float dMAFdt);
   void stopAcoustic();
-  void setAcousticParameters(float level, float mapLoadPercent);
+  void setAcousticParameters(float mafLevel, float mapLoadPercent);
   bool isAcousticOn() const;
   float getCurrentFrequency();
   float getAcousticLevel();

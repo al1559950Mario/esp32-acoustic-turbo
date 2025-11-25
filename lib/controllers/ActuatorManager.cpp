@@ -17,7 +17,7 @@ void ActuatorManager::begin(uint8_t rEnPin, uint8_t turboPwmPin, uint8_t turboPw
 }
 
 
-/// Actualiza actuadores. Turbo usa TPS*MAP y Acoustic Injector su lógica interna
+/// Actualiza actuadores. Turbo usa MAF*MAP y Acoustic Injector su lógica interna
 void ActuatorManager::updateInjector() {
     // Actualiza Acoustic Injector
     injector.update();
@@ -40,10 +40,10 @@ void ActuatorManager::stopVortex() {
     vortex.stop();
 }
 
-/// Modo manual: fuerza un nivel de PWM [0.0-1.0], ignorando TPS*MAP
+/// Modo manual: fuerza un nivel de PWM [0.0-1.0], ignorando MAF*MAP
 /// @param level: 0.0 = apagado, 1.0 = máxima potencia
-void ActuatorManager::updateVortexLevel(float levelTPS, float levelMAP) {
-    vortex.updatePowerLevel(levelTPS, levelMAP); // level ya está normalizado 0–1
+void ActuatorManager::updateVortexLevel(float levelMAF, float levelMAP) {
+    vortex.updatePowerLevel(levelMAF, levelMAP); // level ya está normalizado 0–1
 }
 
 
@@ -53,8 +53,8 @@ bool ActuatorManager::isTurboOn() const {
 }
 
 /// Enciende Acoustic Injector con nivel [0-1]
-void ActuatorManager::startAcoustic(float level, float dTPSdt) {
-    injector.start(level, dTPSdt);
+void ActuatorManager::startAcoustic(float level, float dMAFdt) {
+    injector.start(level, dMAFdt);
 }
 
 /// Apaga Acoustic Injector
@@ -64,15 +64,15 @@ void ActuatorManager::stopAcoustic() {
 
 /// Configura parámetros del Acoustic Injector
 /// @param level: potencia relativa [0-1]
-void ActuatorManager::setAcousticParameters(float tpsLoadLevel, float /*mapLoadLevel*/) {
-    injector.setLevel(tpsLoadLevel);
+void ActuatorManager::setAcousticParameters(float mafLoadLevel, float /*mapLoadLevel*/) {
+    injector.setLevel(mafLoadLevel);
 
     // Debug compacto (rate limit ~200 ms)
     static uint32_t _amLastLogMs = 0;
     uint32_t _amNow = millis();
     if (_amNow - _amLastLogMs >= 200) {
         _amLastLogMs = _amNow;
-        Serial.printf("[AM] maf=%.3f\n", double(tpsLoadLevel));
+        Serial.printf("[AM] maf=%.3f\n", double(mafLoadLevel));
     }
 }
 

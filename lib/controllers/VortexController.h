@@ -4,7 +4,7 @@
 /**
  * VortexController
  * Controla el BTS7960 en una sola dirección con PWM
- * y potencia escalable combinando %TPS y %MAP.
+ * y potencia escalable combinando %MAF y %MAP.
  */
 class VortexController {
 public:
@@ -30,11 +30,11 @@ public:
 
     /**
      * updatePowerLevel()
-     * Actualiza el PWM combinando TPS y MAP
-     * @param tpsPct: porcentaje de acelerador (0-100)
+     * Actualiza el PWM combinando MAF y MAP
+     * @param mafPct: porcentaje normalizado desde el sensor MAF (0-100)
      * @param mapLoadPercent: porcentaje de carga MAP (0-100)
      */
-    void updatePowerLevel(float, float);
+    void updatePowerLevel(float mafPct, float mapLoadPercent);
 
     bool isOn() const;
     bool isActive() const;

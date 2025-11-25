@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "ActuatorManager.h"
 #include "DebugManager.h"
@@ -27,7 +27,7 @@ enum class SystemState {
  * @class StateMachine
  * @brief Gestiona las transiciones y acciones de los estados del sistema.
  *
- * Usa lecturas de vacío MAP (inHg) y pedal (% TPS), además de peticiones de
+ * Usa lecturas de vacío MAP (inHg) y flujo (% MAF), además de peticiones de
  * calibración por consola o BLE, para decidir en qué estado operar.
  */
 class StateMachine {
@@ -44,14 +44,14 @@ public:
   /**
    * Realiza la lógica de transición de estados.
    * @param mapLoadPercent Porcentaje de carga MAP normalizado (0% = vacío máximo, 100% = presión atmosférica)
-   * @param tpsPct Lectura de TPS en porcentaje [0–100].
+   * @param mafPct Lectura del sensor MAF en porcentaje [0-100].
    * @param consoleCalibReq true si hubo petición de calibración por consola.
    * @param bleCalibReq true si hubo petición de calibración por BLE.
    * @param calibLoaded true si la calibracion fue exitosa y hay valores validos para el sistema.
    * @param dbg Objeto DebugManager que puede forzar estado DEBUG.
    */
   void update(float mapLoadPercent,
-              float tpsPct,
+              float mafPct,
               bool serialCalibReq,
               bool bleCalibReq,
               bool calibLoaded,
@@ -72,14 +72,14 @@ public:
   bool readyForBOOST( float, float);
   bool readyForBEAM( float, float);
 
-  float getTPSInitialForInj(){return tpsInitialPercent;};
+  float getMAFInitialForInj(){return mafInitialPercent;};
   float getMAPInitialForInj(){return mapInitialPercent;};
 
   CalibStep currentCalibStep = CalibStep::TPS_MIN;
   unsigned long lastStepTime = 0;
   SystemState getState() const {return current;}
   String getStateName () const;
-  void compute_dTPSdt_and_hold(float currentDeltaTPSLevel, float lastDeltaTPSLevel);
+  void compute_dMAFdt_and_hold(float, float, float currentDeltaMAFLevel);
 
 private:
   Thresholds thresholds;                         ///< Copia local de los umbrales actuales
@@ -91,44 +91,47 @@ private:
   SensorManager* sensors = nullptr;
   
   float              lastMapLoadPercent = 0.0f; ///< Guardar el último mapLoadPercent
-  float tpsInitialPercent = 0.0f;
+  float mafInitialPercent = 0.0f;
   float mapInitialPercent = 0.0f;
-  float _tpsLoadPercent = 0.0f;
+  float _mafLoadPercent = 0.0f;
   float _mapLoadPercent = 0.0f;
+  float _pressurePercent = 0.0f;
+  float _pressureDelta = 0.0f;
   unsigned long vortexStartMillis = 0;
   const unsigned long vortexDelayMs = 200;  // Tiempo en ms para esperar antes de activar vortex
   bool vortexPending = false;  
-  float tpsNormalized{0.0f}; 
+  float mafNormalized{0.0f}; 
   float mapNormalized{0.0f};
+  float _lastPressurePercent = 0.0f;
   float _beamVortexLevel = 0.0f;
   uint32_t _beamVortexLastUpdateMs = 0;
-  float lastDeltaTPSLevelForBOOST;   // <— último TPS%
-  float lastDeltaMAPLevelForBOOST;   // <— último MAP%
-  float lastDeltaTPSLevelForBEAM;   // <— último TPS%
-  float lastDeltaMAPLevelForBEAM;   // <— último MAP%
-  float currentDeltaTPSLevelForBOOST;
+  float lastDeltaMAFLevelForBOOST;   // <- último MAF%
+  float lastDeltaMAPLevelForBOOST;   // <- último MAP%
+  float lastDeltaMAFLevelForBEAM;   // <- último MAF%
+  float lastDeltaMAPLevelForBEAM;   // <- último MAP%
+  float currentDeltaMAFLevelForBOOST;
   float currentDeltaMAPLevelForBOOST;
-  float currentDeltaTPSLevelForBEAM;
+  float currentDeltaMAFLevelForBEAM;
   float currentDeltaMAPLevelForBEAM;
   const float MAP_DROP_THRESHOLD = 0.2f;  
-  const float TPS_DROP_THRESHOLD = 0.2f;
+  const float MAF_DROP_THRESHOLD = 0.2f;
   float avgMAPLevel = 0.0f;
   uint32_t mapSamples = 0;
-  float avgTPSLevel = 0.0f;
-  uint32_t tpsSamples = 0;
+  float avgMAFLevel = 0.0f;
+  uint32_t mafSamples = 0;
   float mapDrop = 0.0f;
-  float tpsDrop = 0.0f;
+  float mafDrop = 0.0f;
   bool dropDetected = false;
   bool belowThresholds = false;
-  float tpsMinOnBeam = 100.0f;
+  float mafMinOnBeam = 100.0f;
   uint32_t decayStartMillis     = 0;     // instante en que se disparó DECAY (ms)
   float decayDurationMs = 1500;          // **Base nominal** para la duración del DECAY en ms. Se escala con w/hold.
   
 
-  // ---------- derivada dTPS/dt (medición y filtrado) ----------
-  unsigned long _derivLastMillis = 0;    // timestamp de la última muestra usada para derivada
-  float _dTPSdtRaw = 0.0f;               // derivada instantánea (nivel por segundo, niveles 0..1)
-  float _dTPSdtEMA = 0.0f;               // EMA (suavizado) de la derivada
+  // ---------- derivada dMAF/dt (medición y filtrado) ----------
+  float _dMAFdtRaw = 0.0f;               // derivada instantánea (nivel por segundo, niveles 0..1)
+  float _dMAFdtEMA = 0.0f;               // derivada filtrada (usar sin filtrar para respuesta rápida)
+  bool _fastAttackActive = false;        // bandera si hay ataque positivo reciente
 
   // ---------- detección de hold ----------
   unsigned long _holdStartMillis = 0;    // cuando empezó la presión
@@ -140,14 +143,7 @@ private:
   float _tFastMs = 150.0f;                // tiempo característico del componente rápido (ms). Valores: 10..200
   float _tSustainMs = 250.0f;            // tiempo característico del sustain/cola (ms). Valores: 200..5000
 
-
-  // DERIV_EMA_ALPHA
-// Qué controla: suavizado exponencial de la derivada dTPS/dt.
-// Rango recomendado: 0.02 .. 0.50
-// Ajuste: disminuir para filtrar más ruido; aumentar para respuesta más rápida.
-const float DERIV_EMA_ALPHA = 0.50f;
-
-// DERIV_NORM
+  // DERIV_NORM
 // Qué controla: normalizador que mapea magnitud de derivada a gFast (0..1).
 // Rango recomendado: 0.5 .. 5.0
 // Ajuste: bajar para que pequeñas caídas activen gFast; subir si hay falsos positivos.
@@ -228,8 +224,13 @@ const float MIN_TAIL_MS = 10.0f;
   static constexpr float MAF_ATTACK_MIN_GAIN  = 0.75f;   // factor aplicado al power cuando el ataque es muy lento
   static constexpr float MAF_ATTACK_MAX_GAIN  = 1.25f;   // factor cuando el ataque es muy rápido
   static constexpr float MAF_RELEASE_REF_DTPS = -0.12f;  // referencia (nivel/sec) para detectar soltado rápido
-
-static constexpr uint32_t MIN_BEAM_DELAY_MS = 1000u; // 1 segundo mínimo antes de permitir BEAM
+//Bájalo por debajo de 0.10f si quieres que BEAM se dispare con ataques más suaves
+//Súbelo si deseas exigir pisadas más bruscas antes de considerar el ataque “válido”.
+  static constexpr float BEAM_ATTACK_MIN_DERIV   = 0.06f;  // nivel/sec mínimo para considerar un ataque rápido
+  static constexpr float BEAM_PRESSURE_PCT_ON    = 12.0f;  // presión mínima (en %) para permitir BEAM
+  static constexpr float BEAM_PRESSURE_DELTA_MIN = 1.5f;   // delta mínimo de presión (%)
+static constexpr uint32_t MIN_BEAM_DELAY_MS = 300u; // m segundos minimos antes de permitir BEAM
+static constexpr uint32_t BEAM_MIN_STREAM_MS = 800u; // tiempo minimo en BEAM antes de pasar a DECAY
 
   // BEAM_COND_MIN_HOLD_MS
   // Qué controla: tiempo mínimo que la condición de entrada a BEAM
@@ -243,11 +244,14 @@ static constexpr uint32_t MIN_BEAM_DELAY_MS = 1000u; // 1 segundo mínimo antes 
   static constexpr float BEAM_VORTEX_RAMP_TAU_SLOW_MS = 260.0f;
 
   // Seguimiento de la condición BEAM sostenida
-  uint32_t _beamCondStartMs = 0;   // instante en que se detectó la condición por primera vez
+  uint32_t _beamCondStartMs = 0;   // instante en que se detecto la condicion por primera vez
+  uint32_t _beamStreamStartMs = 0;
 
 
   void resetBeamVortexRamp(float seedLevel);
   float updateBeamVortexRamp(float mafPower);
 
 };
+
+
 

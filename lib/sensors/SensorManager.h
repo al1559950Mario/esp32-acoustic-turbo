@@ -1,6 +1,6 @@
 #pragma once
 #include "MAPSensor.h"
-#include "TPSSensor.h"
+#include "MAFSensor.h"
 #include <Arduino.h>
 #include "CalibrationManager.h"
 #include "PressureSensor.h"
@@ -13,14 +13,14 @@ public:
   void begin(uint8_t pinPressureData, uint8_t pinPressureSCK, uint8_t pinSDA, uint8_t pinSCL);
 
   float readVacuum_inHg();
-  float readTPSLoadPercent();
+  float readMAFLoadPercent();
   float readMAPLoadPercent();
 
   uint16_t readMAPRawCached();
-  uint16_t readTPSRawCached();
+  uint16_t readMAFRawCached();
   float readMAPVolts();
-  float readTPSVolts();
-  bool isTPSValid();
+  float readMAFVolts();
+  bool isMAFValid();
   float representVoltsFromRaw(uint16_t raw) const;
   void enableSimulacion();
   void disableSimulacion();
@@ -28,9 +28,9 @@ public:
   bool isSimulation();
 
   MAPSensor& getMAP();
-  TPSSensor& getTPS();
+  MAFSensor& getMAF();
 
-  float getRelativeTPSLevel(float);
+  float getRelativeMAFLevel(float);
   float getRelativeMAPLevel(float);
 
   float getPressure_kPa();
@@ -54,19 +54,26 @@ public:
 
 
   void updateADS1115(); // 👈 Opcional, si quieres usar una rutina periódica
+  // Compatibilidad con código antiguo (CalibrationManager, etc.)
+  float readTPSLoadPercent() { return readMAFLoadPercent(); }
+  uint16_t readTPSRawCached() { return readMAFRawCached(); }
+  float readTPSVolts() { return readMAFVolts(); }
+  bool isTPSValid() { return isMAFValid(); }
+  float getRelativeTPSLevel(float ref) { return getRelativeMAFLevel(ref); }
+
 private:
   MAPSensor mapSensor;
-  TPSSensor tpsSensor;
+  MAFSensor mafSensor;
   PressureSensor pressureSensor;
 
   float mapLoadPercent = 0.0f;  //
-  float tpsLoadPercent  = 0;
+  float mafLoadPercent  = 0;
 
   bool simulacionActiva = false;
-  float filteredRawTPS = 0;
+  float filteredRawMAF = 0;
   float filteredRawMAP = 0;
   const float alpha = 0.8;  // coeficiente del filtro
-  float rawTPSCached = 0.0f;
+  float rawMAFCached = 0.0f;
   float rawMAPCached = 0.0f;
 
 

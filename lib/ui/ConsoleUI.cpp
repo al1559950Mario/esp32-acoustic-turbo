@@ -44,15 +44,15 @@ void ConsoleUI::update() {
   if (inputAvailable()) {
     String linea = readLine();
     linea.trim();
-    if (simulationOnPython && linea.startsWith("tps_raw:")) {
-      int idxTPS = linea.indexOf("tps_raw:");
+    if (simulationOnPython && linea.startsWith("maf_raw:")) {
+      int idxTPS = linea.indexOf("maf_raw:");
       int idxMAP = linea.indexOf("map_raw:");
 
       if (idxTPS != -1 && idxMAP != -1) {
         uint16_t tpsRaw = linea.substring(idxTPS + 8, idxMAP - 1).toInt(); // -1 para excluir la coma
         uint16_t mapRaw = linea.substring(idxMAP + 8).toInt();
 
-        sensors->getTPS().setSimulatedRaw(tpsRaw);
+        sensors->getMAF().setSimulatedRaw(tpsRaw);
         sensors->getMAP().setSimulatedRaw(mapRaw);
       }
     } else if (linea.length() == 1) {
@@ -310,12 +310,12 @@ void ConsoleUI::interpretarComando(char c) {
       simulationOnPython = !simulationOnPython;
 
       if (simulationOnPython) {
-        //sensors->getTPS().enableSimulation();
+        //sensors->getMAF().enableSimulation();
         sensors->enableSimulacion();
         //sensors->getMAP().enableSimulation();
         sensors->enableSimulacion();
       } else {
-        sensors->getTPS().disableSimulation();
+        sensors->getMAF().disableSimulation();
         sensors->disableSimulacion();
         sensors->getMAP().disableSimulation();
         sensors->disableSimulacion();
@@ -328,10 +328,10 @@ void ConsoleUI::interpretarComando(char c) {
 
       this->printf("== DEBUG Sensores ==\n");
 
-      this->printf("TPS: raw=%d, volts=%.2f, %%=%.1f%%\n",
-                  sensors->getTPS().readRaw(),
-                  sensors->getTPS().readVolts(),
-                  sensors->getTPS().readPorcent());
+      this->printf("MAF: raw=%d, volts=%.2f, %%=%.1f%%\n",
+                  sensors->getMAF().readRaw(),
+                  sensors->getMAF().readVolts(),
+                  sensors->getMAF().readPorcent());
 
       this->printf("MAP: raw=%d, volts=%.2f\n",
                   sensors->getMAP().readRaw(),
@@ -381,8 +381,8 @@ void ConsoleUI::imprimirDashboard() {
     float mapMaxV = (mapMax * LSB_MV) / 1000.0f;
 
 
-    float tpsV = sensors->readTPSVolts();
-    float tpsPct = sensors->readTPSLoadPercent();
+    float tpsV = sensors->readMAFVolts();
+    float tpsPct = sensors->readMAFLoadPercent();
     float mapPct = sensors->readMAPLoadPercent();
     float mapV = sensors->readMAPVolts();
     uint8_t dac = actuators->getAcousticInjector().getCurrentDAC();
@@ -410,7 +410,7 @@ void ConsoleUI::imprimirDashboard() {
 
     // HUD en vivo: actualización en línea
     this->printf(
-        "\r[%s|%lus]TPS%.1f(%.1f–%.1f)%.0f%%MAP%.1f(%.1f–%.1f)%.0f%%|L%.3f|%.1fkhz|%.0f%% IS:%.1f%|Pk:%.1f|Rm%.1f|PS:%.0f",
+        "\r[%s|%lus]MAF%.1f(%.1f–%.1f)%.0f%%MAP%.1f(%.1f–%.1f)%.0f%%|L%.3f|%.1fkhz|%.0f%% IS:%.1f%|Pk:%.1f|Rm%.1f|PS:%.0f",
         stName, elapsed,
         tpsV, tpsMinV, tpsMaxV, tpsPct,
         mapV, mapMinV, mapMaxV, mapPct,
@@ -428,7 +428,7 @@ void ConsoleUI::imprimirDashboard() {
         lastState = st;
         this->println("\n\n=== VORTEX SYSTEM DASHBOARD ===");
         this->printf("Estado motor:      %s\n", stName);
-        this->printf("TPS Voltage:       %.3f V\n", tpsV);
+        this->printf("MAF Voltage:       %.3f V\n", tpsV);
         this->printf("MAP Voltage:       %.3f V\n", mapV);
         this->printf("DAC Output:        %u\n", dac);
         this->printf("Nivel acústico:    %.2f\n", level);
@@ -475,7 +475,7 @@ void ConsoleUI::imprimirHelp() {
     this->println(F("  i  → Cambiar umbrales INJ ON"));
     this->println(F("  j  → Activar logging"));
     this->println(F("  r  → Borrar calibración actual"));
-    this->println(F("  v  → Visualizar curva TPS-MAP (pendiente desarrollo)"));
+    this->println(F("  v  → Visualizar curva MAF-MAP (pendiente desarrollo)"));
     this->println(F("  x  → Paro manual, volver a IDLE"));
     this->println(F("  z  → Activar/Desactivar modo simulación"));
   }

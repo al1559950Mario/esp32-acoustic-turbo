@@ -65,7 +65,7 @@ void AcousticInjector::begin(uint8_t dacPin) {
 
 }
 
-void AcousticInjector::start(float level, float dTPSdt) {
+void AcousticInjector::start(float level, float dMAFdt) {
   // 1) Reinicio total (fase, nivel, índices)
   resetInternal();
   _active      = true;
@@ -88,7 +88,7 @@ void AcousticInjector::start(float level, float dTPSdt) {
   _levelSweepStartMs  = nowMs;
 
 
-  _dTPSdtEntry = constrain(dTPSdt, -10.0f, 10.0f); // proteger
+  _dMAFdtEntry = constrain(dMAFdt, -10.0f, 10.0f); // proteger
 
   if (!(std::isfinite(targetFreq) && targetFreq > 0.0f)) {
     targetFreq = max(_freqMin, FORCE_FINAL_FREQ_MIN);
@@ -1044,7 +1044,7 @@ void AcousticInjector::updateDecayState() {
 
   // ================== DEBUG INMEDIATO CADA 20 ms ==================
   uint32_t nowMs = millis();
-  if (nowMs - _lastDecayPrintMs >= 20) {
+  if (nowMs - _lastDecayPrintMs >= 1) {
       _lastDecayPrintMs = nowMs;
       Serial.printf(
         "[DECAY_DBG] t=%lu prog=%.3f lvl=%.4f freq=%.1f env=%u zeroCnt=%u DecayFinished=%d\n",

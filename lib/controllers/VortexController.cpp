@@ -38,20 +38,20 @@ void VortexController::stop() {
     }
 }
 
-void VortexController::updatePowerLevel(float levelTPS, float levelMAP) {
+void VortexController::updatePowerLevel(float levelMAF, float levelMAP) {
     // 1) Normalizar entradas
-    float tpsRel = constrain(levelTPS, 0.0f, 1.0f);
+    float mafRel = constrain(levelMAF, 0.0f, 1.0f);
     float mapRel = constrain(levelMAP, 0.0f, 1.0f);
 
     // 2) Pesos (mantén la suma ≈ 1)
-    const float tpsWeight = 0.85f;
+    const float mafWeight = 0.85f;
     const float mapWeight = 0.15f;
-    float sumW = tpsWeight + mapWeight;
-    float tpsW = (sumW > 0.0f) ? (tpsWeight / sumW) : 1.0f;
-    float mapW = 1.0f - tpsW;
+    float sumW = mafWeight + mapWeight;
+    float mafW = (sumW > 0.0f) ? (mafWeight / sumW) : 1.0f;
+    float mapW = 1.0f - mafW;
 
     // 3) Nivel combinado lineal (0..1)
-    float level = constrain(tpsW * tpsRel + mapW * mapRel, 0.0f, 1.0f);
+    float level = constrain(mafW * mafRel + mapW * mapRel, 0.0f, 1.0f);
 
     // -------- Aqui modificamos el comportamiento arriba de 0.5 --------
     // constante ajustable: >1 comprime la mitad superior; 1.0 = sin compresión

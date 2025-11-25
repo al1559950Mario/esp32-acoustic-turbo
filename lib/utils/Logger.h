@@ -6,12 +6,12 @@ class Logger {
 public:
     Logger(BluetoothSerial& bt, bool header = true);
 
-    void log(float tps, float map, const String& event = "");
+    void log(float maf, float map, const String& event = "");
 
     // Futuro: expansión con más sensores
-    void log(float tps, float map, float pressureRel, const String& event = "");
+    void log(float maf, float map, float pressureRel, const String& event = "");
 
-    void logFull(float tpsPercent, float mapPercent, float pressure_kPa, float pressure_pct, float pressure_psi,
+    void logFull(float mafPercent, float mapPercent, float pressure_kPa, float pressure_pct, float pressure_psi,
              float deltaP, float tau, float eventRate, float rms,
              float acousticFreq, float acousticLevel, float turboLevel, float turboCurr,
              bool acousticOn, bool turboOn, const String& state, const String& event);

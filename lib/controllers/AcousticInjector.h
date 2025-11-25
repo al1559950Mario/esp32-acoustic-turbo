@@ -24,7 +24,7 @@ public:
   FrequencyRangeOption getFrequencyRangeOption() const;
 
   void begin(uint8_t dacPin);
-  void start(float level, float dTPSdt);
+  void start(float level, float dMAFdt);
   void stop();
   void setLevel(float level);
   void update();               // Rampa de nivel
@@ -133,8 +133,8 @@ private:
   static constexpr float FORCE_FINAL_FREQ_MIN = 5500.0f;  // objetivo mínimo final (Hz)
   static constexpr float FORCE_FINAL_FREQ_MAX = 7000.0f;  // objetivo máximo final (Hz)
   static constexpr uint32_t FORCE_SWEEP_HOLD_MS = 120;     // tiempo extra tras pre-idle antes del sweep (ms)
-  static constexpr uint32_t FORCE_SWEEP_TIME_MS = 800u;    // duración del barrido inicial (ms)
-  static constexpr float FORCE_SWEEP_SHAPE_EXP = 0.65f;    // <1 = ataque inmediato, >1 = suave
+  static constexpr uint32_t FORCE_SWEEP_TIME_MS = 1000u;   // duración del barrido inicial (ms)
+  static constexpr float FORCE_SWEEP_SHAPE_EXP = 0.50f;    // <1 = ataque inmediato (ease-out), >1 = suave (ease-in)
   static constexpr float FORCE_SWEEP_STEP_LIMIT_HZ = 90.0f; // delta Hz base fuera de la zona de 2 kHz
   static constexpr float FORCE_SWEEP_NEAR_START_GAIN = 60.0f; // multiplicador (0..n) para acelerar cerca de 2 kHz
   static constexpr float FORCE_SWEEP_EXIT_TOL_HZ = 250.0f;    // tolerancia para salir del sweep anticipadamente
@@ -260,7 +260,7 @@ private:
 
   static uint32_t _logLastMs;
   static const uint32_t LOG_INTERVAL_MS = 1; // intervalo telemetría; aumentar si el logging afecta audio
-  float _dTPSdtEntry = 0.0f;
+  float _dMAFdtEntry = 0.0f;
 
   // ======== FASE PRE-IDLE (Simulación de arranque turbo comprimido) ========
 // Debe ir después de detectar la activación y ANTES del sweep de LEVEL
