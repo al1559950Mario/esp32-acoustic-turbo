@@ -35,8 +35,14 @@ void StateMachine::begin(bool hasCalibration,
     vortexPending       = false;
     vortexStartMillis   = 0;
     decayStartMillis = 0;
-    lastDeltaTPSLevelForBOOST      = 0.0f;
+    _fastAttackActive = false;
+    _pressurePercent = 0.0f;
+    _pressureDelta = 0.0f;
+    _lastPressurePercent = 0.0f;
+    lastDeltaMAFLevelForBOOST      = 0.0f;
     lastDeltaMAPLevelForBOOST      = 0.0f;
+    _dMAFdtRaw = 0.0f;
+    _dMAFdtEMA = 0.0f;
 
     if (actuators) {
         actuators->stopAcoustic();
@@ -49,26 +55,26 @@ void StateMachine::begin(bool hasCalibration,
 }
 
 float StateMachine::getLevel() const {
-    return tpsNormalized;
+    return mafNormalized;
 }
 
-bool StateMachine::readyForBOOST(float mapLoad, float tpsLoad) {
+bool StateMachine::readyForBOOST(float mapLoad, float mafLoad) {
     /*return mapLoad >= thresholds.BOOST_MAP_ON
-        && tpsLoad >= thresholds.BOOST_TPS_ON;
+        && mafLoad >= thresholds.BOOST_TPS_ON;
         */
-    return tpsLoad >= thresholds.BOOST_TPS_ON;
+    return mafLoad >= thresholds.BOOST_TPS_ON;
 }
 
-bool StateMachine::readyForBEAM(float mapLoad, float tpsLoad) {
+bool StateMachine::readyForBEAM(float mapLoad, float mafLoad) {
     /*return mapLoad >= thresholds.BEAM_MAP_ON
-        && tpsLoad >= thresholds.BEAM_TPS_ON;
+        && mafLoad >= thresholds.BEAM_TPS_ON;
         */
-    return tpsLoad >= thresholds.BEAM_TPS_ON;
+    return mafLoad >= thresholds.BEAM_TPS_ON;
 
 }
 
 void StateMachine::update(float mapLoadPercent,
-                          float tpsLoadPercent,
+                          float mafLoadPercent,
                           bool serialCalibReq,
                           bool bleCalibReq,
                           bool calibLoaded,
@@ -79,35 +85,43 @@ void StateMachine::update(float mapLoadPercent,
         thresholds = thresholdManager->getThresholds();
     }
 
-    // Mantener buffer de 5 muestras para TPS y MAP
-    static float tpsBuffer[5] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
+    // Mantener buffer de 5 muestras para MAF y MAP
+    static float mafBuffer[5] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
     static float mapBuffer[3] = {0.0f, 0.0f, 0.0f};
+    static float pressureBuffer[3] = {0.0f, 0.0f, 0.0f};
 
     // Desplazar las muestras anteriores
-    tpsBuffer[0] = tpsBuffer[1];
-    tpsBuffer[1] = tpsBuffer[2];
-    tpsBuffer[2] = tpsBuffer[3];
-    tpsBuffer[3] = tpsBuffer[4];
-    tpsBuffer[4] = tpsLoadPercent;
+    mafBuffer[0] = mafBuffer[1];
+    mafBuffer[1] = mafBuffer[2];
+    mafBuffer[2] = mafBuffer[3];
+    mafBuffer[3] = mafBuffer[4];
+    mafBuffer[4] = mafLoadPercent;
 
     mapBuffer[0] = mapBuffer[1];
     mapBuffer[1] = mapBuffer[2];
     mapBuffer[2] = mapLoadPercent;
 
-    // Aplicar mediana
-    _tpsLoadPercent  = median(tpsBuffer[0], tpsBuffer[1], tpsBuffer[2], tpsBuffer[3], tpsBuffer[4]);
-    _mapLoadPercent  = median(mapBuffer[0], mapBuffer[1], mapBuffer[2], mapBuffer[2], mapBuffer[2]);
+    pressureBuffer[0] = pressureBuffer[1];
+    pressureBuffer[1] = pressureBuffer[2];
+    pressureBuffer[2] = sensors ? sensors->getPressurePercent() : 0.0f;
 
-    currentDeltaTPSLevelForBOOST = sensors->getRelativeTPSLevel(thresholds.BOOST_TPS_ON);
+    // Aplicar mediana
+    _mafLoadPercent  = median(mafBuffer[0], mafBuffer[1], mafBuffer[2], mafBuffer[3], mafBuffer[4]);
+    _mapLoadPercent  = median(mapBuffer[0], mapBuffer[1], mapBuffer[2], mapBuffer[2], mapBuffer[2]);
+    _pressurePercent = median(pressureBuffer[0], pressureBuffer[1], pressureBuffer[2], pressureBuffer[2], pressureBuffer[2]);
+    _pressureDelta   = _pressurePercent - _lastPressurePercent;
+    _lastPressurePercent = _pressurePercent;
+
+    currentDeltaMAFLevelForBOOST = sensors->getRelativeMAFLevel(thresholds.BOOST_TPS_ON);
     currentDeltaMAPLevelForBOOST = sensors->getRelativeMAPLevel(thresholds.BOOST_MAP_ON);
 
-    currentDeltaTPSLevelForBEAM = sensors->getRelativeTPSLevel(thresholds.BEAM_TPS_ON);
+    currentDeltaMAFLevelForBEAM = sensors->getRelativeMAFLevel(thresholds.BEAM_TPS_ON);
     currentDeltaMAPLevelForBEAM = sensors->getRelativeMAPLevel(thresholds.BEAM_MAP_ON);
 
     mapNormalized   = mapLoadPercent / 100.0f;
-    tpsNormalized   = tpsLoadPercent / 100.0f;
+    mafNormalized   = mafLoadPercent / 100.0f;
 
-    compute_dTPSdt_and_hold(currentDeltaTPSLevelForBEAM, lastDeltaTPSLevelForBOOST);
+    compute_dMAFdt_and_hold(mafBuffer[4], mafBuffer[0], currentDeltaMAFLevelForBEAM);
 
 
     switch (current) {
@@ -141,10 +155,10 @@ void StateMachine::update(float mapLoadPercent,
             break;
 
         case SystemState::IDLE:
-            if (readyForBOOST(_mapLoadPercent, _tpsLoadPercent)) {
+            if (readyForBOOST(_mapLoadPercent, _mafLoadPercent)) {
                 current = SystemState::BOOST;
                 if (sensors) {
-                    tpsInitialPercent = sensors->readTPSLoadPercent();
+                    mafInitialPercent = sensors->readMAFLoadPercent();
                     mapInitialPercent = sensors->readMAPLoadPercent();
                 }
                 if (actuators) {
@@ -157,22 +171,40 @@ void StateMachine::update(float mapLoadPercent,
 
         case SystemState::BOOST:
             {
-            bool beamRaw = readyForBEAM(_mapLoadPercent, _tpsLoadPercent);
+            bool beamRaw = readyForBEAM(_mapLoadPercent, _mafLoadPercent);
+            bool attackReady = _fastAttackActive;
+            bool pressureReady = (_pressurePercent >= BEAM_PRESSURE_PCT_ON);
+            bool pressureRiseReady = (_pressureDelta >= BEAM_PRESSURE_DELTA_MIN);
             unsigned long now = millis();
-            if (beamRaw) {
+            /*
+            if (beamRaw || attackReady || pressureReady || pressureRiseReady) {
+                Serial.printf("[BEAM][BOOST] raw=%d attack=%d pres=%.1f%% dPres=%.2f presReady=%d dReady=%d\n",
+                              beamRaw ? 1 : 0,
+                              attackReady ? 1 : 0,
+                              _pressurePercent,
+                              _pressureDelta,
+                              pressureReady ? 1 : 0,
+                              pressureRiseReady ? 1 : 0);
+            }
+            
+            */
+            //if (beamRaw && attackReady && pressureReady && pressureRiseReady) {
+
+            if (attackReady & beamRaw) {
                 if (_beamCondStartMs == 0) _beamCondStartMs = now;
                 if ((now - _beamCondStartMs) >= BEAM_COND_MIN_HOLD_MS) {
                     current = SystemState::BEAM;
                     _beamCondStartMs = 0; // reset tracker al entrar
+                    _beamStreamStartMs = now;
                     actuators->stopAcoustic();
-                    actuators->startAcoustic(0.005f, _dTPSdtEMA);
-                    resetBeamVortexRamp(currentDeltaTPSLevelForBEAM);
+                    actuators->startAcoustic(0.005f, _dMAFdtEMA);
+                    resetBeamVortexRamp(currentDeltaMAFLevelForBEAM);
                 }
             } else {
                 _beamCondStartMs = 0; // reset si la condición se rompe
             }
 
-            if (_tpsLoadPercent <= thresholds.BOOST_TPS_OFF){
+            if (_mafLoadPercent <= thresholds.BOOST_TPS_OFF){
                 current = SystemState::IDLE;
             }
             }
@@ -180,12 +212,19 @@ void StateMachine::update(float mapLoadPercent,
 
         case SystemState::BEAM: {
             // detectar caída usando derivada suavizada (unidades: nivel/sec)
-            float deriv = _dTPSdtEMA; // ya calculada por compute_dTPSdt_and_hold
+            float deriv = _dMAFdtEMA; // ya calculada por compute_dMAFdt_and_hold
             bool dropDetected = (deriv <= -DERIV_DROP_THRESHOLD);
-            belowThresholds = (_tpsLoadPercent <= thresholds.BEAM_TPS_OFF);
+            belowThresholds = (_mafLoadPercent <= thresholds.BEAM_TPS_OFF);
+            unsigned long now = millis();
+            if (_beamStreamStartMs == 0) {
+                _beamStreamStartMs = now;
+            }
+            bool beamMinTimeMet = (now - _beamStreamStartMs) >= BEAM_MIN_STREAM_MS;
+            if (belowThresholds && !beamMinTimeMet) {
+                belowThresholds = false;
+            }
 
             if (belowThresholds) {
-                unsigned long now = millis();
 
                 // calcular hold_ms si estuvo activo
                 unsigned long holdMs = 0;
@@ -223,8 +262,9 @@ void StateMachine::update(float mapLoadPercent,
                 // disparar DECAY con parámetros ahora dinámicos
                 decayStartMillis = now;
                 current = SystemState::DECAY;
+                _beamStreamStartMs = 0;
                 vortexPending = false;
-                actuators->getAcousticInjector().setDecayParameters(durationMs, avgTPSLevel,
+                actuators->getAcousticInjector().setDecayParameters(durationMs, avgMAFLevel,
                                                                     gFast, gSustain, (uint32_t)tFast, (uint32_t)tSustain);
                 actuators->getAcousticInjector().startDecay(now);
 
@@ -242,8 +282,11 @@ void StateMachine::update(float mapLoadPercent,
             // Interrumpir decay solo si la condición BEAM se mantiene
             {
             unsigned long now = millis();
-            bool beamRaw = readyForBEAM(_mapLoadPercent, _tpsLoadPercent);
-            if (beamRaw) {
+            bool beamRaw = readyForBEAM(_mapLoadPercent, _mafLoadPercent);
+            bool attackReady = _fastAttackActive;
+            bool pressureReady = (_pressurePercent >= BEAM_PRESSURE_PCT_ON);
+            bool pressureRiseReady = (_pressureDelta >= BEAM_PRESSURE_DELTA_MIN);
+            if (beamRaw && attackReady && pressureReady && pressureRiseReady) {
                 if (_beamCondStartMs == 0) _beamCondStartMs = now;
             } else {
                 _beamCondStartMs = 0;
@@ -251,17 +294,17 @@ void StateMachine::update(float mapLoadPercent,
 
             bool minDelayOk = (now - decayStartMillis >= MIN_BEAM_DELAY_MS);
             bool holdOk = (_beamCondStartMs != 0) && ((now - _beamCondStartMs) >= BEAM_COND_MIN_HOLD_MS);
-            if (beamRaw && minDelayOk && holdOk) {
+            if (beamRaw && attackReady && pressureReady && pressureRiseReady && minDelayOk && holdOk) {
                 current = SystemState::BEAM;  // o BEAM si así lo quieres
                 _beamCondStartMs = 0;
                 if (sensors) {
-                    tpsInitialPercent = sensors->readTPSLoadPercent();
+                    mafInitialPercent = sensors->readMAFLoadPercent();
                     mapInitialPercent = sensors->readMAPLoadPercent();
                 }
                 if (actuators) {
                     actuators->stopAcoustic();
-                    actuators->startAcoustic(0.005f, _dTPSdtEMA);
-                    resetBeamVortexRamp(currentDeltaTPSLevelForBEAM);
+                    actuators->startAcoustic(0.005f, _dMAFdtEMA);
+                    resetBeamVortexRamp(currentDeltaMAFLevelForBEAM);
                     vortexPending     = true;
                     vortexStartMillis = now;
                 }
@@ -270,8 +313,7 @@ void StateMachine::update(float mapLoadPercent,
             }
 
             // Mantener lógica original de tiempo
-            if (!actuators->decayFinished()) {
-           
+            if (actuators->decayFinished()) {
                 current = SystemState::IDLE;
                 if (actuators) {
                     actuators->stopAcoustic();
@@ -298,11 +340,11 @@ void StateMachine::handleActions() {
 
     if (current == SystemState::BOOST) {
     // Solo turbo / vortex
-    if (abs(currentDeltaTPSLevelForBOOST - lastDeltaTPSLevelForBOOST) > 0.01f
+    if (abs(currentDeltaMAFLevelForBOOST - lastDeltaMAFLevelForBOOST) > 0.01f
         || abs(currentDeltaMAPLevelForBOOST  - lastDeltaMAPLevelForBOOST ) > 0.01f) {
-        //Usando solo TPS temporalmente
-        actuators->updateVortexLevel(currentDeltaTPSLevelForBOOST, currentDeltaTPSLevelForBOOST);
-        lastDeltaTPSLevelForBOOST = currentDeltaTPSLevelForBOOST;
+        //Usando solo MAF temporalmente
+        actuators->updateVortexLevel(currentDeltaMAFLevelForBOOST, currentDeltaMAFLevelForBOOST);
+        lastDeltaMAFLevelForBOOST = currentDeltaMAFLevelForBOOST;
         lastDeltaMAPLevelForBOOST = currentDeltaMAPLevelForBOOST;
         }
     }
@@ -312,31 +354,32 @@ void StateMachine::handleActions() {
             thresholds = thresholdManager->getThresholds();
             }
         mapSamples++;
-        tpsSamples++;
+        mafSamples++;
 
         avgMAPLevel += (currentDeltaMAPLevelForBEAM - avgMAPLevel) / float(mapSamples);
-        avgTPSLevel += (currentDeltaTPSLevelForBEAM - avgTPSLevel) / float(tpsSamples);
+        avgMAFLevel += (currentDeltaMAFLevelForBEAM - avgMAFLevel) / float(mafSamples);
 
         // Dinámica de MAF (antes TPS): ajustar potencia según rapidez
-        float powerInput = currentDeltaTPSLevelForBEAM;
-        float attackNorm = ( _dTPSdtEMA - MAF_ATTACK_SLOW_DTPS )
+        float powerInput = currentDeltaMAFLevelForBEAM;
+        float attackNorm = ( _dMAFdtEMA - MAF_ATTACK_SLOW_DTPS )
                          / (MAF_ATTACK_FAST_DTPS - MAF_ATTACK_SLOW_DTPS);
         attackNorm = constrain(attackNorm, 0.0f, 1.0f);
         float attackGain = MAF_ATTACK_MIN_GAIN
                          + attackNorm * (MAF_ATTACK_MAX_GAIN - MAF_ATTACK_MIN_GAIN);
+
         float power = powerInput * attackGain;
-        if (_dTPSdtEMA < 0.0f) {
-            float releaseNorm = constrain(_dTPSdtEMA / MAF_RELEASE_REF_DTPS, 0.0f, 1.0f);
+        if (_dMAFdtEMA < 0.0f) {
+            float releaseNorm = constrain(_dMAFdtEMA / MAF_RELEASE_REF_DTPS, 0.0f, 1.0f);
             power *= (1.0f - 0.5f * releaseNorm); // reduce hasta 50 % en soltados rápidos
         }
         power = constrain(power, 0.0f, 1.0f);
 
-        bool levelChanged = (abs(currentDeltaTPSLevelForBEAM - lastDeltaTPSLevelForBEAM) > 0.01f
+        bool levelChanged = (abs(currentDeltaMAFLevelForBEAM - lastDeltaMAFLevelForBEAM) > 0.01f
                           || abs(currentDeltaMAPLevelForBEAM  - lastDeltaMAPLevelForBEAM ) > 0.01f);
 
         if (levelChanged) {
             actuators->setAcousticParameters(power, power);
-            lastDeltaTPSLevelForBEAM = currentDeltaTPSLevelForBEAM;
+            lastDeltaMAFLevelForBEAM = currentDeltaMAFLevelForBEAM;
             lastDeltaMAPLevelForBEAM = currentDeltaMAPLevelForBEAM;
         }
 
@@ -407,36 +450,28 @@ String StateMachine::getStateName() const {
 }
 
 // Llama a esto cada ciclo de control con los niveles 0..1
-void StateMachine::compute_dTPSdt_and_hold(float currentDeltaTPSLevel, float lastDeltaTPSLevel) {
-  unsigned long now = millis();
-  // primer llamado seguro: inicializar referencia temporal y salir
-  if (_derivLastMillis == 0) {
-    _derivLastMillis = now;
-    _dTPSdtRaw = 0.0f;
-    return;
-  }
+void StateMachine::compute_dMAFdt_and_hold(float newestMAFPercent,
+                                           float oldestMAFPercent,
+                                           float currentDeltaMAFLevel) {
+  // derivada usando ventana completa (5 muestras => 4 intervalos)
+  float window = 4.0f; // diferencia entre índice 4 y 0
+  float raw = (newestMAFPercent - oldestMAFPercent) / window;
 
-  unsigned long dt_ms = now - _derivLastMillis;
-  if (dt_ms == 0) dt_ms = 1; // proteger
+  _dMAFdtRaw = raw;
 
-  // derivada en unidades por segundo (niveles 0..1)
-  float raw = (currentDeltaTPSLevel - lastDeltaTPSLevel) / (float(dt_ms) / 1000.0f);
+  // Para esta versión simple usamos el valor instantáneo como derivada filtrada
+  _dMAFdtEMA = raw;
 
-  // proteger contra outliers
-  raw = constrain(raw, -10.0f, 10.0f);
+  // Ataque rápido activo solo si la pendiente supera el umbral positivo
+  _fastAttackActive = (_dMAFdtEMA >= BEAM_ATTACK_MIN_DERIV);
 
-  _dTPSdtRaw = raw;
 
-  // EMA para suavizar la derivada
-  _dTPSdtEMA = DERIV_EMA_ALPHA * raw + (1.0f - DERIV_EMA_ALPHA) * _dTPSdtEMA;
-
-  if (!_holdActive && currentDeltaTPSLevel > PRESS_EPS) {
+  if (!_holdActive && currentDeltaMAFLevel > PRESS_EPS) {
     _holdActive = true;
-    _holdStartMillis = now;
+    _holdStartMillis = millis();
   }
-
-  _derivLastMillis = now;
 }
+
 
 
 
