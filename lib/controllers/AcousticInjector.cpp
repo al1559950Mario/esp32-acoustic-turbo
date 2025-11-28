@@ -1,5 +1,6 @@
 #include "AcousticInjector.h"
 #include "driver/dac.h"
+#include "../audio/IAcousticOutput.h"
 #include <math.h>
 #include "StateMachine.h"
 #include <cmath>   // para std::isfinite, std::isnan, std::isinf
@@ -34,7 +35,6 @@ void AcousticInjector::begin(uint8_t dacPin) {
   _dacPin = dacPin;
 
   _dacChannel = (_dacPin == 25) ? DAC_CHANNEL_1 : DAC_CHANNEL_2;
-  dac_output_enable(_dacChannel);
 
   _level = 0.0f;
   _targetLevel = 0.0f;
@@ -50,18 +50,27 @@ void AcousticInjector::begin(uint8_t dacPin) {
   }
 
   // configurar timer a sampleRate fijo (counts = us porque prescaler 80 -> 1MHz)
-  _timer = timerBegin(2, 80, true); // Timer 2, 1 MHz
+  _timer = timerBegin(2, 2, true); // Timer 2, 40 MHz tick
   timerAttachInterrupt(_timer, &AcousticInjector::onTimer, true);
 
+  #if 0
   float sampleRate = SAMPLE_RATE; // p.ej. 64kHz
   float periodPerSample = 1e6f / sampleRate; // μs
   timerAlarmWrite(_timer, static_cast<uint32_t>(periodPerSample), true);
+  #endif
+  // Reemplazo: programar periodo en cuentas (40 MHz)
+  const uint32_t timerBaseHz = 80000000u / 2u; // 40 MHz
+  uint64_t periodCounts = ((uint64_t)timerBaseHz + (uint64_t)(SAMPLE_RATE/2)) / (uint64_t)SAMPLE_RATE; // redondeo
+  timerAlarmWrite(_timer, periodCounts, true);
   timerAlarmDisable(_timer);
 
   // init phase values
   _phaseAcc = 0;
   _phaseStep = 0;
   _levelInt = (uint8_t)(_level * 255.0f);
+
+  // Backend se establece externamente (ActuatorManager) mediante setOutput().
+  // Si se desea usar DAC interno como fallback, hacerlo explícitamente fuera.
 
 }
 
@@ -108,10 +117,12 @@ void AcousticInjector::start(float level, float dMAFdt) {
   // 3) Calcular primer phaseStep en startFreq
   updateWaveFrequency(_currentFrequency);
 
-  // 4) Arrancar timer/DAC y seed de decay de forma atómica
-  timerWrite(_timer, 0);
-  delay(1);
-  timerAlarmEnable(_timer);
+  // 4) Arrancar salida: en pull-mode no habilita timer; caso contrario usa timer/ISR
+  if (!_pullMode) {
+    timerWrite(_timer, 0);
+    delay(1);
+    timerAlarmEnable(_timer);
+  }
 
   noInterrupts();
   // seed de envelope desde nivel float convertido a 16-bit
@@ -126,8 +137,8 @@ void AcousticInjector::stop() {
   resetInternal();
   _active = false;
   _inDecay = false;
-  timerAlarmDisable(_timer);
-  dac_output_voltage(_dacChannel, 128);
+  if (_timer) timerAlarmDisable(_timer);
+  if (_output) _output->write(128);
   _level = 0.0f;
   _targetLevel = 0.0f;
   _levelInt = 0;
@@ -447,7 +458,7 @@ void IRAM_ATTR AcousticInjector::onTimer() {
     _instance->_decayEnvInt16 = 0;
     _instance->_resAmpInt16 = 0;
     _instance->_levelInt = 0;
-    dac_output_voltage(_instance->_dacChannel, 128); // salida neutra DAC
+    if (_instance->_output) _instance->_output->writeFromISR(128); // salida neutra
     _instance->_lastDACValue = 128;
     return;
   }
@@ -473,7 +484,7 @@ void IRAM_ATTR AcousticInjector::onTimer() {
   uint8_t  level8_local     = _instance->_levelInt;
   uint32_t resPhaseAcc_local = _instance->_resPhaseAcc;
   uint32_t resPhaseStep_local= _instance->_resPhaseStep;
-  dac_channel_t dacCh_local  = _instance->_dacChannel;  
+  // dac_channel_t dacCh_local  = _instance->_dacChannel;  
   bool     inDecay_local     = _instance->_inDecay;
 
   // ================= LÓGICA DE SELECCIÓN DE RESONADOR =================
@@ -484,7 +495,7 @@ void IRAM_ATTR AcousticInjector::onTimer() {
     if (principal > 255) principal = 255;
     uint8_t output = uint8_t(principal);
     if (output != _instance->_lastDACValue) {
-        dac_output_voltage(dacCh_local, output);
+        if (_instance->_output) _instance->_output->writeFromISR(output);
         _instance->_lastDACValue = output;
     }
     _instance->_lastDACValue = output;
@@ -524,7 +535,7 @@ void IRAM_ATTR AcousticInjector::onTimer() {
   uint8_t output = uint8_t(out);
 
   if (output != _instance->_lastDACValue) {
-    dac_output_voltage(dacCh_local, output);
+    if (_instance->_output) _instance->_output->writeFromISR(output);
     _instance->_lastDACValue = output;
 }
 
@@ -556,7 +567,7 @@ void AcousticInjector::test() {
 }
 
 void AcousticInjector::testFloor() {
-  Serial.println(F("[AI] Prueba piso DAC (1 LSB) iniciada..."));
+  Serial.println(F("[AI] Prueba piso salida (min step 8-bit) iniciada..."));
 
   bool wasActive = _active;
   if (_timer) {
@@ -564,7 +575,7 @@ void AcousticInjector::testFloor() {
   }
 
   const float freq = 6000.0f;
-  const float sampleRate = 64000.0f;
+  const float sampleRate = float(SAMPLE_RATE);
   const uint8_t bias = 128;
   const float oneLsbLevel = 1.0f / 127.0f;
   const float amplitude = 127.0f * oneLsbLevel;
@@ -574,22 +585,24 @@ void AcousticInjector::testFloor() {
   const uint32_t durationMs = 2000;
   const uint32_t samples = uint32_t((durationMs / 1000.0f) * sampleRate);
 
+  const uint32_t periodUs = (uint32_t)(1000000.0f / sampleRate);
+
   for (uint32_t i = 0; i < samples; ++i) {
     float value = bias + amplitude * sinf(phase);
     int v = constrain(int(value + 0.5f), 0, 255);
-    dac_output_voltage(_dacChannel, uint8_t(v));
+    if (_output) _output->write(uint8_t(v));
     phase += dPhase;
     if (phase >= 2.0f * PI) phase -= 2.0f * PI;
-    delayMicroseconds(15);
+    delayMicroseconds(periodUs);
   }
 
-  dac_output_voltage(_dacChannel, bias);
+  if (_output) _output->write(bias);
   if (_timer && wasActive) {
     timerWrite(_timer, 0);
     timerAlarmEnable(_timer);
   }
 
-  Serial.println(F("[AI] Prueba piso DAC finalizada."));
+  Serial.println(F("[AI] Prueba piso salida finalizada."));
 }
 
 void AcousticInjector::emitResonant(float level) {
@@ -606,13 +619,13 @@ void AcousticInjector::emitResonant(float level) {
 
   for (int i = 0; i < sampleCount; ++i) {
     float value = bias + amplitude * sinf(phase);
-    dac_output_voltage(_dacChannel, constrain((int)value, 0, 255));
+    if (_output) _output->write(constrain((int)value, 0, 255));
     phase += dPhase;
     if (phase >= 2.0f * PI) phase -= 2.0f * PI;
     delayMicroseconds(15);
   }
 
-  dac_output_voltage(_dacChannel, bias);
+  if (_output) _output->write(bias);
   Serial.println(F("✅ Señal por fase acumulada finalizada."));
 }
 
@@ -628,6 +641,70 @@ void AcousticInjector::testSimple() {
 
   stop();
   Serial.println(F("✅ Test simple finalizado"));
+}
+
+void AcousticInjector::startFixedSine(uint32_t freqHz, float level) {
+  // Inicializa una salida senoidal estable usando la ruta ISR estándar, evitando pre-idle/sweeps
+  resetInternal();
+  _active = true;
+  _inDecay = false;
+  _forceSweep = false;
+  _targetLevel = constrain(level, 0.0f, 1.0f);
+  _level = _targetLevel;
+  _levelInt = uint8_t(_level * 255.0f);
+  updateWaveFrequency((float)freqHz);
+  // Arrancar timer solo si no estamos en pull-mode
+  if (!_pullMode && _timer) {
+    timerWrite(_timer, 0);
+    delay(1);
+    timerAlarmEnable(_timer);
+  }
+}
+
+void AcousticInjector::usePullMode(bool enable) {
+  _pullMode = enable;
+  if (enable && _timer) {
+    timerAlarmDisable(_timer);
+  }
+}
+
+uint8_t AcousticInjector::pullSampleThunk(void* ctx) {
+  return static_cast<AcousticInjector*>(ctx)->nextSample8();
+}
+
+uint8_t AcousticInjector::nextSample8() {
+  if (!_active) return 128;
+
+  // avance de fase principal (fixed point)
+  // Slew del phaseStep hacia el objetivo para evitar saltos bruscos
+  if (_phaseStepSmooth == 0) _phaseStepSmooth = _phaseStep;
+  int32_t dstep = (int32_t)_phaseStep - (int32_t)_phaseStepSmooth;
+  if (dstep > (int32_t)PHASESTEP_SLEW_MAX) dstep = (int32_t)PHASESTEP_SLEW_MAX;
+  else if (dstep < -(int32_t)PHASESTEP_SLEW_MAX) dstep = -(int32_t)PHASESTEP_SLEW_MAX;
+  _phaseStepSmooth = (uint32_t)((int32_t)_phaseStepSmooth + dstep);
+  _phaseAcc += _phaseStepSmooth;
+
+  const uint32_t idx      = (_phaseAcc >> PHASE_FRAC) & (TABLE_SIZE - 1);
+  const uint32_t nextIdx  = (idx + 1) & (TABLE_SIZE - 1);
+  const uint32_t frac     = _phaseAcc & ((1ULL << PHASE_FRAC) - 1);
+
+  const uint8_t  sample1  = _sineTable[idx];
+  const uint8_t  sample2  = _sineTable[nextIdx];
+  const int32_t  delta    = int32_t(sample2) - int32_t(sample1);
+  const int32_t  interp   = int32_t(sample1) + int32_t((delta * frac) >> PHASE_FRAC);
+  const int32_t  centered_p = interp - 128;
+
+  // Slew del nivel (0..255) para evitar clics al cambiar target
+  if (_levelIntSmooth == 0) _levelIntSmooth = _levelInt;
+  int16_t dlev = (int16_t)_levelInt - (int16_t)_levelIntSmooth;
+  if (dlev > (int16_t)LEVEL_SLEW_STEP) dlev = (int16_t)LEVEL_SLEW_STEP;
+  else if (dlev < -(int16_t)LEVEL_SLEW_STEP) dlev = -(int16_t)LEVEL_SLEW_STEP;
+  _levelIntSmooth = (uint16_t)((int16_t)_levelIntSmooth + dlev);
+  uint8_t level8_local = (uint8_t)(_levelIntSmooth & 0xFF);
+  int32_t principal = 128 + ((centered_p * int32_t(level8_local)) >> 8);
+  if (principal < 0) principal = 0;
+  if (principal > 255) principal = 255;
+  return uint8_t(principal);
 }
 
 // mapLoadToWaveFrequency: convierte la potencia (0..1) en una frecuencia de barrido acoplada perceptualmente.
@@ -677,9 +754,10 @@ void AcousticInjector::updateWaveFrequency(float freqHz) {
 
     _phaseStep = newStep;
 
-    // reprograma periodo de timer a sample-period igual
-    float periodUs = 1e6f / sr;
-    timerAlarmWrite(_timer, uint32_t(periodUs), true);
+    // reprograma periodo del timer en cuentas (40 MHz), con redondeo
+    const uint32_t timerBaseHz = 80000000u / 2u; // 40 MHz
+    uint64_t periodCounts = ((uint64_t)timerBaseHz + (uint64_t)(SAMPLE_RATE/2)) / (uint64_t)SAMPLE_RATE;
+    timerAlarmWrite(_timer, periodCounts, true);
 }
 
 void AcousticInjector::setFrequencyRangeOption(FrequencyRangeOption option) {

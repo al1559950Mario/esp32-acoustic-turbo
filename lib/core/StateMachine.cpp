@@ -190,7 +190,7 @@ void StateMachine::update(float mapLoadPercent,
             */
             //if (beamRaw && attackReady && pressureReady && pressureRiseReady) {
 
-            if (attackReady & beamRaw) {
+            if (beamRaw) {
                 if (_beamCondStartMs == 0) _beamCondStartMs = now;
                 if ((now - _beamCondStartMs) >= BEAM_COND_MIN_HOLD_MS) {
                     current = SystemState::BEAM;

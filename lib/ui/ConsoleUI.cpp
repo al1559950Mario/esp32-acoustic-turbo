@@ -97,8 +97,22 @@ void ConsoleUI::interpretarComando(char c) {
 
     case 'b':  // Iniciar inyección acústica (100%)
       if (!devOnly()) break;
+      //actuators->getAcousticInjector().testFloor();
       //actuators->startAcoustic(1.0f, 100);
-      //actuators->getAcousticInjector().testLevelSR();
+      //actuators->getAcousticInjector().testSimple();
+      actuators->testminimalPCMDAC();
+      break;
+
+    case 'p':  // Iniciar seno continuo 1 kHz @ 60% (driver I2S)
+      if (!devOnly()) break;
+      this->println(F("[UI] Iniciando seno continuo 1 kHz (60%) por I2S"));
+      if (actuators) actuators->startPureSine(1000, 0.6f);
+      break;
+
+    case 'q':  // Detener seno continuo
+      if (!devOnly()) break;
+      this->println(F("[UI] Deteniendo seno continuo I2S"));
+      if (actuators) actuators->stopPureSine();
       break;
 
     case 'c':  // Solicitar calibración por consola
@@ -110,6 +124,35 @@ void ConsoleUI::interpretarComando(char c) {
       developerMode = true;
       this->println(">> Modo desarrollador ACTIVADO.");
       imprimirHelp();
+      break;
+
+    case 'o':  // Seno por ISR (AcousticInjector) 1 kHz @ 30%
+      if (!devOnly()) break;
+      this->println(F("[UI] Iniciando seno ISR 4 kHz (30%)"));
+      if (actuators) actuators->startISRSine(4000, 0.3f);
+      break;
+
+    case 'O':  // Detener seno ISR
+      if (!devOnly()) break;
+      this->println(F("[UI] Deteniendo seno ISR"));
+      if (actuators) actuators->stopISRSine();
+      break;
+
+    case 'u':  // Mostrar estadísticas de audio (drops/underruns/watermarks)
+      if (!devOnly()) break;
+      if (actuators) {
+        uint32_t drops=0, underruns=0; size_t minA=0, maxA=0;
+        actuators->getAudioStats(drops, underruns, minA, maxA);
+        this->printf("[AUDIO] dropsFromISR=%lu, underruns=%lu, minAvail=%u, maxAvail=%u\n",
+                     (unsigned long)drops, (unsigned long)underruns,
+                     (unsigned)minA, (unsigned)maxA);
+      }
+      break;
+
+    case 'U':  // Reset estadísticas de audio
+      if (!devOnly()) break;
+      if (actuators) actuators->resetAudioStats();
+      this->println(F("[AUDIO] Estadísticas reseteadas"));
       break;
 
     case 'f':  // Cambiar rango de frecuencia acústica
@@ -284,11 +327,6 @@ void ConsoleUI::interpretarComando(char c) {
       } else {
         this->println("⚠️ Turbo no disponible.");
       }
-      break;
-
-    case 'u':  // Placeholder para otro comando dev
-      if (!devOnly()) break;
-      // Implementar acción para 'u' si aplica
       break;
 
     case 'v':  // Visualización curva (dev mode)

@@ -3,6 +3,8 @@
 #include <Arduino.h>
 #include "driver/dac.h"
 
+class IAcousticOutput; // forward declaration
+
 /*
   AcousticInjector.h
 
@@ -36,6 +38,10 @@ public:
   void testFloor(); // Prueba del nivel mínimo audible (1 LSB)
   void emitResonant(float level); // Señal por fase acumulada
   void testSimple();
+  // Seno fijo mediante la misma ruta ISR/tabla (sin pre-idle ni sweep)
+  void startFixedSine(uint32_t freqHz, float level);
+  void stopFixedSine() { stop(); }
+  void usePullMode(bool enable);
   void setTargetFrequency(float freq) {
     _targetFrequency = freq;
   }
@@ -51,6 +57,9 @@ public:
   void updateDecayState();           // llamados desde loop/task para recalcular envelope/resonator
   float freqGainFactor(float hz);
 
+  // Backend de salida (ej. InternalDAC o PCM5102)
+  void setOutput(IAcousticOutput* out) { _output = out; }
+
   bool isInDecay() const;
 
   // Getter público para la FSM
@@ -60,7 +69,13 @@ public:
 
   static AcousticInjector* _instance;
 
+  // Pull-mode (no ISR) support: driver I2S solicita muestras
+  static uint8_t pullSampleThunk(void* ctx);
+  uint8_t nextSample8();
+
 private:
+  // Salida abstracta; si es nullptr no se emite
+  IAcousticOutput* _output = nullptr;
   uint8_t  _dacPin = 0;
   uint8_t  _index = 0;      // índice para tabla seno (solo para modo tabla)
   float    _level = 0.0f;
@@ -88,9 +103,15 @@ private:
   static constexpr uint8_t PHASE_FRAC = 16;
   static_assert((1 << PHASE_FRAC) > 0, "PHASE_FRAC ok");
   bool _active = false;
+  bool _pullMode = false;
 
   volatile uint32_t _phaseAcc = 0;
   volatile uint32_t _phaseStep = 0;
+  // Suavizado en pull-mode para evitar pops en cambios de frecuencia/nivel
+  uint32_t _phaseStepSmooth = 0;     // seguidor de _phaseStep con slew limitado
+  uint16_t _levelIntSmooth = 0;      // 0..255 nivel suavizado por muestra
+  static constexpr uint32_t PHASESTEP_SLEW_MAX = 1024u; // incremento máximo de step por sample
+  static constexpr uint8_t  LEVEL_SLEW_STEP    = 3u;    // cambio máx. de nivel por sample (0..255)
 
   // Tabla seno y tamaño
   // TABLE_SIZE: número de entradas en la tabla seno usada por ISR (potencia de 2 recomendada).
@@ -99,7 +120,7 @@ private:
 
   // Tasas de muestreo
   // SAMPLE_RATE: tasa objetivo (Hz) para la ISR/DAC. Mantener 64000 para alta fidelidad.
-  static constexpr uint32_t SAMPLE_RATE = 64000;  // 64 kHz para alta fidelidad
+  static constexpr uint32_t SAMPLE_RATE = 48000;  // 48 kHz para robustez bajo carga
 
   // Paso de rampa para suavizar cambios en el nivel (_level).
   // RAMP_STEP: cuanto cambia _level por llamada a update().

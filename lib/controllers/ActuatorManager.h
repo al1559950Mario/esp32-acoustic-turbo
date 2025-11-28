@@ -3,6 +3,7 @@
 #include "VortexController.h"
 #include "AcousticInjector.h"
 #include "ThresholdManager.h"
+#include "../audio/PCM5102Driver.h"
 
 class ActuatorManager {
 public:
@@ -37,11 +38,27 @@ public:
   float getTurboSense();
   bool decayFinished() const;
 
+  // Minimal PCM/I2S sine test helper
+  void testminimalPCMDAC();
+
+  // Continuous pure sine via I2S pipeline
+  void startPureSine(uint32_t freqHz = 1000, float amplitude = 0.6f);
+  void stopPureSine();
+
+  // ISR pipeline sine (uses AcousticInjector ISR)
+  void startISRSine(uint32_t freqHz = 1000, float level = 0.3f);
+  void stopISRSine();
+
+  // Exponer stats de audio
+  void getAudioStats(uint32_t& dropsFromISR, uint32_t& underruns, size_t& minAvail, size_t& maxAvail) const;
+  void resetAudioStats();
+
   
 
 private:
   VortexController vortex;
   AcousticInjector injector;
+  PCM5102Driver pcm5102;
   ThresholdManager* thresholdManager = nullptr;  ///< Puntero al gestor de umbrales
 
 };
