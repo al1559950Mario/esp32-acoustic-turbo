@@ -489,18 +489,19 @@ void IRAM_ATTR AcousticInjector::onTimer() {
 
   // ================= LÓGICA DE SELECCIÓN DE RESONADOR =================
   if (!inDecay_local) {
-    // Ya no en decay → pero sigue activo, usar salida principal
-    int32_t principal = 128 + ((centered_p * int32_t(level8_local)) >> 8);
-    if (principal < 0) principal = 0;
-    if (principal > 255) principal = 255;
-    uint8_t output = uint8_t(principal);
+    // Cálculo interno en 16-bit y conversión final a 8-bit (mejor precisión)
+    int16_t p16 = int16_t(centered_p) << 8; // -32768..+32512
+    int32_t pScaled16 = (int32_t(p16) * int32_t(level8_local)) >> 8; // Q8
+    int32_t out8i = (pScaled16 >> 8) + 128;
+    if (out8i < 0) out8i = 0; else if (out8i > 255) out8i = 255;
+    uint8_t output = uint8_t(out8i);
     if (output != _instance->_lastDACValue) {
-        if (_instance->_output) _instance->_output->writeFromISR(output);
-        _instance->_lastDACValue = output;
+      if (_instance->_output) _instance->_output->writeFromISR(output);
+      _instance->_lastDACValue = output;
     }
     _instance->_lastDACValue = output;
     return;
-  }
+}
 
   // ---------- DECAY activo: ring down y mezcla (enteros, ISR friendly) ----------
   resPhaseAcc_local += resPhaseStep_local;
@@ -518,21 +519,24 @@ void IRAM_ATTR AcousticInjector::onTimer() {
 
 
   uint16_t resAmp16_local = _instance->_resAmpInt16; // 0..65535
-  uint32_t tmp = uint32_t(resAmp16_local) * uint32_t(env16_local >> 8);
-  uint16_t resAmpEnvAdjusted16 = uint16_t(tmp >> 8);
-  uint8_t resGain8 = uint8_t((uint32_t(resAmpEnvAdjusted16) * 255u) >> 16u);
+uint32_t tmp = uint32_t(resAmp16_local) * uint32_t(env16_local >> 8);
+uint16_t resAmpEnvAdjusted16 = uint16_t(tmp >> 8); // Q16
 
-  int32_t resonatorScaled = (int32_t(centered_r) * int32_t(resGain8)) >> 8;
-  int32_t scaledLevel = (int32_t(level8_local) * int32_t(levelMul16_local)) >> 16;
-  if (scaledLevel < 0) scaledLevel = 0;
-  if (scaledLevel > 255) scaledLevel = 255;
-  int32_t principalScaled = (int32_t(centered_p) * scaledLevel) >> 8;
+// Convertir señales a 16-bit centrado
+int16_t p16 = int16_t(centered_p) << 8;
+int16_t r16 = int16_t(centered_r) << 8;
 
-  int32_t mixed_signed = principalScaled + resonatorScaled;
-  int32_t out = mixed_signed + 128;
-  out = (out < 0) ? 0 : (out > 255 ? 255 : out);
+// Escalas en Q16
+uint32_t levelGainQ16 = (uint32_t(level8_local) * uint32_t(levelMul16_local)) >> 8; // 0..65535
+int32_t principalScaled16 = (int32_t(p16) * int32_t(levelGainQ16)) >> 16;
+int32_t resonatorScaled16 = (int32_t(r16) * int32_t(resAmpEnvAdjusted16)) >> 16;
 
-  uint8_t output = uint8_t(out);
+int32_t mixed16 = principalScaled16 + resonatorScaled16;
+if (mixed16 < -32768) mixed16 = -32768; else if (mixed16 > 32767) mixed16 = 32767;
+int32_t out8i = (mixed16 >> 8) + 128;
+if (out8i < 0) out8i = 0; else if (out8i > 255) out8i = 255;
+
+uint8_t output = uint8_t(out8i);
 
   if (output != _instance->_lastDACValue) {
     if (_instance->_output) _instance->_output->writeFromISR(output);
