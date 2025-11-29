@@ -113,6 +113,20 @@ void PCM5102Driver::writerTask() {
       size_t written = 0;
       i2s_write(_port, buf, CHUNK, &written, portMAX_DELAY);
       continue;
+    } else if (_cb16) {
+      // Pull-mode 16-bit: external source provides signed 16-bit samples centered at 0
+      const size_t frames = CHUNK / 4;
+      size_t idx = 0;
+      for (size_t i = 0; i < frames; ++i) {
+        int16_t s = _cb16(_cbCtx);
+        buf[idx++] = (uint8_t)(s & 0xFF);
+        buf[idx++] = (uint8_t)((s >> 8) & 0xFF);
+        buf[idx++] = (uint8_t)(s & 0xFF);
+        buf[idx++] = (uint8_t)((s >> 8) & 0xFF);
+      }
+      size_t written = 0;
+      i2s_write(_port, buf, CHUNK, &written, portMAX_DELAY);
+      continue;
     } else if (_cb) {
       // Pull-mode: ask external source for samples in this clock domain
       const size_t frames = CHUNK / 4;

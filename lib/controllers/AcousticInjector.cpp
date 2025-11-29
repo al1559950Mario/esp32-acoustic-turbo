@@ -27,7 +27,7 @@ uint8_t AcousticInjector::_sineTable[AcousticInjector::TABLE_SIZE] = {
    20,  20,  21,  24,  28,  33,  40,  48,
    57,  67,  78,  90, 102, 115, 128, 140,
   153, 165, 177, 188, 198, 207, 215, 222
-}
+};
 int16_t AcousticInjector::nextSample16() {
   if (!_active) return 0;
   _phaseAcc += _phaseStep;
@@ -995,13 +995,13 @@ void AcousticInjector::updateDecayState() {
   // =========================================================
   // ===== FEATURE SWITCHES (todas desactivadas por defecto) ==
   // =========================================================
-  const bool USE_SHOULDER      = true;//
+  const bool USE_SHOULDER      = false;//
   const bool USE_SOFT_BEND     = false;//
-  const bool USE_REBOUND       = true;//
+  const bool USE_REBOUND       = false;//
   const bool USE_TAIL_FREEZE   = false;//
-  const bool USE_FADE_OUT      = true;//
-  const bool USE_MIX_SNAPSHOT  = true;
-  const bool USE_ENERGY_FLOOR  = true;//
+  const bool USE_FADE_OUT      = false;//
+  const bool USE_MIX_SNAPSHOT  = false;
+  const bool USE_ENERGY_FLOOR  = false;//
 
   // ===========================================
   // ===== PARÃƒÆ’Ã‚ÂMETROS BASE / DEFAULTS ==========

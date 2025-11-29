@@ -11,6 +11,7 @@
 class PCM5102Driver : public IAcousticOutput {
 public:
   using SampleCallback = uint8_t(*)(void* ctx);
+  using SampleCallback16 = int16_t(*)(void* ctx);
   void attachPins(int bck, int lrck, int data) {
     _pin_bck = bck;
     _pin_lrck = lrck;
@@ -36,6 +37,7 @@ public:
 
   // Pull-mode sample source (single clock domain generation)
   void setSampleSource(SampleCallback cb, void* ctx) { _cb = cb; _cbCtx = ctx; }
+  void setSampleSource16(SampleCallback16 cb16, void* ctx) { _cb16 = cb16; _cbCtx = ctx; }
 
 private:
   static void writerTaskThunk(void* arg) {
@@ -72,5 +74,6 @@ private:
 
   // Optional pull-mode callback
   SampleCallback _cb = nullptr;
+  SampleCallback16 _cb16 = nullptr;
   void* _cbCtx = nullptr;
 };
