@@ -38,6 +38,11 @@ public:
   float getTurboSense();
   bool decayFinished() const;
 
+  // Test acústico: barrido de piso dinámico usando salida actual
+  void testFloorDynamic();
+  void testFloorUltra();
+  void testFloorNano();
+
   // Minimal PCM/I2S sine test helper
   void testminimalPCMDAC();
 

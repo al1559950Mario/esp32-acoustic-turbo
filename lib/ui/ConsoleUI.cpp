@@ -95,12 +95,19 @@ void ConsoleUI::interpretarComando(char c) {
       toggleSistema();
       break;
 
-    case 'b':  // Iniciar inyección acústica (100%)
+    case 'b':  // Test acústico: piso dinámico del DAC
       if (!devOnly()) break;
-      //actuators->getAcousticInjector().testFloor();
-      //actuators->startAcoustic(1.0f, 100);
-      //actuators->getAcousticInjector().testSimple();
-      actuators->testminimalPCMDAC();
+      if (actuators) actuators->testFloorDynamic();
+      break;
+
+    case 'B':  // Test acústico: piso ultra (sub‑LSB) usando driver I2S
+      if (!devOnly()) break;
+      if (actuators) actuators->testFloorUltra();
+      break;
+
+    case 'N':  // Test acústico: piso nano (−70..−90 dBFS)
+      if (!devOnly()) break;
+      if (actuators) actuators->testFloorNano();
       break;
 
     case 'p':  // Iniciar seno continuo 1 kHz @ 60% (driver I2S)

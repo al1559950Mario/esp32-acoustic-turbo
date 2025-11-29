@@ -972,13 +972,13 @@ void AcousticInjector::updateDecayState() {
   // =========================================================
   // ===== FEATURE SWITCHES (todas desactivadas por defecto) ==
   // =========================================================
-  const bool USE_SHOULDER      = false;//
-  const bool USE_SOFT_BEND     = false;//
-  const bool USE_REBOUND       = false;//
+  const bool USE_SHOULDER      = true;//
+  const bool USE_SOFT_BEND     = true;//
+  const bool USE_REBOUND       = true;//
   const bool USE_TAIL_FREEZE   = false;//
-  const bool USE_FADE_OUT      = false;//
-  const bool USE_MIX_SNAPSHOT  = false;
-  const bool USE_ENERGY_FLOOR  = false;//
+  const bool USE_FADE_OUT      = true;//
+  const bool USE_MIX_SNAPSHOT  = true;
+  const bool USE_ENERGY_FLOOR  = true;//
 
   // ===========================================
   // ===== PARÃƒÆ’Ã†â€™Ãƒâ€šÃ‚ÂMETROS BASE / DEFAULTS ==========
