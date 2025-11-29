@@ -28,29 +28,6 @@ uint8_t AcousticInjector::_sineTable[AcousticInjector::TABLE_SIZE] = {
    57,  67,  78,  90, 102, 115, 128, 140,
   153, 165, 177, 188, 198, 207, 215, 222
 };
-int16_t AcousticInjector::nextSample16() {
-  if (!_active) return 0;
-  _phaseAcc += _phaseStep;
-  const uint32_t idx     = (_phaseAcc >> PHASE_FRAC) & (TABLE_SIZE - 1);
-  const uint32_t nextIdx = (idx + 1) & (TABLE_SIZE - 1);
-  const uint32_t frac    = _phaseAcc & ((1ULL << PHASE_FRAC) - 1);
-
-  const uint8_t s1 = _sineTable[idx];
-  const uint8_t s2 = _sineTable[nextIdx];
-  const int32_t delta  = int32_t(s2) - int32_t(s1);
-  const int32_t interp = int32_t(s1) + int32_t((delta * frac) >> PHASE_FRAC);
-  const int32_t centered = interp - 128; // -128..+127
-
-  // Escala a 16-bit nativo con nivel en 0..1
-  int16_t centered16 = int16_t(centered) << 8; // -32768..+32512
-  float lvl = _level;
-  if (lvl < 0.0f) lvl = 0.0f; else if (lvl > 1.0f) lvl = 1.0f;
-  int32_t ampQ15 = int32_t(lvl * 32767.0f + 0.5f);
-  int32_t out16 = (int32_t(centered16) * ampQ15) >> 15;
-  if (out16 < -32768) out16 = -32768; else if (out16 > 32767) out16 = 32767;
-  return int16_t(out16);
-};
-
 void AcousticInjector::begin(uint8_t dacPin) {
   _instance = this;
 
@@ -77,7 +54,7 @@ void AcousticInjector::begin(uint8_t dacPin) {
 
   #if 0
   float sampleRate = SAMPLE_RATE; // p.ej. 64kHz
-  float periodPerSample = 1e6f / sampleRate; // ÃƒÅ½Ã‚Â¼s
+  float periodPerSample = 1e6f / sampleRate; // ÃƒÆ’Ã…Â½Ãƒâ€šÃ‚Â¼s
   timerAlarmWrite(_timer, static_cast<uint32_t>(periodPerSample), true);
   #endif
   // Reemplazo: programar periodo en cuentas (40 MHz)
@@ -92,12 +69,12 @@ void AcousticInjector::begin(uint8_t dacPin) {
   _levelInt = (uint8_t)(_level * 255.0f);
 
   // Backend se establece externamente (ActuatorManager) mediante setOutput().
-  // Si se desea usar DAC interno como fallback, hacerlo explÃƒÆ’Ã‚Â­citamente fuera.
+  // Si se desea usar DAC interno como fallback, hacerlo explÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­citamente fuera.
 
 }
 
 void AcousticInjector::start(float level, float dMAFdt) {
-  // 1) Reinicio total (fase, nivel, ÃƒÆ’Ã‚Â­ndices)
+  // 1) Reinicio total (fase, nivel, ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­ndices)
   resetInternal();
   _active      = true;
   _inDecay = false;
@@ -180,13 +157,13 @@ void AcousticInjector::setLevel(float level) {
 
 void AcousticInjector::update() {
   if (!_active) {
-    _levelSweepInitDone = false;    // reset para la prÃƒÆ’Ã‚Â³xima activaciÃƒÆ’Ã‚Â³n
-    // FIX: aseguramos rearmar pre-idle en prÃƒÆ’Ã‚Â³xima activaciÃƒÆ’Ã‚Â³n
+    _levelSweepInitDone = false;    // reset para la prÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³xima activaciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n
+    // FIX: aseguramos rearmar pre-idle en prÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³xima activaciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n
     _preIdleStartMs = 0;
     return;
   }
 
-  // ParÃƒÆ’Ã‚Â¡metros del sweep inicial
+  // ParÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡metros del sweep inicial
   const uint32_t forceSweepTimeMs = FORCE_SWEEP_TIME_MS;
 
   // ------ calcular dt ------
@@ -446,7 +423,7 @@ void AcousticInjector::update() {
   _peakFreqDuringBeam  = (_currentFrequency > _peakFreqDuringBeam) ? _currentFrequency : _peakFreqDuringBeam;
 /*
     // ---------------------------------------------------------------
-  // LOG cada 20 ms (telemetrÃƒÆ’Ã‚Â­a compacta)
+  // LOG cada 20 ms (telemetrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­a compacta)
   static uint32_t _lastLogMs = 0;
   if (now - _lastLogMs >= 20) {           // cada 20 ms
     _lastLogMs = now;
@@ -473,7 +450,7 @@ void AcousticInjector::update() {
 void IRAM_ATTR AcousticInjector::onTimer() {
   if (!_instance) return;
 
-  // Si el sistema no estÃƒÆ’Ã‚Â¡ activo, reiniciamos para preparar arranque limpio
+  // Si el sistema no estÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡ activo, reiniciamos para preparar arranque limpio
   if (!_instance->_active) {
     _instance->_phaseAcc = 0;
     _instance->_resPhaseAcc = 0;
@@ -489,7 +466,7 @@ void IRAM_ATTR AcousticInjector::onTimer() {
   // avance de fase principal (fixed point)
   _instance->_phaseAcc += _instance->_phaseStep;
 
-  // ÃƒÆ’Ã‚Ândice entero y fracciÃƒÆ’Ã‚Â³n para interpolaciÃƒÆ’Ã‚Â³n principal
+  // ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Ândice entero y fracciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n para interpolaciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n principal
   const uint32_t idx      = (_instance->_phaseAcc >> PHASE_FRAC) & (TABLE_SIZE - 1);
   const uint32_t nextIdx  = (idx + 1) & (TABLE_SIZE - 1);
   const uint32_t frac     = _instance->_phaseAcc & ((1ULL << PHASE_FRAC) - 1);
@@ -500,7 +477,7 @@ void IRAM_ATTR AcousticInjector::onTimer() {
   const int32_t  interp   = int32_t(sample1) + int32_t((delta * frac) >> PHASE_FRAC);
   const int32_t  centered_p = interp - 128;
 
-  // Salidas y estado compartido: leer copias atÃƒÆ’Ã‚Â³micas de volÃƒÆ’Ã‚Â¡tiles
+  // Salidas y estado compartido: leer copias atÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³micas de volÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡tiles
   uint16_t env16_local      = _instance->_decayEnvInt16;
   uint16_t levelMul16_local = _instance->_decayLevelMulInt;
   uint8_t  level8_local     = _instance->_levelInt;
@@ -509,9 +486,9 @@ void IRAM_ATTR AcousticInjector::onTimer() {
   // dac_channel_t dacCh_local  = _instance->_dacChannel;  
   bool     inDecay_local     = _instance->_inDecay;
 
-  // ================= LÃƒÆ’Ã¢â‚¬Å“GICA DE SELECCIÃƒÆ’Ã¢â‚¬Å“N DE RESONADOR =================
+  // ================= LÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œGICA DE SELECCIÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œN DE RESONADOR =================
   if (!inDecay_local) {
-    // CÃƒÆ’Ã‚Â¡lculo interno en 16-bit y conversiÃƒÆ’Ã‚Â³n final a 8-bit (mejor precisiÃƒÆ’Ã‚Â³n)
+    // CÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lculo interno en 16-bit y conversiÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n final a 8-bit (mejor precisiÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n)
     int16_t p16 = int16_t(centered_p) << 8; // -32768..+32512
     int32_t pScaled16 = (int32_t(p16) * int32_t(level8_local)) >> 8; // Q8
     int32_t out8i = (pScaled16 >> 8) + 128;
@@ -544,7 +521,7 @@ void IRAM_ATTR AcousticInjector::onTimer() {
 uint32_t tmp = uint32_t(resAmp16_local) * uint32_t(env16_local >> 8);
 uint16_t resAmpEnvAdjusted16 = uint16_t(tmp >> 8); // Q16
 
-// Convertir seÃƒÆ’Ã‚Â±ales a 16-bit centrado
+// Convertir seÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â±ales a 16-bit centrado
 int16_t p16 = int16_t(centered_p) << 8;
 int16_t r16 = int16_t(centered_r) << 8;
 
@@ -577,7 +554,7 @@ bool AcousticInjector::isActive() const {
 }
 
 void AcousticInjector::test() {
-  Serial.println(F("ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ…Â  Prueba acÃƒÆ’Ã‚Âºstica iniciada..."));
+  Serial.println(F("ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€¦Ã‚Â  Prueba acÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Âºstica iniciada..."));
   start(1.0f, 0.0f);
 
   for (int i = 0; i < 250; i++) {
@@ -589,7 +566,7 @@ void AcousticInjector::test() {
   }
 
   stop();
-  Serial.println(F("ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Prueba finalizada."));
+  Serial.println(F("ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ Prueba finalizada."));
 }
 
 void AcousticInjector::testFloor() {
@@ -632,7 +609,7 @@ void AcousticInjector::testFloor() {
 }
 
 void AcousticInjector::testFloorDynamic() {
-  Serial.println(F("[AI] Test de piso dinÃƒÆ’Ã‚Â¡mico iniciado..."));
+  Serial.println(F("[AI] Test de piso dinÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡mico iniciado..."));
 
   bool wasActive = _active;
   if (_timer) {
@@ -645,7 +622,7 @@ void AcousticInjector::testFloorDynamic() {
   const float dPhase = 2.0f * PI * freq / sampleRate;
   const uint32_t periodUs = (uint32_t)(1000000.0f / sampleRate);
 
-  // Barrido de amplitudes en mÃƒÆ’Ã‚Âºltiplos de LSB (8-bit)
+  // Barrido de amplitudes en mÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Âºltiplos de LSB (8-bit)
   const uint8_t lsbSteps[] = { 1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64 };
   const uint32_t dwellMsPerStep = 1200;       // 1.2 s por paso
   const uint32_t samplesPerStep = uint32_t((dwellMsPerStep / 1000.0f) * sampleRate);
@@ -668,7 +645,7 @@ void AcousticInjector::testFloorDynamic() {
         delay(1); // yield al scheduler cada ~256 muestras
       }
     }
-    // pequeÃƒÆ’Ã‚Â±a pausa entre pasos para evitar WDT y permitir tareas del sistema
+    // pequeÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â±a pausa entre pasos para evitar WDT y permitir tareas del sistema
     delay(5);
   }
 
@@ -678,11 +655,11 @@ void AcousticInjector::testFloorDynamic() {
     timerAlarmEnable(_timer);
   }
 
-  Serial.println(F("[AI] Test de piso dinÃƒÆ’Ã‚Â¡mico finalizado."));
+  Serial.println(F("[AI] Test de piso dinÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡mico finalizado."));
 }
 
 void AcousticInjector::emitResonant(float level) {
-  Serial.println(F("ÃƒÂ°Ã…Â¸Ã…â€™Ã‚Â¼ Emitiendo seÃƒÆ’Ã‚Â±al resonante por fase acumulada (5s)..."));
+  Serial.println(F("ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¦Ã¢â‚¬â„¢Ãƒâ€šÃ‚Â¼ Emitiendo seÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â±al resonante por fase acumulada (5s)..."));
 
   const float freq = 6370.0f;
   const float amplitude = 127.0f * constrain(level, 0.0f, 1.0f);
@@ -702,11 +679,11 @@ void AcousticInjector::emitResonant(float level) {
   }
 
   if (_output) _output->write(bias);
-  Serial.println(F("ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ SeÃƒÆ’Ã‚Â±al por fase acumulada finalizada."));
+  Serial.println(F("ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ SeÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â±al por fase acumulada finalizada."));
 }
 
 void AcousticInjector::testSimple() {
-  Serial.println(F("ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ…Â  Test simple iniciado"));
+  Serial.println(F("ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€¦Ã‚Â  Test simple iniciado"));
   start(1.0f, 0.0f);
 
   unsigned long startTime = millis();
@@ -716,11 +693,11 @@ void AcousticInjector::testSimple() {
   }
 
   stop();
-  Serial.println(F("ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Test simple finalizado"));
+  Serial.println(F("ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ Test simple finalizado"));
 }
 
 void AcousticInjector::startFixedSine(uint32_t freqHz, float level) {
-  // Inicializa una salida senoidal estable usando la ruta ISR estÃƒÆ’Ã‚Â¡ndar, evitando pre-idle/sweeps
+  // Inicializa una salida senoidal estable usando la ruta ISR estÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡ndar, evitando pre-idle/sweeps
   resetInternal();
   _active = true;
   _inDecay = false;
@@ -842,7 +819,7 @@ void AcousticInjector::updateWaveFrequency(float freqHz) {
     const float sr = SAMPLE_RATE;  // p.ej. 32000
     _currentFrequency = freqHz;
 
-    // Acumulador y contador estÃƒÆ’Ã‚Â¡ticos o miembros de clase
+    // Acumulador y contador estÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡ticos o miembros de clase
     static float _freqSum = 0.0f;
     static uint32_t _freqCount = 0;
 
@@ -851,7 +828,7 @@ void AcousticInjector::updateWaveFrequency(float freqHz) {
     _freqCount++;
     _avgFrequency = _freqSum / _freqCount;  // <-- variable miembro de clase
 
-    // cÃƒÆ’Ã‚Â¡lculo fixed-point para phaseStep
+    // cÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lculo fixed-point para phaseStep
     double step = freqHz * TABLE_SIZE * (1ULL << PHASE_FRAC) / sr;
     uint32_t newStep = (step < 1.0) ? 1 : uint32_t(round(step));
 
@@ -914,7 +891,7 @@ void AcousticInjector::startDecay(uint32_t now) {
   _zeroCount = 0;
   interrupts();
 
-  // escribir snapshot atÃƒÆ’Ã‚Â³mico en variables usadas por decay y precompute de amplitude inicial
+  // escribir snapshot atÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³mico en variables usadas por decay y precompute de amplitude inicial
   noInterrupts();
   _decayEnvInt16 = env_snapshot;
   _decayMixSnapshot16 = decayMixInt16_local;
@@ -926,7 +903,7 @@ void AcousticInjector::startDecay(uint32_t now) {
   // asegurar multiplicador de nivel por defecto
   _decayLevelMulInt = uint16_t(65535u);
   interrupts();
-  // justo despuÃƒÆ’Ã‚Â©s de interrupts() final en startDecay
+  // justo despuÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©s de interrupts() final en startDecay
   /*
   
   Serial.printf("DBG:startDecay t=%lu env=%u mix=%u resAmp=%u phaseStep=%u phaseAcc=%u\n",
@@ -957,17 +934,17 @@ void AcousticInjector::setDecayParameters(uint32_t durationMs, float avgTPSLevel
   _tFastMs = max<uint32_t>(5u, tFastMs);
   _tSustainMs = max<uint32_t>(10u, tSustainMs);
 
-  // precomputar resonator step y escribir atÃƒÆ’Ã‚Â³micamente
+  // precomputar resonator step y escribir atÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³micamente
   const float sr = float(SAMPLE_RATE);
   double step = _decayResFreq * TABLE_SIZE * (1ULL << PHASE_FRAC) / sr;
   uint32_t newStep = (step < 1.0) ? 1u : uint32_t(round(step));
 
   noInterrupts();
   _resPhaseStep = newStep;
-  // actualizar la versiÃƒÆ’Ã‚Â³n en 16-bit de mix para la ISR
+  // actualizar la versiÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n en 16-bit de mix para la ISR
   _decayMixInt16 = uint16_t(constrain(_decayMix * 65535.0f, 0.0f, 65535.0f));
   interrupts();
-  // justo despuÃƒÆ’Ã‚Â©s de interrupts() final en setDecayParameters
+  // justo despuÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©s de interrupts() final en setDecayParameters
 /*
 Serial.printf("DBG:setDecay dur=%u TPSf=%0.3f mix=%0.4f mix16=%u freq=%0.1f newStep=%u\n",
               _decayDurationMs,
@@ -984,7 +961,7 @@ Serial.printf("DBG:setDecay dur=%u TPSf=%0.3f mix=%0.4f mix16=%u freq=%0.1f newS
 void AcousticInjector::updateDecayState() {
   if (!_inDecay) return;
   // ------------------------------
-  // Snapshot atÃƒÆ’Ã‚Â³mico (lecturas compartidas)
+  // Snapshot atÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³mico (lecturas compartidas)
   // ------------------------------
   noInterrupts();
   uint16_t env16_copy    = _decayEnvInt16;
@@ -1004,7 +981,7 @@ void AcousticInjector::updateDecayState() {
   const bool USE_ENERGY_FLOOR  = false;//
 
   // ===========================================
-  // ===== PARÃƒÆ’Ã‚ÂMETROS BASE / DEFAULTS ==========
+  // ===== PARÃƒÆ’Ã†â€™Ãƒâ€šÃ‚ÂMETROS BASE / DEFAULTS ==========
   // ===========================================
   const float MIN_ENERGY_F_REAL  = USE_ENERGY_FLOOR ? DECAY_MIN_ENERGY_TIGHT : DECAY_MIN_ENERGY_BASE;
 
@@ -1036,7 +1013,7 @@ void AcousticInjector::updateDecayState() {
     progress = constrain(tSinceStart / float(max<uint32_t>(1u, totalMs)), 0.0f, 1.0f);
   }
 
-  progress = min(progress, 1.0f); // protecciÃƒÆ’Ã‚Â³n
+  progress = min(progress, 1.0f); // protecciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n
 
   // ===========================================
   // ===== MAIN EXPONENTIAL DECAY BLOCK ========
@@ -1202,7 +1179,7 @@ void AcousticInjector::updateDecayState() {
       _zeroCount = 0;
   }
 
-  // Salida directa del decay cuando se cumple la condiciÃƒÆ’Ã‚Â³n estable
+  // Salida directa del decay cuando se cumple la condiciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n estable
   if (readyToEnd && _zeroCount >= 3) {
       noInterrupts();
       _decayFinished = true;   // avisar a FSM, pero NO tocar _inDecay
@@ -1241,7 +1218,7 @@ void AcousticInjector::updateDecayState() {
 
 }
 
-// simple frequency correction  (values 0..1). AjustÃƒÆ’Ã‚Â¡ segÃƒÆ’Ã‚Âºn pruebas.
+// simple frequency correction  (values 0..1). AjustÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡ segÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Âºn pruebas.
 float AcousticInjector::freqGainFactor(float hz) {
   // tabla de ejemplo: (f, G)
   // por defecto asumimos ligera mayor eficiencia en medio ~3.5kHz
