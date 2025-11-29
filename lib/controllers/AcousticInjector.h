@@ -36,6 +36,7 @@ public:
   static void IRAM_ATTR onTimer();
   void test();  // Prueba rápida del sonido acústico
   void testFloor(); // Prueba del nivel mínimo audible (1 LSB)
+  void testFloorDynamic(); // Barrido de piso real (multiples LSB)
   void emitResonant(float level); // Señal por fase acumulada
   void testSimple();
   // Seno fijo mediante la misma ruta ISR/tabla (sin pre-idle ni sweep)
@@ -72,6 +73,9 @@ public:
   // Pull-mode (no ISR) support: driver I2S solicita muestras
   static uint8_t pullSampleThunk(void* ctx);
   uint8_t nextSample8();
+  // Pull-mode 16-bit nativo para PCM5102
+  static int16_t pullSample16Thunk(void* ctx);
+  int16_t nextSample16();
 
 private:
   // Salida abstracta; si es nullptr no se emite
@@ -107,6 +111,13 @@ private:
 
   volatile uint32_t _phaseAcc = 0;
   volatile uint32_t _phaseStep = 0;
+
+  // Puerta (gate) para ataques/liberaciones suaves percibidas desde 0
+  volatile uint16_t _gateQ15 = 0;       // 0..32767
+  uint16_t _gateStepUpQ15 = 0;          // incremento por muestra
+  uint16_t _gateStepDownQ15 = 0;        // decremento por muestra
+  static constexpr uint32_t GATE_ATTACK_MS  = 25; // rampa de entrada ~25 ms
+  static constexpr uint32_t GATE_RELEASE_MS = 25; // rampa de salida ~25 ms
   // Suavizado en pull-mode para evitar pops en cambios de frecuencia/nivel
   uint32_t _phaseStepSmooth = 0;     // seguidor de _phaseStep con slew limitado
   uint16_t _levelIntSmooth = 0;      // 0..255 nivel suavizado por muestra

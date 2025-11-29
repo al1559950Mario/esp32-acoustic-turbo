@@ -18,9 +18,9 @@ void ActuatorManager::begin(uint8_t rEnPin, uint8_t turboPwmPin, uint8_t turboPw
     // Reutilizamos acousticDacPin como DATA (por defecto 25)
     pcm5102.attachPins(PIN_I2S_BCK, PIN_I2S_LRCK, acousticDacPin);
     pcm5102.begin(48000); // debe coincidir con SAMPLE_RATE del inyector
-    // Activar modo pull: el driver llamará a AcousticInjector para obtener muestras
+    // Activar modo pull: el driver llamarÃ¡ a AcousticInjector para obtener muestras
     injector.usePullMode(true);
-    pcm5102.setSampleSource(&AcousticInjector::pullSampleThunk, &injector);
+    pcm5102.setSampleSource16(&AcousticInjector::pullSample16Thunk, &injector);
 
     // Apagar ambos al inicio
     vortex.stop();
@@ -28,7 +28,7 @@ void ActuatorManager::begin(uint8_t rEnPin, uint8_t turboPwmPin, uint8_t turboPw
 }
 
 
-/// Actualiza actuadores. Turbo usa MAF*MAP y Acoustic Injector su lógica interna
+/// Actualiza actuadores. Turbo usa MAF*MAP y Acoustic Injector su lÃ³gica interna
 void ActuatorManager::updateInjector() {
     // Actualiza Acoustic Injector
     injector.update();
@@ -52,9 +52,9 @@ void ActuatorManager::stopVortex() {
 }
 
 /// Modo manual: fuerza un nivel de PWM [0.0-1.0], ignorando MAF*MAP
-/// @param level: 0.0 = apagado, 1.0 = máxima potencia
+/// @param level: 0.0 = apagado, 1.0 = mÃ¡xima potencia
 void ActuatorManager::updateVortexLevel(float levelMAF, float levelMAP) {
-    vortex.updatePowerLevel(levelMAF, levelMAP); // level ya está normalizado 0–1
+    vortex.updatePowerLevel(levelMAF, levelMAP); // level ya estÃ¡ normalizado 0â€“1
 }
 
 
@@ -73,7 +73,7 @@ void ActuatorManager::stopAcoustic() {
     injector.stop();
 }
 
-/// Configura parámetros del Acoustic Injector
+/// Configura parÃ¡metros del Acoustic Injector
 /// @param level: potencia relativa [0-1]
 void ActuatorManager::setAcousticParameters(float mafLoadLevel, float /*mapLoadLevel*/) {
     injector.setLevel(mafLoadLevel);
@@ -123,6 +123,82 @@ void ActuatorManager::getAudioStats(uint32_t& dropsFromISR, uint32_t& underruns,
 
 void ActuatorManager::resetAudioStats() {
     pcm5102.resetStats();
+}
+
+void ActuatorManager::testFloorDynamic() {
+    // Detener generador normal para evitar mezcla
+    injector.stop();
+
+    // ParÃ¡metros del test
+    const uint32_t freqHz = 6000;
+    const uint32_t dwellMs = 1200;
+    const uint8_t steps[] = { 1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64 };
+
+    Serial.println(F("[AM] Test de piso dinÃ¡mico (driver) iniciado..."));
+    for (size_t i = 0; i < sizeof(steps); ++i) {
+        uint8_t lsb = steps[i];
+        float amp = float(lsb) / 127.0f; // normaliza 8-bit LSB a 0..1
+        if (amp > 1.0f) amp = 1.0f;
+        Serial.printf("[AM][PISO] paso=%u LSB=%u amp=%.3f\n", (unsigned)i, (unsigned)lsb, double(amp));
+        pcm5102.startPureSine(freqHz, amp);
+        vTaskDelay(pdMS_TO_TICKS(dwellMs));
+    }
+    pcm5102.stopPureSine();
+    Serial.println(F("[AM] Test de piso dinÃ¡mico finalizado."));
+}
+
+void ActuatorManager::testFloorUltra() {
+    // Detener generador normal para no mezclar
+    injector.stop();
+
+    // Amplitudes subâ€‘LSB (referidas a fullâ€‘scale = 1.0)
+    // Aprox. dBFS: -48, -50, -52, -54, -56, -58, -60, -62, -64, -66
+    const float amps[] = { 0.0040f, 0.00316f, 0.00251f, 0.0020f, 0.00158f,
+                           0.00126f, 0.00100f, 0.00079f, 0.00063f, 0.00050f };
+    const uint32_t freqHz = 6000;
+    const uint32_t dwellMs = 1400; // un poco mÃ¡s de tiempo por paso
+
+    Serial.println(F("[AM] Test de piso ultra (subâ€‘LSB) iniciado..."));
+    for (size_t i = 0; i < sizeof(amps)/sizeof(amps[0]); ++i) {
+        float amp = amps[i];
+        if (amp < 0.0f) amp = 0.0f; if (amp > 1.0f) amp = 1.0f;
+        Serial.printf("[AM][PISO_ULTRA] paso=%u amp=%.5f\n", (unsigned)i, double(amp));
+        pcm5102.startPureSine(freqHz, amp);
+        vTaskDelay(pdMS_TO_TICKS(dwellMs));
+    }
+    pcm5102.stopPureSine();
+    Serial.println(F("[AM] Test de piso ultra finalizado."));
+}
+
+void ActuatorManager::testFloorNano() {
+    // Silencio y detenemos el inyector
+    injector.stop();
+    pcm5102.stopPureSine();
+
+    // Pasos en dBFS muy bajos: -70 a -90 dBFS
+    const float dB[] = { -70.0f, -75.0f, -80.0f, -85.0f, -90.0f };
+    const uint32_t freqHz = 6000;
+    const uint32_t dwellMs = 1800; // mÃ¡s tiempo por paso
+
+    Serial.println(F("[AM] Test de piso nano (âˆ’70..âˆ’90 dBFS) iniciado..."));
+    // Preâ€‘silencio para referencia
+    Serial.println(F("[AM][PISO_NANO] silencio base"));
+    pcm5102.startPureSine(freqHz, 0.0f);
+    vTaskDelay(pdMS_TO_TICKS(800));
+
+    for (size_t i = 0; i < sizeof(dB)/sizeof(dB[0]); ++i) {
+        // amp(lineal) = 10^(dB/20)
+        float amp = powf(10.0f, dB[i] / 20.0f);
+        if (amp < 0.0f) amp = 0.0f; if (amp > 1.0f) amp = 1.0f;
+        Serial.printf("[AM][PISO_NANO] paso=%u dB=%.1f amp=%.6f\n", (unsigned)i, double(dB[i]), double(amp));
+        pcm5102.startPureSine(freqHz, amp);
+        vTaskDelay(pdMS_TO_TICKS(dwellMs));
+        // pequeÃ±o silencio entre pasos para limpiar memoria auditiva
+        pcm5102.startPureSine(freqHz, 0.0f);
+        vTaskDelay(pdMS_TO_TICKS(250));
+    }
+    pcm5102.stopPureSine();
+    Serial.println(F("[AM] Test de piso nano finalizado."));
 }
 
 /// Acceso directo al VortexController (BTS7960)
