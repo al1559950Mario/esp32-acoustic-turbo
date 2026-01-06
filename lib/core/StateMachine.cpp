@@ -59,17 +59,16 @@ float StateMachine::getLevel() const {
 }
 
 bool StateMachine::readyForBOOST(float mapLoad, float mafLoad) {
-    /*return mapLoad >= thresholds.BOOST_MAP_ON
-        && mafLoad >= thresholds.BOOST_TPS_ON;
-        */
-    return mafLoad >= thresholds.BOOST_TPS_ON;
+    bool vacuumReady = (_pressurePercent <= BEAM_VACUUM_PCT_ON);
+    bool mafRising   = (_dMAFdtEMA >= BEAM_MAF_ATTACK_MIN_DERIV);
+    bool mafFallback = (mafLoad >= thresholds.BOOST_TPS_ON);
+    return (vacuumReady && mafRising) || (mafFallback && mafRising);
 }
 
 bool StateMachine::readyForBEAM(float mapLoad, float mafLoad) {
-    /*return mapLoad >= thresholds.BEAM_MAP_ON
-        && mafLoad >= thresholds.BEAM_TPS_ON;
-        */
-    return mafLoad >= thresholds.BEAM_TPS_ON;
+    bool vacuumReady = (_pressurePercent <= BEAM_VACUUM_PCT_ON);
+    bool mafRising   = (_dMAFdtEMA >= BEAM_MAF_ATTACK_MIN_DERIV);
+    return vacuumReady && mafRising;
 
 }
 
@@ -163,6 +162,8 @@ void StateMachine::update(float mapLoadPercent,
                 }
                 if (actuators) {
                     actuators->startVortex();
+                    // Semilla temprana del inyector para solapar con BOOST (nivel maximo se ajusta en BEAM)
+                    actuators->startAcoustic(0.01f, _dMAFdtEMA);
                     vortexPending     = true;
                     vortexStartMillis = millis();
                 }
@@ -171,41 +172,29 @@ void StateMachine::update(float mapLoadPercent,
 
         case SystemState::BOOST:
             {
-            bool beamRaw = readyForBEAM(_mapLoadPercent, _mafLoadPercent);
-            bool attackReady = _fastAttackActive;
             bool vacuum = (_pressurePercent <= BEAM_VACUUM_PCT_ON);
             bool pressureRiseReady = (_pressureDelta >= BEAM_VACUUM_DELTA_MIN);
+            bool mafRising = (_dMAFdtEMA >= BEAM_MAF_ATTACK_MIN_DERIV);
             unsigned long now = millis();
-            
-            //if (beamRaw || attackReady || pressureReady || pressureRiseReady) {
-            /*
-            if ( pressureReady && pressureRiseReady) {
 
-                Serial.printf("[BEAM][BOOST] raw=%d attack=%d pres=%.1f%% dPres=%.2f presReady=%d dReady=%d\n",
-                              beamRaw ? 1 : 0,
-                              attackReady ? 1 : 0,
-                              _pressurePercent,
-                              _pressureDelta,
-                              pressureReady ? 1 : 0,
-                              pressureRiseReady ? 1 : 0);
-            }
-            
-            */
-            
-            //if (beamRaw && attackReady && pressureReady && pressureRiseReady) {
-            if (vacuum) {
+            bool beamGate = vacuum && mafRising;
+
+            if (beamGate && pressureRiseReady) {
                 if (_beamCondStartMs == 0) _beamCondStartMs = now;
-                if ((now - _beamCondStartMs) >= BEAM_COND_MIN_HOLD_MS) {
-                    resetBeamTracking();
-                    current = SystemState::BEAM;
-                    _beamCondStartMs = 0; // reset tracker al entrar
-                    _beamStreamStartMs = now;
+            } else {
+                _beamCondStartMs = 0; // reset si la condicion se rompe
+            }
+
+            if (beamGate && pressureRiseReady && (now - _beamCondStartMs) >= BEAM_COND_MIN_HOLD_MS) {
+                resetBeamTracking();
+                current = SystemState::BEAM;
+                _beamCondStartMs = 0; // reset tracker al entrar
+                _beamStreamStartMs = now;
+                if (actuators) {
                     actuators->stopAcoustic();
                     actuators->startAcoustic(0.005f, _dMAFdtEMA);
-                    resetBeamVortexRamp(currentDeltaMAFLevelForBEAM);
                 }
-            } else {
-                _beamCondStartMs = 0; // reset si la condición se rompe
+                resetBeamVortexRamp(currentDeltaMAFLevelForBEAM);
             }
 
             if (_mafLoadPercent <= thresholds.BOOST_TPS_OFF){
@@ -285,14 +274,13 @@ void StateMachine::update(float mapLoadPercent,
         }
 
         case SystemState::DECAY:
-            // Interrumpir decay solo si la condición BEAM se mantiene
+            // Interrumpir decay solo si la condicion BEAM se mantiene
             {
             unsigned long now = millis();
-            bool beamRaw = readyForBEAM(_mapLoadPercent, _mafLoadPercent);
-            bool attackReady = _fastAttackActive;
+            bool beamGate = readyForBEAM(_mapLoadPercent, _mafLoadPercent);
             bool pressureReady = (_pressurePercent <= BEAM_VACUUM_PCT_ON);
             bool pressureRiseReady = (_pressureDelta >= BEAM_VACUUM_DELTA_MIN);
-            if (pressureReady && pressureRiseReady) {
+            if (beamGate && pressureReady && pressureRiseReady) {
                 if (_beamCondStartMs == 0) _beamCondStartMs = now;
             } else {
                 _beamCondStartMs = 0;
@@ -300,10 +288,9 @@ void StateMachine::update(float mapLoadPercent,
 
             bool minDelayOk = (now - decayStartMillis >= MIN_BEAM_DELAY_MS);
             bool holdOk = (_beamCondStartMs != 0) && ((now - _beamCondStartMs) >= BEAM_COND_MIN_HOLD_MS);
-            //if (beamRaw && attackReady && pressureReady && pressureRiseReady && minDelayOk && holdOk) {
-            if (pressureRiseReady && minDelayOk && holdOk) {
+            if (beamGate && pressureRiseReady && minDelayOk && holdOk) {
                 resetBeamTracking();
-                current = SystemState::BEAM;  // o BEAM si así lo quieres
+                current = SystemState::BEAM;  // o BEAM si asi lo quieres
                 _beamCondStartMs = 0;
                 if (sensors) {
                     mafInitialPercent = sensors->readMAFLoadPercent();
@@ -495,7 +482,4 @@ void StateMachine::compute_dMAFdt_and_hold(float newestMAFPercent,
     _holdStartMillis = millis();
   }
 }
-
-
-
 

@@ -240,7 +240,7 @@ static constexpr uint32_t BEAM_MIN_STREAM_MS = 50u; // tiempo minimo en BEAM ant
   // de permitir la transición. Ayuda a filtrar falsos positivos.
   // Rango recomendado: 100 .. 500 ms
   // Ajuste: aumentar si aún hay falsos positivos; reducir para respuesta más rápida.
-  static constexpr uint32_t BEAM_COND_MIN_HOLD_MS = 150u; // Tiempo necesario activando condicionales para entrar a BEAM
+  static constexpr uint32_t BEAM_COND_MIN_HOLD_MS = 50u; // Tiempo necesario activando condicionales para entrar a BEAM
  
   static constexpr float BEAM_VORTEX_ENTRY_LEVEL      = 0.85f;
   static constexpr float BEAM_VORTEX_RAMP_TAU_FAST_MS = 60.0f;
