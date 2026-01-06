@@ -71,6 +71,7 @@ public:
   float getLevel() const;
   bool readyForBOOST( float, float);
   bool readyForBEAM( float, float);
+  void resetBeamTracking();
 
   float getMAFInitialForInj(){return mafInitialPercent;};
   float getMAPInitialForInj(){return mapInitialPercent;};

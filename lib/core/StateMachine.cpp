@@ -196,6 +196,7 @@ void StateMachine::update(float mapLoadPercent,
             if (vacuum) {
                 if (_beamCondStartMs == 0) _beamCondStartMs = now;
                 if ((now - _beamCondStartMs) >= BEAM_COND_MIN_HOLD_MS) {
+                    resetBeamTracking();
                     current = SystemState::BEAM;
                     _beamCondStartMs = 0; // reset tracker al entrar
                     _beamStreamStartMs = now;
@@ -271,6 +272,7 @@ void StateMachine::update(float mapLoadPercent,
                 actuators->getAcousticInjector().setDecayParameters(durationMs, avgMAFLevel,
                                                                     gFast, gSustain, (uint32_t)tFast, (uint32_t)tSustain);
                 actuators->getAcousticInjector().startDecay(now);
+                resetBeamTracking();
 
 
                 // reset hold tracker
@@ -300,6 +302,7 @@ void StateMachine::update(float mapLoadPercent,
             bool holdOk = (_beamCondStartMs != 0) && ((now - _beamCondStartMs) >= BEAM_COND_MIN_HOLD_MS);
             //if (beamRaw && attackReady && pressureReady && pressureRiseReady && minDelayOk && holdOk) {
             if (pressureRiseReady && minDelayOk && holdOk) {
+                resetBeamTracking();
                 current = SystemState::BEAM;  // o BEAM si así lo quieres
                 _beamCondStartMs = 0;
                 if (sensors) {
@@ -405,6 +408,22 @@ void StateMachine::resetBeamVortexRamp(float seedLevel) {
   float seeded = constrain(seedLevel, 0.0f, 1.0f);
   _beamVortexLevel = max(BEAM_VORTEX_ENTRY_LEVEL, seeded);
   _beamVortexLastUpdateMs = millis();
+}
+
+void StateMachine::resetBeamTracking() {
+  _beamCondStartMs = 0;
+  _beamStreamStartMs = 0;
+  mapSamples = 0;
+  mafSamples = 0;
+  avgMAPLevel = 0.0f;
+  avgMAFLevel = 0.0f;
+  lastDeltaMAFLevelForBEAM = 0.0f;
+  lastDeltaMAPLevelForBEAM = 0.0f;
+  mafMinOnBeam = 100.0f;
+  _holdActive = false;
+  _holdStartMillis = 0;
+  _beamVortexLevel = BEAM_VORTEX_ENTRY_LEVEL;
+  _beamVortexLastUpdateMs = 0;
 }
 
 float StateMachine::updateBeamVortexRamp(float mafPower) {
