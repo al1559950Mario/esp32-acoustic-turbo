@@ -68,7 +68,8 @@ bool StateMachine::readyForBOOST(float mapLoad, float mafLoad) {
 bool StateMachine::readyForBEAM(float mapLoad, float mafLoad) {
     bool vacuumReady = (_pressurePercent <= BEAM_VACUUM_PCT_ON);
     bool mafRising   = (_dMAFdtEMA >= BEAM_MAF_ATTACK_MIN_DERIV);
-    return vacuumReady && mafRising;
+    bool mafStrong   = (mafLoad >= thresholds.BEAM_TPS_ON);
+    return vacuumReady && (mafRising || mafStrong);
 
 }
 
@@ -173,19 +174,35 @@ void StateMachine::update(float mapLoadPercent,
         case SystemState::BOOST:
             {
             bool vacuum = (_pressurePercent <= BEAM_VACUUM_PCT_ON);
-            bool pressureRiseReady = (_pressureDelta >= BEAM_VACUUM_DELTA_MIN);
             bool mafRising = (_dMAFdtEMA >= BEAM_MAF_ATTACK_MIN_DERIV);
             unsigned long now = millis();
 
-            bool beamGate = vacuum && mafRising;
+            bool beamGate = readyForBEAM(_mapLoadPercent, _mafLoadPercent);
 
-            if (beamGate && pressureRiseReady) {
+            static uint32_t _boostDbgLast = 0;
+            if (now - _boostDbgLast >= 80) {
+                _boostDbgLast = now;
+                uint32_t holdMs = (_beamCondStartMs == 0) ? 0 : (now - _beamCondStartMs);
+                bool mafStrong = (_mafLoadPercent >= thresholds.BEAM_TPS_ON);
+                Serial.printf("[DBG BOOST] vac=%.2f dP=%.2f maf=%.2f dMAF=%.3f gate=%d rise=%d strong=%d hold=%lu/%u\n",
+                              _pressurePercent,
+                              _pressureDelta,
+                              _mafLoadPercent,
+                              _dMAFdtEMA,
+                              beamGate ? 1 : 0,
+                              mafRising ? 1 : 0,
+                              mafStrong ? 1 : 0,
+                              (unsigned long)holdMs,
+                              (unsigned)BEAM_COND_MIN_HOLD_MS);
+            }
+
+            if (beamGate) {
                 if (_beamCondStartMs == 0) _beamCondStartMs = now;
             } else {
                 _beamCondStartMs = 0; // reset si la condicion se rompe
             }
 
-            if (beamGate && pressureRiseReady && (now - _beamCondStartMs) >= BEAM_COND_MIN_HOLD_MS) {
+            if (beamGate && (now - _beamCondStartMs) >= BEAM_COND_MIN_HOLD_MS) {
                 resetBeamTracking();
                 current = SystemState::BEAM;
                 _beamCondStartMs = 0; // reset tracker al entrar
@@ -278,9 +295,22 @@ void StateMachine::update(float mapLoadPercent,
             {
             unsigned long now = millis();
             bool beamGate = readyForBEAM(_mapLoadPercent, _mafLoadPercent);
-            bool pressureReady = (_pressurePercent <= BEAM_VACUUM_PCT_ON);
-            bool pressureRiseReady = (_pressureDelta >= BEAM_VACUUM_DELTA_MIN);
-            if (beamGate && pressureReady && pressureRiseReady) {
+            static uint32_t _decayDbgLast = 0;
+            if (now - _decayDbgLast >= 120) {
+                _decayDbgLast = now;
+                uint32_t holdMs = (_beamCondStartMs == 0) ? 0 : (now - _beamCondStartMs);
+                bool mafStrong = (_mafLoadPercent >= thresholds.BEAM_TPS_ON);
+                Serial.printf("[DBG DECAY] vac=%.2f dP=%.2f maf=%.2f dMAF=%.3f gate=%d strong=%d hold=%lu/%u\n",
+                              _pressurePercent,
+                              _pressureDelta,
+                              _mafLoadPercent,
+                              _dMAFdtEMA,
+                              beamGate ? 1 : 0,
+                              mafStrong ? 1 : 0,
+                              (unsigned long)holdMs,
+                              (unsigned)BEAM_COND_MIN_HOLD_MS);
+            }
+            if (beamGate) {
                 if (_beamCondStartMs == 0) _beamCondStartMs = now;
             } else {
                 _beamCondStartMs = 0;
@@ -288,7 +318,7 @@ void StateMachine::update(float mapLoadPercent,
 
             bool minDelayOk = (now - decayStartMillis >= MIN_BEAM_DELAY_MS);
             bool holdOk = (_beamCondStartMs != 0) && ((now - _beamCondStartMs) >= BEAM_COND_MIN_HOLD_MS);
-            if (beamGate && pressureRiseReady && minDelayOk && holdOk) {
+            if (beamGate && minDelayOk && holdOk) {
                 resetBeamTracking();
                 current = SystemState::BEAM;  // o BEAM si asi lo quieres
                 _beamCondStartMs = 0;
