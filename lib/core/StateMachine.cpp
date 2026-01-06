@@ -67,9 +67,8 @@ bool StateMachine::readyForBOOST(float mapLoad, float mafLoad) {
 
 bool StateMachine::readyForBEAM(float mapLoad, float mafLoad) {
     bool vacuumReady = (_pressurePercent <= BEAM_VACUUM_PCT_ON);
-    bool mafRising   = (_dMAFdtEMA >= BEAM_MAF_ATTACK_MIN_DERIV);
-    bool mafStrong   = (mafLoad >= thresholds.BEAM_TPS_ON);
-    return vacuumReady && (mafRising || mafStrong);
+    // Permitir disparo principalmente por vacio; MAF se usa solo para potencia
+    return vacuumReady;
 
 }
 
