@@ -173,11 +173,14 @@ void StateMachine::update(float mapLoadPercent,
             {
             bool beamRaw = readyForBEAM(_mapLoadPercent, _mafLoadPercent);
             bool attackReady = _fastAttackActive;
-            bool pressureReady = (_pressurePercent >= BEAM_PRESSURE_PCT_ON);
-            bool pressureRiseReady = (_pressureDelta >= BEAM_PRESSURE_DELTA_MIN);
+            bool vacuum = (_pressurePercent <= BEAM_VACUUM_PCT_ON);
+            bool pressureRiseReady = (_pressureDelta >= BEAM_VACUUM_DELTA_MIN);
             unsigned long now = millis();
+            
+            //if (beamRaw || attackReady || pressureReady || pressureRiseReady) {
             /*
-            if (beamRaw || attackReady || pressureReady || pressureRiseReady) {
+            if ( pressureReady && pressureRiseReady) {
+
                 Serial.printf("[BEAM][BOOST] raw=%d attack=%d pres=%.1f%% dPres=%.2f presReady=%d dReady=%d\n",
                               beamRaw ? 1 : 0,
                               attackReady ? 1 : 0,
@@ -188,9 +191,9 @@ void StateMachine::update(float mapLoadPercent,
             }
             
             */
+            
             //if (beamRaw && attackReady && pressureReady && pressureRiseReady) {
-
-            if (beamRaw) {
+            if (vacuum) {
                 if (_beamCondStartMs == 0) _beamCondStartMs = now;
                 if ((now - _beamCondStartMs) >= BEAM_COND_MIN_HOLD_MS) {
                     current = SystemState::BEAM;
@@ -215,6 +218,7 @@ void StateMachine::update(float mapLoadPercent,
             float deriv = _dMAFdtEMA; // ya calculada por compute_dMAFdt_and_hold
             bool dropDetected = (deriv <= -DERIV_DROP_THRESHOLD);
             belowThresholds = (_mafLoadPercent <= thresholds.BEAM_TPS_OFF);
+            bool beamExit = (_pressurePercent >= BEAM_VACUUM_PCT_OFF);
             unsigned long now = millis();
             if (_beamStreamStartMs == 0) {
                 _beamStreamStartMs = now;
@@ -224,7 +228,7 @@ void StateMachine::update(float mapLoadPercent,
                 belowThresholds = false;
             }
 
-            if (belowThresholds) {
+            if (beamExit) {
 
                 // calcular hold_ms si estuvo activo
                 unsigned long holdMs = 0;
@@ -284,9 +288,9 @@ void StateMachine::update(float mapLoadPercent,
             unsigned long now = millis();
             bool beamRaw = readyForBEAM(_mapLoadPercent, _mafLoadPercent);
             bool attackReady = _fastAttackActive;
-            bool pressureReady = (_pressurePercent >= BEAM_PRESSURE_PCT_ON);
-            bool pressureRiseReady = (_pressureDelta >= BEAM_PRESSURE_DELTA_MIN);
-            if (beamRaw && attackReady && pressureReady && pressureRiseReady) {
+            bool pressureReady = (_pressurePercent <= BEAM_VACUUM_PCT_ON);
+            bool pressureRiseReady = (_pressureDelta >= BEAM_VACUUM_DELTA_MIN);
+            if (pressureReady && pressureRiseReady) {
                 if (_beamCondStartMs == 0) _beamCondStartMs = now;
             } else {
                 _beamCondStartMs = 0;
@@ -294,7 +298,8 @@ void StateMachine::update(float mapLoadPercent,
 
             bool minDelayOk = (now - decayStartMillis >= MIN_BEAM_DELAY_MS);
             bool holdOk = (_beamCondStartMs != 0) && ((now - _beamCondStartMs) >= BEAM_COND_MIN_HOLD_MS);
-            if (beamRaw && attackReady && pressureReady && pressureRiseReady && minDelayOk && holdOk) {
+            //if (beamRaw && attackReady && pressureReady && pressureRiseReady && minDelayOk && holdOk) {
+            if (pressureRiseReady && minDelayOk && holdOk) {
                 current = SystemState::BEAM;  // o BEAM si así lo quieres
                 _beamCondStartMs = 0;
                 if (sensors) {
@@ -463,7 +468,7 @@ void StateMachine::compute_dMAFdt_and_hold(float newestMAFPercent,
   _dMAFdtEMA = raw;
 
   // Ataque rápido activo solo si la pendiente supera el umbral positivo
-  _fastAttackActive = (_dMAFdtEMA >= BEAM_ATTACK_MIN_DERIV);
+  _fastAttackActive = (_dMAFdtEMA >= BEAM_MAF_ATTACK_MIN_DERIV);
 
 
   if (!_holdActive && currentDeltaMAFLevel > PRESS_EPS) {

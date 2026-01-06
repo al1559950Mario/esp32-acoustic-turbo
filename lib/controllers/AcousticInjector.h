@@ -53,6 +53,16 @@ public:
   float getFreqMin() const { return _freqMin; }
   float getFreqMax() const { return _freqMax; }
   void startDecay(uint32_t  nowMillis);
+  // Ajustes del DECAY (ring-down):
+  // - durationMs: duración mínima garantizada del decay (ms). Si la fórmula interna calcula
+  //   una duración mayor, se usa la mayor. Útil para fijar colas mínimas.
+  //   Sugerido: 200..4000 ms según sensación buscada.
+  // - avgMAPLevel: nivel medio 0..1 (carga/MAF/TPS normalizado) para calcular la mezcla del
+  //   resonador. Mayor => más mezcla (cola más “resonante”).
+  // - gFast, gSustain (0..1): pesos para componentes rápido/sustain del envelope. Actualmente
+  //   se almacenan para blending interno; valores típicos 0..1. Mantener en 0..1.
+  // - tFastMs, tSustainMs: tiempos característicos (ms) de los componentes rápido/sustain.
+  //   Útiles para moldear la sensación de caída. Típicos: tFast=50..300 ms, tSustain=200..5000 ms.
   void setDecayParameters(uint32_t durationMs, float avgMAPLevel,
                         float gFast, float gSustain, uint32_t tFastMs, uint32_t tSustainMs);
   void updateDecayState();           // llamados desde loop/task para recalcular envelope/resonator
@@ -138,6 +148,11 @@ private:
   // Ajuste empírico: 0.005..0.02 = suave; >0.02 = respuesta más rápida.
   static constexpr float LEVEL_RAMP_STEP = 0.005f;
   static constexpr float LEVEL_SMOOTH_TAU_MS = 120.0f;
+  // Remapeo de nivel local al inyector: comprime el rango para
+  // que ~0.8 de entrada alcance 1.0 de salida y aplica gamma
+  // para empujar niveles medios hacia arriba.
+  static constexpr float LEVEL_MAP_TOP_AT = 0.80f;   // 80% -> 100%
+  static constexpr float LEVEL_MAP_GAMMA  = 0.80f;   // <1.0 acelera hacia el tope
   float _lastTargetLevel = 0.0f;
 
   FrequencyRangeOption _freqOption = RANGE_3;
@@ -163,14 +178,14 @@ private:
 
   static constexpr float FORCE_SWEEP_START_HZ = 2000.0f;  // inicio fijo del sweep
   static constexpr float FORCE_FINAL_FREQ_MIN = 5500.0f;  // objetivo mínimo final (Hz)
-  static constexpr float FORCE_FINAL_FREQ_MAX = 7000.0f;  // objetivo máximo final (Hz)
+  static constexpr float FORCE_FINAL_FREQ_MAX = 6400.0f;  // objetivo máximo final (Hz)
   static constexpr uint32_t FORCE_SWEEP_HOLD_MS = 120;     // tiempo extra tras pre-idle antes del sweep (ms)
   static constexpr uint32_t FORCE_SWEEP_TIME_MS = 1000u;   // duración del barrido inicial (ms)
-  static constexpr float FORCE_SWEEP_SHAPE_EXP = 0.50f;    // <1 = ataque inmediato (ease-out), >1 = suave (ease-in)
+  static constexpr float FORCE_SWEEP_SHAPE_EXP = 1.50f;    // <1 = ataque inmediato (ease-out), >1 = suave (ease-in)
   static constexpr float FORCE_SWEEP_STEP_LIMIT_HZ = 90.0f; // delta Hz base fuera de la zona de 2 kHz
   static constexpr float FORCE_SWEEP_NEAR_START_GAIN = 60.0f; // multiplicador (0..n) para acelerar cerca de 2 kHz
   static constexpr float FORCE_SWEEP_EXIT_TOL_HZ = 250.0f;    // tolerancia para salir del sweep anticipadamente
-  static constexpr uint32_t SONIC_SHOT_DURATION_MS = 90u;   // duración del disparo
+  static constexpr uint32_t SONIC_SHOT_DURATION_MS = 190u;   // duración del disparo
   static constexpr uint32_t SONIC_SHOT_COOLDOWN_MS = 140u;  // mínima separación entre disparos
   static constexpr float SONIC_SHOT_ZONE_HZ = 180.0f;       // ventana alrededor de 2 kHz / 3.5 kHz para armar disparo
   static constexpr float SONIC_SHOT_MIN_DELTA_HZ = 550.0f;  // delta requerido para considerar transición real
@@ -220,6 +235,9 @@ private:
 
   // Tabla seno 0..255 para ISR rápido
   static uint8_t _sineTable[TABLE_SIZE];
+
+  // Aplica clamp + gamma al nivel [0..1] para convertir a amplitud efectiva
+  float mapLevelForAmplitude(float x) const;
 
   // Estado del resonador/decay
   volatile bool _inDecay = false;
@@ -302,12 +320,12 @@ private:
 // Duración total de la fase pre-idle (ms)
 // 2000–6000 recomendado (2–6 segundos)
 // Efecto: más tiempo = turbo “cargando” más realista antes del sweep
-static constexpr uint32_t PRE_IDLE_TIME_MS = 2000;
+static constexpr uint32_t PRE_IDLE_TIME_MS = 1000;
 
 // Nivel máximo audible durante pre-idle (0.02–0.10 típico)
 // Efecto: mayor → más audible; menor → más sutil
 static constexpr float PRE_IDLE_MAX = 0.02f;
-static constexpr float PRE_IDLE_MIN_LEVEL = 0.005f;
+static constexpr float PRE_IDLE_MIN_LEVEL = 0.0005f;
 
 // Exponente de curva inicial (1.5–4.0 recomendado)
 // Efecto: mayor → arranque más silencioso y sube tarde; menor → sube más lineal
@@ -322,7 +340,7 @@ static constexpr float PRE_IDLE_WOBBLE_STRENGTH = 0.08f;
 static constexpr float PRE_IDLE_WOBBLE_SPEED = 8.0f;
 
   // Sweep inicial (sin pre-idle)
-  static constexpr float SWEEP_LOW_START_LEVEL   = 0.005f;
+  static constexpr float SWEEP_LOW_START_LEVEL   = 0.0005f;
   static constexpr float SWEEP_LOW_END_LEVEL     = 0.015f;
   static constexpr float SWEEP_LOW_TIME_FRACTION = 0.65f;
   static constexpr float SWEEP_LOW_EXP           = 3.0f;
@@ -332,34 +350,69 @@ static constexpr float PRE_IDLE_WOBBLE_SPEED = 8.0f;
   static constexpr float SWEEP_FREQ_HIGH_EXP      = 0.8f;
 
   // -------- Par�metros base del DECAY / resonador ----------
-  static constexpr float DECAY_MIN_ENERGY_BASE  = 0.005f;
-  static constexpr float DECAY_MIN_ENERGY_TIGHT = 0.0050f;
+  // Nivel mínimo de energía (floor) del envelope para evitar cero absoluto.
+  // Subir => colas más cortas/estables; Bajar => colas más largas/sutiles. 0.0003..0.002 típico.
+  static constexpr float DECAY_MIN_ENERGY_BASE  = 0.0005f;
+  // Variante “estricta” usada cuando se activa el floor energético. Normalmente igual que BASE.
+  // Útil para cortar antes en ambientes ruidosos.
+  static constexpr float DECAY_MIN_ENERGY_TIGHT = 0.0005f;
+  // Término base (segundos) de la duración calculada del decay a niveles bajos.
+  // Subir alarga todas las colas; bajar las acorta. 0.2..0.6 s típico.
   static constexpr float DECAY_ZP_BASE = 0.35f;
+  // Exponente del término dependiente del nivel: mayor => la duración crece más con niveles altos.
+  // 1.0..2.0 típico.
   static constexpr float DECAY_ZP_POWER_EXP = 1.3f;
+  // Peso del término log2(level+1): aporta tiempo extra perceptual a niveles bajos.
+  // 0.1..0.4 típico.
   static constexpr float DECAY_ZP_LOG_SCALE = 0.20f;
-  static constexpr float DECAY_GAMMA = 1.4f;
-  static constexpr float DECAY_SHOULDER_FRAC = 0.35f;
-  static constexpr float DECAY_SOFT_BEND_DEPTH = 0.20f;
-  static constexpr float DECAY_SOFT_BEND_TIME_MS = 350.0f;
-  static constexpr float DECAY_REBOUND_A = 0.08f;
-  static constexpr float DECAY_REBOUND_DAMP = 12.0f;
-  static constexpr float DECAY_REBOUND_FREQ_HZ = 15.0f;
-  static constexpr float DECAY_REBOUND_WINDOW_FRAC = 0.5f;
+  // Curvatura del progreso: pow(progress, gamma). >1: arranque más sostenido y caída al final.
+  // 1.1..1.8 típico.
+  static constexpr float DECAY_GAMMA = 1.1f;
+  // Fracción inicial “hombro” (sustain) sin progreso. 0 desactiva. 0.2..0.5 típico.
+  static constexpr float DECAY_SHOULDER_FRAC = 0.1f;
+  // Profundidad del “soft bend” (reducción gradual de nivel/frecuencia al inicio). 0.1..0.3 típico.
+  static constexpr float DECAY_SOFT_BEND_DEPTH = 0.30f;
+  // Tiempo para alcanzar la profundidad completa del soft bend (ms). 200..600 ms típico.
+  static constexpr float DECAY_SOFT_BEND_TIME_MS = 250.0f;
+  // Rebote: amplitud relativa de la oscilación amortiguada (0 desactiva prácticamente). 0.05..0.15 típico.
+  static constexpr float DECAY_REBOUND_A = 0.18f;
+  // Rebote: amortiguación exponencial e^{-damp*t}. Mayor => se apaga antes. 6..20 típico.
+  static constexpr float DECAY_REBOUND_DAMP = 6.0f;
+  // Rebote: frecuencia de la oscilación (Hz). 8..30 Hz típico.
+  static constexpr float DECAY_REBOUND_FREQ_HZ = 12.0f;
+  // Ventana (fracción de la duración) donde se permite el rebote. 0.3..0.7 típico.
+  static constexpr float DECAY_REBOUND_WINDOW_FRAC = 0.7f;
+  // Relación de frecuencia final respecto al máximo; reservado/no usado actualmente.
   static constexpr float DECAY_END_FREQ_RATIO = 0.30f;
-  static constexpr float DECAY_MIN_FREQ_HZ = 2500.0f;
-  static constexpr float DECAY_FREQ_COUPLE_EXP = 0.6f;
+  // Frecuencia mínima permitida (Hz) del resonador durante el decay. Subir => menos cola grave.
+  static constexpr float DECAY_MIN_FREQ_HZ = 2000.0f;
+  // Exponente de acoplamiento nivel→frecuencia. Mayor comprime el efecto a niveles bajos. 0.4..0.9 típico.
+  static constexpr float DECAY_FREQ_COUPLE_EXP = 0.8f;
+  // Umbral del envelope (Q16) considerado “casi cero” para salida del decay. 16..128 recomendado.
   static constexpr uint16_t DECAY_ENVELOPE_EXIT_THRESHOLD = 64u;
+  // Periodo (ms) para control temporizado del decay; reservado/no usado directo en update.
   static constexpr uint32_t DECAY_CONTROL_PERIOD_MS = 20u;
-  static constexpr float DECAY_SLEW_HIGH_FREQ_DELTA_HZ = 40.0f;
+  // Límite de cambio de frecuencia por paso (zona alta). Subir => seguimiento más rápido.
+  static constexpr float DECAY_SLEW_HIGH_FREQ_DELTA_HZ = 80.0f;
+  // Extra permitido a frecuencias bajas (se suma al anterior). 200..500 Hz típico.
   static constexpr float DECAY_SLEW_LOW_FREQ_EXTRA_HZ = 240.0f;
+  // Duración mínima del sweep del resonador; reservado/no usado.
   static constexpr uint32_t DECAY_MIN_SWEEP_MS = 50u;
-  static constexpr uint32_t DECAY_MAX_SWEEP_MS = 500u;
+  // Duración máxima del sweep del resonador; reservado/no usado.
+  static constexpr uint32_t DECAY_MAX_SWEEP_MS = 100u;
+  // Multiplicador de sweep del resonador; reservado/no usado.
   static constexpr float DECAY_RES_SWEEP_MULT = 5.5f;
+  // Factor energético para cálculos futuros; reservado/no usado.
   static constexpr float DECAY_ENERGY_K = 0.85f;
+  // Límite de paso de frecuencia en la cola; reservado/no usado.
   static constexpr uint32_t DECAY_SLEW_TAIL_MAX_STEP = 128u;
+  // Punto de progreso [0..1] a partir del cual se “congela” la frecuencia (si se activa la feature).
   static constexpr float DECAY_TAIL_FREEZE_PROGRESS = 0.85f;
+  // Ratio de “freeze” de cola; reservado/no usado.
   static constexpr float DECAY_TAIL_FREEZE_RATIO = 0.30f;
-  static constexpr float DECAY_FADE_START_PROGRESS = 0.90f;
+  // Progreso [0..1] desde el que se aplica el fade final. 0.85..0.95 típico.
+  static constexpr float DECAY_FADE_START_PROGRESS = 0.80f;
+  // Duración del fade final (ms); reservado/no usado directo en update actual.
   static constexpr uint32_t DECAY_FADE_MS = 160u;  // --- Peak capture during BEAM ---
 float _peakLevelDuringBeam = 0.0f;       // Máximo level alcanzado en BEAM (0.0 - 1.0)
 float _peakFreqDuringBeam = 0.0f;        // Máxima frecuencia alcanzada en BEAM (Hz)

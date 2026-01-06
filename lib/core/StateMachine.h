@@ -226,11 +226,12 @@ const float MIN_TAIL_MS = 10.0f;
   static constexpr float MAF_RELEASE_REF_DTPS = -0.12f;  // referencia (nivel/sec) para detectar soltado rápido
 //Bájalo por debajo de 0.10f si quieres que BEAM se dispare con ataques más suaves
 //Súbelo si deseas exigir pisadas más bruscas antes de considerar el ataque “válido”.
-  static constexpr float BEAM_ATTACK_MIN_DERIV   = 0.06f;  // nivel/sec mínimo para considerar un ataque rápido
-  static constexpr float BEAM_PRESSURE_PCT_ON    = 12.0f;  // presión mínima (en %) para permitir BEAM
-  static constexpr float BEAM_PRESSURE_DELTA_MIN = 1.5f;   // delta mínimo de presión (%)
-static constexpr uint32_t MIN_BEAM_DELAY_MS = 300u; // m segundos minimos antes de permitir BEAM
-static constexpr uint32_t BEAM_MIN_STREAM_MS = 800u; // tiempo minimo en BEAM antes de pasar a DECAY
+  static constexpr float BEAM_MAF_ATTACK_MIN_DERIV   = 0.04f;  // nivel/sec mínimo para considerar un ataque rápido
+  static constexpr float BEAM_VACUUM_PCT_ON    = -3.0f;  // vacio mínima (en %) para permitir BEAM
+  static constexpr float BEAM_VACUUM_PCT_OFF    = -1.0f;  // vacio max (en %) para romper BEAM
+  static constexpr float BEAM_VACUUM_DELTA_MIN = 1.0f;   // delta mínimo de vacio (%)
+static constexpr uint32_t MIN_BEAM_DELAY_MS = 50u; // m segundos minimos antes de permitir BEAM
+static constexpr uint32_t BEAM_MIN_STREAM_MS = 50u; // tiempo minimo en BEAM antes de pasar a DECAY
 
   // BEAM_COND_MIN_HOLD_MS
   // Qué controla: tiempo mínimo que la condición de entrada a BEAM
@@ -238,7 +239,8 @@ static constexpr uint32_t BEAM_MIN_STREAM_MS = 800u; // tiempo minimo en BEAM an
   // de permitir la transición. Ayuda a filtrar falsos positivos.
   // Rango recomendado: 100 .. 500 ms
   // Ajuste: aumentar si aún hay falsos positivos; reducir para respuesta más rápida.
-  static constexpr uint32_t BEAM_COND_MIN_HOLD_MS = 300u;
+  static constexpr uint32_t BEAM_COND_MIN_HOLD_MS = 150u; // Tiempo necesario activando condicionales para entrar a BEAM
+ 
   static constexpr float BEAM_VORTEX_ENTRY_LEVEL      = 0.85f;
   static constexpr float BEAM_VORTEX_RAMP_TAU_FAST_MS = 60.0f;
   static constexpr float BEAM_VORTEX_RAMP_TAU_SLOW_MS = 260.0f;

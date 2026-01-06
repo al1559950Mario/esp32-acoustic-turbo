@@ -136,7 +136,7 @@ void ConsoleUI::interpretarComando(char c) {
     case 'o':  // Seno por ISR (AcousticInjector) 1 kHz @ 30%
       if (!devOnly()) break;
       this->println(F("[UI] Iniciando seno ISR 4 kHz (30%)"));
-      if (actuators) actuators->startISRSine(4000, 0.3f);
+      if (actuators) actuators->startISRSine(4000, 0.9f);
       break;
 
     case 'O':  // Detener seno ISR
@@ -438,7 +438,7 @@ void ConsoleUI::imprimirDashboard() {
     float freq = actuators->getAcousticInjector().getFrequency();
     float oscillationAmplitude = sensors->computeOscillationAmplitude();
     float rms = sensors->computeRMS();
-    float pressurePSI = sensors->getPressurePSI();
+    float pressurePercent = sensors->getPressurePercent();
 
     // Obtener potencia del turbo (0–100%)
     float boostLevel = actuators->getVortexController().getLastPWM() * 100.0f;
@@ -455,7 +455,7 @@ void ConsoleUI::imprimirDashboard() {
 
     // HUD en vivo: actualización en línea
     this->printf(
-        "\r[%s|%lus]MAF%.1f(%.1f–%.1f)%.0f%%MAP%.1f(%.1f–%.1f)%.0f%%|L%.3f|%.1fkhz|%.0f%% IS:%.1f%|Pk:%.1f|Rm%.1f|PS:%.0f",
+        "\r[%s|%lus]MAF%.1f(%.1f–%.1f)%.0f%%MAP%.1f(%.1f–%.1f)%.0f%%|L%.3f|%.1fkhz|%.0f%% IS:%.1f%|Pk:%.1f|Rm%.1f|P:%.1f%",
         stName, elapsed,
         tpsV, tpsMinV, tpsMaxV, tpsPct,
         mapV, mapMinV, mapMaxV, mapPct,
@@ -465,7 +465,7 @@ void ConsoleUI::imprimirDashboard() {
         boostSense,
         oscillationAmplitude,
         rms,
-        pressurePSI
+        pressurePercent
       );
 
     // Detalle en nueva línea si cambió estado

@@ -73,6 +73,18 @@ void AcousticInjector::begin(uint8_t dacPin) {
 
 }
 
+// Remapeo local del nivel a amplitud efectiva (clamp + gamma)
+float AcousticInjector::mapLevelForAmplitude(float x) const {
+  x = constrain(x, 0.0f, 1.0f);
+  float y = x / LEVEL_MAP_TOP_AT;
+  if (y > 1.0f) y = 1.0f;
+  const float g = LEVEL_MAP_GAMMA;
+  if (g > 0.0f && g != 1.0f) {
+    y = powf(y, g);
+  }
+  return constrain(y, 0.0f, 1.0f);
+}
+
 void AcousticInjector::start(float level, float dMAFdt) {
   // 1) Reinicio total (fase, nivel, ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­ndices)
   resetInternal();
@@ -82,7 +94,10 @@ void AcousticInjector::start(float level, float dMAFdt) {
   if (_targetLevel < SWEEP_LOW_START_LEVEL) _targetLevel = SWEEP_LOW_START_LEVEL;
   _level       = SWEEP_LOW_START_LEVEL;
   _levelAtSweepStart = SWEEP_LOW_START_LEVEL;
-  _levelInt    = uint8_t(_level * 255.0f);
+  {
+    float amp = mapLevelForAmplitude(_level);
+    _levelInt = uint8_t(constrain(amp * 255.0f, 0.0f, 255.0f));
+  }
 
   // 2) Configurar inicio y objetivo de frecuencia
   uint32_t nowMs = millis();
@@ -357,7 +372,10 @@ void AcousticInjector::update() {
     float wobble = sinf(tIdle * PRE_IDLE_WOBBLE_SPEED * 2.0f * PI)
                    * PRE_IDLE_WOBBLE_STRENGTH * baseIdle;
     _level = constrain(baseIdle + wobble, PRE_IDLE_MIN_LEVEL, PRE_IDLE_MAX);
-    _levelInt = uint8_t(_level * 255.0f);
+    {
+      float amp = mapLevelForAmplitude(_level);
+      _levelInt = uint8_t(constrain(amp * 255.0f, 0.0f, 255.0f));
+    }
     return;
   }
 
@@ -368,7 +386,10 @@ void AcousticInjector::update() {
     _level = SWEEP_LOW_START_LEVEL
            + freqProgress * (SWEEP_LOW_END_LEVEL - SWEEP_LOW_START_LEVEL);
     _level = constrain(_level, SWEEP_LOW_START_LEVEL, SWEEP_LOW_END_LEVEL);
-    _levelInt = uint8_t(constrain(_level * 255.0f, 0.0f, 255.0f));
+    {
+      float amp = mapLevelForAmplitude(_level);
+      _levelInt = uint8_t(constrain(amp * 255.0f, 0.0f, 255.0f));
+    }
     if (_levelInt < 1) _levelInt = 1;
     sweepLogProgress = freqProgress;
     sweepLoggingActive = true;
@@ -377,14 +398,18 @@ void AcousticInjector::update() {
     float alphaLevel = 1.0f - expf(-dt / max(1e-4f, levelTau));
     _level += (tLevel - _level) * alphaLevel;
     _level = constrain(_level, 0.0f, 1.0f);
-    _levelInt = uint8_t(constrain(_level * 255.0f, 0.0f, 255.0f));
+    {
+      float amp = mapLevelForAmplitude(_level);
+      _levelInt = uint8_t(constrain(amp * 255.0f, 0.0f, 255.0f));
+    }
   }
 
   if (sonicShotLevelTarget > 0.0f) {
     float boosted = constrain(sonicShotLevelTarget, 0.0f, 1.0f);
     if (boosted > _level) {
       _level = boosted;
-      _levelInt = uint8_t(constrain(_level * 255.0f, 0.0f, 255.0f));
+      float amp = mapLevelForAmplitude(_level);
+      _levelInt = uint8_t(constrain(amp * 255.0f, 0.0f, 255.0f));
       if (_levelInt < 1) _levelInt = 1;
     }
   }
@@ -406,7 +431,7 @@ void AcousticInjector::update() {
   */
   
   // --- DECAY MIX / ENVELOPE (igual que antes) ---
-  float A = constrain(_level, 0.0f, 1.0f);
+  float A = mapLevelForAmplitude(_level);
   float energy = A * A;
   float G = freqGainFactor(_currentFrequency);
   float effective = energy * G;
@@ -704,7 +729,10 @@ void AcousticInjector::startFixedSine(uint32_t freqHz, float level) {
   _forceSweep = false;
   _targetLevel = constrain(level, 0.0f, 1.0f);
   _level = _targetLevel;
-  _levelInt = uint8_t(_level * 255.0f);
+  {
+    float amp = mapLevelForAmplitude(_level);
+    _levelInt = uint8_t(constrain(amp * 255.0f, 0.0f, 255.0f));
+  }
   updateWaveFrequency((float)freqHz);
   // Arrancar timer solo si no estamos en pull-mode
   if (!_pullMode && _timer) {
@@ -1199,8 +1227,7 @@ void AcousticInjector::updateDecayState() {
       return;
   }
 
-
-  // ================== DEBUG INMEDIATO CADA 20 ms ==================
+/*
   uint32_t nowMs = millis();
   if (nowMs - _lastDecayPrintMs >= 1) {
       _lastDecayPrintMs = nowMs;
@@ -1215,6 +1242,9 @@ void AcousticInjector::updateDecayState() {
         (int)_decayFinished
       );
   }
+
+*/
+  // ================== DEBUG INMEDIATO CADA 20 ms ==================
 
 }
 
