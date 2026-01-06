@@ -59,10 +59,8 @@ float StateMachine::getLevel() const {
 }
 
 bool StateMachine::readyForBOOST(float mapLoad, float mafLoad) {
-    bool vacuumReady = (_pressurePercent <= BEAM_VACUUM_PCT_ON);
-    bool mafRising   = (_dMAFdtEMA >= BEAM_MAF_ATTACK_MIN_DERIV);
     bool mafFallback = (mafLoad >= thresholds.BOOST_TPS_ON);
-    return (vacuumReady && mafRising) || (mafFallback && mafRising);
+    return (mafFallback);
 }
 
 bool StateMachine::readyForBEAM(float mapLoad, float mafLoad) {
@@ -178,23 +176,6 @@ void StateMachine::update(float mapLoadPercent,
 
             bool beamGate = readyForBEAM(_mapLoadPercent, _mafLoadPercent);
 
-            static uint32_t _boostDbgLast = 0;
-            if (now - _boostDbgLast >= 80) {
-                _boostDbgLast = now;
-                uint32_t holdMs = (_beamCondStartMs == 0) ? 0 : (now - _beamCondStartMs);
-                bool mafStrong = (_mafLoadPercent >= thresholds.BEAM_TPS_ON);
-                Serial.printf("[DBG BOOST] vac=%.2f dP=%.2f maf=%.2f dMAF=%.3f gate=%d rise=%d strong=%d hold=%lu/%u\n",
-                              _pressurePercent,
-                              _pressureDelta,
-                              _mafLoadPercent,
-                              _dMAFdtEMA,
-                              beamGate ? 1 : 0,
-                              mafRising ? 1 : 0,
-                              mafStrong ? 1 : 0,
-                              (unsigned long)holdMs,
-                              (unsigned)BEAM_COND_MIN_HOLD_MS);
-            }
-
             if (beamGate) {
                 if (_beamCondStartMs == 0) _beamCondStartMs = now;
             } else {
@@ -295,20 +276,7 @@ void StateMachine::update(float mapLoadPercent,
             unsigned long now = millis();
             bool beamGate = readyForBEAM(_mapLoadPercent, _mafLoadPercent);
             static uint32_t _decayDbgLast = 0;
-            if (now - _decayDbgLast >= 120) {
-                _decayDbgLast = now;
-                uint32_t holdMs = (_beamCondStartMs == 0) ? 0 : (now - _beamCondStartMs);
-                bool mafStrong = (_mafLoadPercent >= thresholds.BEAM_TPS_ON);
-                Serial.printf("[DBG DECAY] vac=%.2f dP=%.2f maf=%.2f dMAF=%.3f gate=%d strong=%d hold=%lu/%u\n",
-                              _pressurePercent,
-                              _pressureDelta,
-                              _mafLoadPercent,
-                              _dMAFdtEMA,
-                              beamGate ? 1 : 0,
-                              mafStrong ? 1 : 0,
-                              (unsigned long)holdMs,
-                              (unsigned)BEAM_COND_MIN_HOLD_MS);
-            }
+        
             if (beamGate) {
                 if (_beamCondStartMs == 0) _beamCondStartMs = now;
             } else {
