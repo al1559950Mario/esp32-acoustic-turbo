@@ -76,6 +76,8 @@ private:
   float rawMAFCached = 0.0f;
   float rawMAPCached = 0.0f;
 
+  size_t pressureCount = 0;
+
 
   float vacuum_inHg = 0;
   float amplitudeOscillation;  // ΔP: Pmax - Pmin
