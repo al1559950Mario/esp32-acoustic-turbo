@@ -15,7 +15,9 @@ void PressureSensor::begin(uint8_t pinData, uint8_t pinSCK) {
     long readings[N];
 
     for (int i = 0; i < N; i++) {
-        readings[i] = readRaw();
+        long reading = 0;
+        readRaw(reading);
+        readings[i] = reading;
         delay(5);
     }
 
@@ -41,18 +43,21 @@ void PressureSensor::begin(uint8_t pinData, uint8_t pinSCK) {
     maxReading = RANGE_KPA;
 }
 
-long PressureSensor::readRaw() {
+bool PressureSensor::readRaw(long& value) {
     static long lastValid = 0;
 
     unsigned long startTime = micros();
     const unsigned long timeout_us = 200000;
 
     while (digitalRead(_pinData) == HIGH) {
-        if (micros() - startTime > timeout_us) return lastValid;
+        if (micros() - startTime > timeout_us) {
+            value = lastValid;
+            return false;
+        }
         delayMicroseconds(5);
     }
 
-    long value = 0;
+    value = 0;
     for (uint8_t i = 0; i < 24; i++) {
         digitalWrite(_pinSCK, HIGH);
         delayMicroseconds(5);
@@ -69,38 +74,29 @@ long PressureSensor::readRaw() {
     digitalWrite(_pinSCK, LOW);
 
     lastValid = value;
-    return value;
+    return true;
 }
 
-void PressureSensor::updateRawCached() {
-    long newVal = readRaw();
-    if (newVal != 0) {
+bool PressureSensor::updateRawCached() {
+    long newVal = 0;
+    bool hasNewSample = readRaw(newVal);
+    if (hasNewSample) {
         _rawCached = newVal;
         _lastUpdate = millis();
     }
+    return hasNewSample;
 }
 
 
 float PressureSensor::getPressure_kPa() {
-    const int FILTER_N = 5;
-    static float buffer[FILTER_N] = {0};
-    static uint8_t index = 0;
-    static bool filled = false;
-
+    
     long rawCached = _rawCached;
     float pressure = (rawCached * _scale) + _offset;
 
     // Limitar al rango físico
     pressure = constrain(pressure, minReading, maxReading);
 
-    buffer[index++] = pressure;
-    if (index >= FILTER_N) { index = 0; filled = true; }
-
-    float sum = 0.0f;
-    uint8_t count = filled ? FILTER_N : index;
-    for (uint8_t i = 0; i < count; i++) sum += buffer[i];
-
-    return sum / count;
+    return pressure;
 }
 
 void PressureSensor::setCalibration(float scale, float offset) {

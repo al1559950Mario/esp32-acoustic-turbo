@@ -115,8 +115,9 @@ void SensorManager::updateADS1115() {
 
 
 void SensorManager::updatePressure() {
-    pressureSensor.updateRawCached();
-
+    if (!pressureSensor.updateRawCached()) {
+      return;
+    }
     float pKPa = getPressure_kPa();
 
     // Guardar en buffer

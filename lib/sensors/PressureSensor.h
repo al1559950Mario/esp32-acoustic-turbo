@@ -6,13 +6,13 @@ public:
     PressureSensor() = default;
 
     void begin(uint8_t pinData, uint8_t pinSCK);
-    long readRaw();
+    bool readRaw(long& value);
     float getPressure_kPa();
     void setCalibration(float scale, float offset);
 
     // --- Nuevas funciones ---
     void setMinMax(float minVal, float maxVal); // definir rango para %
-    void updateRawCached();
+    bool updateRawCached();
     
 private:
     uint8_t _pinData;
