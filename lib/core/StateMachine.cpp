@@ -100,7 +100,7 @@ void StateMachine::update(float mapLoadPercent,
 
     pressureBuffer[0] = pressureBuffer[1];
     pressureBuffer[1] = pressureBuffer[2];
-    pressureBuffer[2] = sensors ? sensors->getPressurePercent() : 0.0f;
+    pressureBuffer[2] = sensors ? sensors->getPressurePercentSigned() : 0.0f;
 
     // Aplicar mediana
     _mafLoadPercent  = median(mafBuffer[0], mafBuffer[1], mafBuffer[2], mafBuffer[3], mafBuffer[4]);

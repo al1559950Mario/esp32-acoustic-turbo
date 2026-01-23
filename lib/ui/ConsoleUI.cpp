@@ -438,7 +438,7 @@ void ConsoleUI::imprimirDashboard() {
     float freq = actuators->getAcousticInjector().getFrequency();
     float oscillationAmplitude = sensors->computeOscillationAmplitude();
     float rms = sensors->computeRMS();
-    float pressurePercent = sensors->getPressurePercent();
+    float pressurePercent = sensors->getPressurePercentSigned();
 
     // Obtener potencia del turbo (0–100%)
     float boostLevel = actuators->getVortexController().getLastPWM() * 100.0f;

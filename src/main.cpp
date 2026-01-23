@@ -180,7 +180,7 @@ void loop() {
         bool  turboOn = actuators.isTurboOn();
         float deltaP = sensors.computeOscillationAmplitude();
         float pressure_kPa = sensors.getPressure_kPa();
-        float pressure_pct = sensors.getPressurePercent();
+        float pressure_pct = sensors.getPressurePercentSigned();
         float pressure_psi = sensors.getPressurePSI();
         float eventRate = sensors.computeEventRate();
         float tau = sensors.computeTau();

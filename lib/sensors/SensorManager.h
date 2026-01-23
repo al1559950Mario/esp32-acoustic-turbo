@@ -47,7 +47,8 @@ public:
 
   const float* getPressureBuffer() const { return pressureKPABuffer; }
   size_t getBufferSize() const { return PRESSURE_BUFFER_SIZE; }
-  float getPressurePercent();
+  float getPressurePercentSigned();
+  float getPressurePercentAbs();
   float getPressurePSI();
   float computeOscillationAmplitude();  
   float readOscillationAmplitude(); 

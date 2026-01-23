@@ -146,9 +146,14 @@ float SensorManager::getPressureKPAFromBuffer() {
 }
 
   // Devuelve la presión del buffer como porcentaje relativo a ±40 kPa
-float SensorManager::getPressurePercent() {
+float SensorManager::getPressurePercentSigned() {
     float pKPa = getPressureKPAFromBuffer();
     return (pKPa / 40.0f) * 100.0f;
+}
+
+float SensorManager::getPressurePercentAbs(){
+  float pKPa getPressureKPAFromBuffer();
+  return((fabsf(pKPa)/40.0f)*100.0f)
 }
 
 // Devuelve la presión del buffer en PSI
