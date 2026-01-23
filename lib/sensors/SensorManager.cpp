@@ -227,15 +227,19 @@ float SensorManager::computeEventRate(float threshold_kPa , float samplingPeriod
   }
 
 float SensorManager::computeRMS() {
-    float sumSq = 0.0f;
     size_t count = pressureCount;
     if (count == 0) {
       return 0.0f;
     }    
-    float offset = getPressureKPAFromBuffer(); // usar último valor como referencia
+    float sum = 0.0f;
+    for (size_t i = 0; i < count; i++) {
+      sum += pressureKPABuffer[i];
+    }
+    float mean = sum / count;
+    float sumSq = 0.0f;
 
     for (size_t i = 0; i < count; i++) {
-      float val = pressureKPABuffer[i] - offset;
+      float val = pressureKPABuffer[i] - mean;
       sumSq += val * val;
     }
     return sqrt(sumSq / count);
