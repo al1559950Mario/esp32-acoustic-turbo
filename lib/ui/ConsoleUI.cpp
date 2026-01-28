@@ -10,7 +10,7 @@ void ConsoleUI::setFSM(StateMachine* ref) {
     lastState = fsm->getState();
     lastTransitionMS = millis();
   } else {
-    lastState = SystemState::IDLE;
+    lastState = SystemState::UNKNOWN;
     lastTransitionMS = 0;
   }
 }
@@ -137,12 +137,12 @@ void ConsoleUI::interpretarComando(char c) {
         actuators->stopAcoustic();
       break;
 
-    case 'r':  // Borrar calibración actual
+    case 'r':  // Borrar calibración y poner FSM en estado sin calibrar
       if (!devOnly()) break;
       CalibrationManager::getInstance().clearCalibration();
       if (fsm) {
-        fsm->debugForceState(SystemState::IDLE);
-        this->println(">> Calibración borrada. FSM reiniciada a IDLE.");
+        fsm->debugForceState(SystemState::SIN_CALIBRAR);
+        this->println(">> Se requiere recalibrar de nuevo para poder usar el sistema");
       } else {
         this->println("⚠️ No se puede cambiar estado: FSM no está disponible.");
       }
@@ -248,11 +248,10 @@ void ConsoleUI::imprimirDashboard() {
   uint16_t mapMax = calib.getMAPMax();
 
   static const char* stateNames[] = {
-    "IDLE", "ALIGN", "FLOW", "DECAY"
+    "OFF", "SIN_CAL", "CALIB", "IDLE",
+    "BEAM", "BOOST", "DESCAY", "DEBUG", "??"
   };
-  const size_t stateCount = sizeof(stateNames) / sizeof(stateNames[0]);
-  const size_t stateIndex = static_cast<size_t>(st);
-  const char* stName = (stateIndex < stateCount) ? stateNames[stateIndex] : "??";
+  const char* stName = stateNames[int(st)];
 
   float tpsMinV = tpsMin * 3.3f / 4095.0f;
   float tpsMaxV = tpsMax * 3.3f / 4095.0f;
