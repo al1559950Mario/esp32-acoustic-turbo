@@ -8,18 +8,20 @@
 
 /**
  * @enum SystemState
- * Define los distintos estados del sistema turbo-acústico.
+ * Define los estados del flujo acústico (FSM).
  */
 enum class SystemState {
-  OFF,                   ///< Sistema apagado/standby
-  SIN_CALIBRAR,          ///< No se ha realizado calibración
-  CALIBRATION,           ///< Modo calibración activa
-  IDLE,                  ///< Esperando subida de carga
-  INYECCION_ACUSTICA,    ///< Inyección acústica activa
-  VORTEX,                 ///< Turbo encendido
-  DESCAYENDO,            ///< Turbo descendiendo
-  DEBUG,
-  UNKNOWN                  ///< Estado de debug (solo con forzar)
+  IDLE,   ///< Todo en cero, arranque limpio
+  ALIGN,  ///< Acople: BEAM dominante + BOOST mínimo
+  FLOW,   ///< Flujo estable: escalar BEAM/BOOST con MAF
+  DECAY   ///< Ring-down controlado
+};
+
+enum class FlowVerdict {
+  LOST,
+  INCONSISTENT,
+  LAMINAR,
+  UNKNOWN
 };
 
 /**
@@ -69,10 +71,12 @@ public:
   void handleActions();
 
   /**
-   * Si el estado actual es DEBUG, lo reemplaza por uno nuevo.
+   * Fuerza el estado de la FSM (uso de depuración).
    * @param nuevoEstado Estado al que forzar la FSM.
    */
   void debugForceState(SystemState nuevoEstado);
+  void setCompatibilityMode(bool enabled);
+  bool isCompatibilityMode() const;
   float getLevel() const;
   bool readyForInjection(float, float);
 
@@ -84,14 +88,16 @@ public:
 private:
   Thresholds thresholds;                         ///< Copia local de los umbrales actuales
   ThresholdManager* thresholdManager = nullptr;  ///< Puntero al gestor de umbrales
-  SystemState        current{SystemState::OFF};   ///< Estado actual
+  SystemState        current{SystemState::IDLE};   ///< Estado actual
   ActuatorManager* actuators = nullptr;
   CalibrationManager* calibMgr= nullptr;
   float              lastMapLoadPercent = 0.0f; ///< Guardar el último mapLoadPercent
+  float              lastTpsPercent = 0.0f;
 
-
-  
   float currentLevel{0.0f};  ///< Nivel actual de inyección acústica calculado internamente
+  unsigned long stateEntryMs = 0;
+  unsigned long flowStableMs = 0;
+  bool compatibilityMode = true;
 
 
 };

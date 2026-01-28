@@ -124,9 +124,8 @@ void setup() {
   actuators.stopAll();
 
   if (!calibLoaded)
-    Serial.println("  Estado inicial: SIN_CALIBRAR (necesita calibración)");
-  else
-    Serial.println("  Estado inicial: OFF (calibración cargada)");
+    Serial.println("  Advertencia: sin calibración cargada");
+  Serial.println("  Estado inicial: IDLE");
 }
 
 void loop() {
@@ -167,4 +166,3 @@ void loop() {
 
   delay(20);
 }
-
