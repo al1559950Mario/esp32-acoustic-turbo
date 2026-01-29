@@ -261,6 +261,7 @@
     void resetBeamVortexRamp(float seedLevel);
     float updateBeamVortexRamp(float mafPower);
 
-  };
+};
+
 
 

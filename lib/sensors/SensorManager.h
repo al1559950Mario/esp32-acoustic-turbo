@@ -55,7 +55,7 @@ public:
   float getPressurePercentAbs();
   float getPressurePSI();
   float computeOscillationAmplitude();  
-  float readOscillationAmplitude(); 
+  float readOscillationAmplitude();
   float getPressureMedianKPa() const { return pressureMedianKPa; }
   float getPressureMADKPa() const { return pressureMadKPa; }
   float getPressureOutlierRatio() const { return pressureOutlierRatio; }

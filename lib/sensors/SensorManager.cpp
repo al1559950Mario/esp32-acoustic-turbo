@@ -277,8 +277,8 @@ float SensorManager::computeMedianPressure() {
     std::nth_element(tmp.begin(), tmp.begin() + mid, tmp.end());
     float med = tmp[mid];
     if ((count % 2) == 0) {
-      auto maxIt = std::max_element(tmp.begin(), tmp.begin() + mid);
-      med = (*maxIt + med) * 0.5f;
+      std::nth_element(tmp.begin(), tmp.begin() + mid - 1, tmp.end());
+      med = (tmp[mid - 1] + med) * 0.5f;
     }
     return med;
 }
@@ -298,8 +298,8 @@ float SensorManager::computeMAD() {
     std::nth_element(devs.begin(), devs.begin() + mid, devs.end());
     float mad = devs[mid];
     if ((count % 2) == 0) {
-      auto maxIt = std::max_element(devs.begin(), devs.begin() + mid);
-      mad = (*maxIt + mad) * 0.5f;
+      std::nth_element(devs.begin(), devs.begin() + mid - 1, devs.end());
+      mad = (devs[mid - 1] + mad) * 0.5f;
     }
     return mad;
 }
