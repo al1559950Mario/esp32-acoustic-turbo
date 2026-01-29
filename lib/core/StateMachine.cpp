@@ -323,6 +323,34 @@ void StateMachine::update(float mapLoadPercent,
     }
 
     if (current != lastState) {
+        if (current == SystemState::BOOST && sensors) {
+            float osc = sensors->computeOscillationAmplitude();
+            float rms = sensors->computeRMS();
+            float median = sensors->computeMedianPressure();
+            float mad = sensors->computeMAD();
+            float outlierRatio = sensors->computeOutlierRatio();
+            float rmsSlope = sensors->computeRMSSlope();
+            bool oscOk = (osc <= FLOW_OSCILLATION_KPA_MAX);
+            bool rmsOk = (rms <= FLOW_RMS_KPA_MAX);
+            bool madOk = (mad <= FLOW_MAD_KPA_MAX);
+            bool outlierOk = (outlierRatio <= FLOW_OUTLIER_RATIO_MAX);
+            bool slopeOk = (fabsf(rmsSlope) <= FLOW_RMS_SLOPE_KPA_S_MAX);
+            bool flowStable = oscOk && rmsOk && madOk && outlierOk && slopeOk;
+            Serial.printf(
+                ">> BOOST metrics | osc=%.3f kPa(%s) | rms=%.3f kPa(%s) | median=%.3f kPa | mad=%.3f kPa(%s) | outliers=%.2f(%s) | rms_slope=%.3f kPa/s(%s) | estado_sugerido=%s\n",
+                osc,
+                oscOk ? "OK" : "NO",
+                rms,
+                rmsOk ? "OK" : "NO",
+                median,
+                mad,
+                madOk ? "OK" : "NO",
+                outlierRatio,
+                outlierOk ? "OK" : "NO",
+                rmsSlope,
+                slopeOk ? "OK" : "NO",
+                flowStable ? "FLOW" : "ALIGN");
+        }
         lastState = current;
     }
 }
@@ -479,4 +507,3 @@ void StateMachine::compute_dMAFdt_and_hold(float newestMAFPercent,
     _holdStartMillis = millis();
   }
 }
-
