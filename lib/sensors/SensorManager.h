@@ -42,6 +42,10 @@ public:
   void  updatePressure();
 
   float computeRMS();
+  float computeMedianPressure();
+  float computeMAD();
+  float computeOutlierRatio(float k = 3.0f);
+  float computeRMSSlope();
   float computeEventRate(float threshold_kPa = 0.5f, float samplingPeriod_ms = 12.5f);
   float computeTau(float threshold_kPa = 0.5f, float samplingPeriod_ms = 12.5f);
 
@@ -52,6 +56,10 @@ public:
   float getPressurePSI();
   float computeOscillationAmplitude();  
   float readOscillationAmplitude(); 
+  float getPressureMedianKPa() const { return pressureMedianKPa; }
+  float getPressureMADKPa() const { return pressureMadKPa; }
+  float getPressureOutlierRatio() const { return pressureOutlierRatio; }
+  float getPressureRMSSlope() const { return pressureRmsSlope; }
 
 
   void updateADS1115(); // 👈 Opcional, si quieres usar una rutina periódica
@@ -87,4 +95,10 @@ private:
   static constexpr size_t PRESSURE_BUFFER_SIZE = 800; // 10 s a 80 Hz
   float pressureKPABuffer[PRESSURE_BUFFER_SIZE];
   size_t bufferIndex = 0;
+  float pressureMedianKPa = 0.0f;
+  float pressureMadKPa = 0.0f;
+  float pressureOutlierRatio = 0.0f;
+  float pressureRmsSlope = 0.0f;
+  float lastPressureRms = 0.0f;
+  uint32_t lastPressureRmsMs = 0;
 };
