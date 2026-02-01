@@ -69,6 +69,15 @@ public:
   float readTPSVolts() { return readMAFVolts(); }
   bool isTPSValid() { return isMAFValid(); }
   float getRelativeTPSLevel(float ref) { return getRelativeMAFLevel(ref); }
+  // Funciones de lectura para cada métrica
+float readMedianPressure();
+float readMAD();
+float readOutlierRatio();
+float readRMSSlope();
+float readRMS();
+float readTau();
+float readEventRate();
+void resetMetrics();
 
 private:
   MAPSensor mapSensor;
@@ -101,4 +110,10 @@ private:
   float pressureRmsSlope = 0.0f;
   float lastPressureRms = 0.0f;
   uint32_t lastPressureRmsMs = 0;
+
+  float pressureRMS = 0.0f;
+  float pressureTau = 0.0f;
+  float pressureEventRate = 0.0f;
+
+
 };

@@ -196,6 +196,7 @@ void StateMachine::update(float mapLoadPercent,
 
             if (_mafLoadPercent <= thresholds.BOOST_TPS_OFF){
                 current = SystemState::IDLE;
+                sensors->resetMetrics();
             }
             }
             break;
@@ -253,6 +254,7 @@ void StateMachine::update(float mapLoadPercent,
                 // disparar DECAY con parámetros ahora dinámicos
                 decayStartMillis = now;
                 current = SystemState::DECAY;
+                sensors->resetMetrics();
                 _beamStreamStartMs = 0;
                 vortexPending = false;
                 actuators->getAcousticInjector().setDecayParameters(durationMs, avgMAFLevel,
@@ -322,14 +324,21 @@ void StateMachine::update(float mapLoadPercent,
             break;
     }
 
-    if (current != lastState) {
-        if (current == SystemState::BOOST && sensors) {
-            float osc = sensors->computeOscillationAmplitude();
-            float rms = sensors->computeRMS();
-            float median = sensors->computeMedianPressure();
-            float mad = sensors->computeMAD();
-            float outlierRatio = sensors->computeOutlierRatio();
-            float rmsSlope = sensors->computeRMSSlope();
+    if ((current == SystemState::BOOST && sensors) or (current == SystemState::BEAM && sensors)) {
+                // ── BOOST metrics throttled ─────────────────────────────
+        static uint32_t lastMetricsPrintMs = 0;
+        const uint32_t METRICS_PERIOD_MS = 120;
+
+        uint32_t now = millis();
+
+        if (sensors && (now - lastMetricsPrintMs >= METRICS_PERIOD_MS)) {
+            lastMetricsPrintMs = now;
+            float osc = sensors->readOscillationAmplitude();
+            float rms = sensors->readRMS();
+            float median = sensors->readMedianPressure();
+            float mad = sensors->readMAD();
+            float outlierRatio = sensors->readOutlierRatio();
+            float rmsSlope = sensors->readRMSSlope();
             bool oscOk = (osc <= FLOW_OSCILLATION_KPA_MAX);
             bool rmsOk = (rms <= FLOW_RMS_KPA_MAX);
             bool madOk = (mad <= FLOW_MAD_KPA_MAX);
@@ -353,6 +362,7 @@ void StateMachine::update(float mapLoadPercent,
         }
         lastState = current;
     }
+
 }
 
 void StateMachine::handleActions() {

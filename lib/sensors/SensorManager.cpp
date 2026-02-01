@@ -133,12 +133,15 @@ void SensorManager::updatePressure() {
       pressureCount++;
     }
 
-    // Calcula la amplitud de oscilación en cada ciclo
+    // Calcula todas las métricas y almacena
     amplitudeOscillation = computeOscillationAmplitude();
     pressureMedianKPa = computeMedianPressure();
     pressureMadKPa = computeMAD();
     pressureOutlierRatio = computeOutlierRatio();
     pressureRmsSlope = computeRMSSlope();
+    pressureRMS = computeRMS();
+    pressureTau = computeTau(1.0f, 10.0f); // Ajusta parámetros según tu sampling
+    pressureEventRate = computeEventRate(1.0f, 10.0f); // Ajusta parámetros según tu sampling
 
 }
 
@@ -337,4 +340,29 @@ float SensorManager::computeRMSSlope() {
     lastPressureRms = rms;
     lastPressureRmsMs = now;
     return slope;
+}
+
+// Funciones de lectura para cada métrica
+float SensorManager::readMedianPressure()    { return pressureMedianKPa; }
+float SensorManager::readMAD()               { return pressureMadKPa; }
+float SensorManager::readOutlierRatio()      { return pressureOutlierRatio; }
+float SensorManager::readRMSSlope()          { return pressureRmsSlope; }
+float SensorManager::readRMS()               { return pressureRMS; }
+float SensorManager::readTau()               { return pressureTau; }
+float SensorManager::readEventRate()         { return pressureEventRate; }
+
+void SensorManager::resetMetrics() {
+    for (size_t i = 0; i < PRESSURE_BUFFER_SIZE; i++) pressureKPABuffer[i] = 0.0f;
+    bufferIndex = 0;
+    pressureCount = 0;
+    amplitudeOscillation = 0.0f;
+    pressureMedianKPa = 0.0f;
+    pressureMadKPa = 0.0f;
+    pressureOutlierRatio = 0.0f;
+    pressureRmsSlope = 0.0f;
+    pressureRMS = 0.0f;
+    pressureTau = 0.0f;
+    pressureEventRate = 0.0f;
+    lastPressureRms = 0.0f;
+    lastPressureRmsMs = 0;
 }
