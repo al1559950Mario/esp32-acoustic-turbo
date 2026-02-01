@@ -7,21 +7,21 @@
   #include "SensorManager.h"
 
 
-  /**
-   * @enum SystemState
-   * Define los distintos estados del sistema turbo-acústico.
-   */
-  enum class SystemState {
-    OFF,                   ///< Sistema apagado/standby
-    NO_CALIB,          ///< No se ha realizado calibración
-    CALIBRATION,           ///< Modo calibración activa
-    IDLE,                  ///< Esperando subida de carga
-    BOOST,    ///< Inyección acústica activa
-    BEAM,                 ///< Turbo encendido
-    DECAY,            ///< Turbo descendiendo
-    DEBUG,
-    UNKNOWN                  ///< Estado de debug (solo con forzar)
-  };
+/**
+ * @enum SystemState
+ * Define los distintos estados del sistema turbo-acústico.
+ */
+enum class SystemState {
+  OFF,          ///< Sistema apagado/standby
+  NO_CALIB,     ///< No se ha realizado calibración
+  CALIBRATION,  ///< Modo calibración activa
+  IDLE,         ///< Motor detenido / sistema apagado
+  ALIGN,        ///< Acople persistente (corrige turbulencia, no abandona)
+  FLOW,         ///< Operación estable con resonancia sostenida
+  DECAY,        ///< Ring-down controlado
+  DEBUG,
+  UNKNOWN       ///< Estado de debug (solo con forzar)
+};
 
   /**
    * @class StateMachine
@@ -63,15 +63,13 @@
      */
     void handleActions();
 
-    /**
-     * Si el estado actual es DEBUG, lo reemplaza por uno nuevo.
-     * @param nuevoEstado Estado al que forzar la FSM.
-     */
-    void debugForceState(SystemState nuevoEstado);
-    float getLevel() const;
-    bool readyForBOOST( float, float);
-    bool readyForBEAM( float, float);
-    void resetBeamTracking();
+  /**
+   * Si el estado actual es DEBUG, lo reemplaza por uno nuevo.
+   * @param nuevoEstado Estado al que forzar la FSM.
+   */
+  void debugForceState(SystemState nuevoEstado);
+  float getLevel() const;
+  void resetBeamTracking();
 
     float getMAFInitialForInj(){return mafInitialPercent;};
     float getMAPInitialForInj(){return mapInitialPercent;};
@@ -82,52 +80,53 @@
     String getStateName () const;
     void compute_dMAFdt_and_hold(float, float, float currentDeltaMAFLevel);
 
-  private:
-    Thresholds thresholds;                         ///< Copia local de los umbrales actuales
-    ThresholdManager* thresholdManager = nullptr;  ///< Puntero al gestor de umbrales
-    SystemState        current{SystemState::OFF};   ///< Estado actual
-    SystemState lastState;
-    ActuatorManager* actuators = nullptr;
-    CalibrationManager* calibMgr= nullptr;
-    SensorManager* sensors = nullptr;
-    
-    float              lastMapLoadPercent = 0.0f; ///< Guardar el último mapLoadPercent
-    float mafInitialPercent = 0.0f;
-    float mapInitialPercent = 0.0f;
-    float _mafLoadPercent = 0.0f;
-    float _mapLoadPercent = 0.0f;
-    float _pressurePercent = 0.0f;
-    float _pressureDelta = 0.0f;
-    unsigned long vortexStartMillis = 0;
-    const unsigned long vortexDelayMs = 200;  // Tiempo en ms para esperar antes de activar vortex
-    bool vortexPending = false;  
-    float mafNormalized{0.0f}; 
-    float mapNormalized{0.0f};
-    float _lastPressurePercent = 0.0f;
-    float _beamVortexLevel = 0.0f;
-    uint32_t _beamVortexLastUpdateMs = 0;
-    float lastDeltaMAFLevelForBOOST;   // <- último MAF%
-    float lastDeltaMAPLevelForBOOST;   // <- último MAP%
-    float lastDeltaMAFLevelForBEAM;   // <- último MAF%
-    float lastDeltaMAPLevelForBEAM;   // <- último MAP%
-    float currentDeltaMAFLevelForBOOST;
-    float currentDeltaMAPLevelForBOOST;
-    float currentDeltaMAFLevelForBEAM;
-    float currentDeltaMAPLevelForBEAM;
-    const float MAP_DROP_THRESHOLD = 0.2f;  
-    const float MAF_DROP_THRESHOLD = 0.2f;
-    float avgMAPLevel = 0.0f;
-    uint32_t mapSamples = 0;
-    float avgMAFLevel = 0.0f;
-    uint32_t mafSamples = 0;
-    float mapDrop = 0.0f;
-    float mafDrop = 0.0f;
-    bool dropDetected = false;
-    bool belowThresholds = false;
-    float mafMinOnBeam = 100.0f;
-    uint32_t decayStartMillis     = 0;     // instante en que se disparó DECAY (ms)
-    float decayDurationMs = 1500;          // **Base nominal** para la duración del DECAY en ms. Se escala con w/hold.
-    
+private:
+  Thresholds thresholds;                         ///< Copia local de los umbrales actuales
+  ThresholdManager* thresholdManager = nullptr;  ///< Puntero al gestor de umbrales
+  SystemState        current{SystemState::OFF};   ///< Estado actual
+  SystemState lastState;
+  ActuatorManager* actuators = nullptr;
+  CalibrationManager* calibMgr= nullptr;
+  SensorManager* sensors = nullptr;
+  
+  float              lastMapLoadPercent = 0.0f; ///< Guardar el último mapLoadPercent
+  float mafInitialPercent = 0.0f;
+  float mapInitialPercent = 0.0f;
+  float _mafLoadPercent = 0.0f;
+  float _mapLoadPercent = 0.0f;
+  float _pressurePercent = 0.0f;
+  float _pressureDelta = 0.0f;
+  unsigned long vortexStartMillis = 0;
+  const unsigned long vortexDelayMs = 200;  // Tiempo en ms para esperar antes de activar vortex
+  bool vortexPending = false;  
+  float mafNormalized{0.0f}; 
+  float mapNormalized{0.0f};
+  float _lastPressurePercent = 0.0f;
+  float _beamVortexLevel = 0.0f;
+  uint32_t _beamVortexLastUpdateMs = 0;
+  float lastDeltaMAFLevelForBEAM;   // <- último MAF%
+  float lastDeltaMAPLevelForBEAM;   // <- último MAP%
+  float currentDeltaMAFLevelForBEAM;
+  float currentDeltaMAPLevelForBEAM;
+  const float MAP_DROP_THRESHOLD = 0.2f;  
+  const float MAF_DROP_THRESHOLD = 0.2f;
+  float avgMAPLevel = 0.0f;
+  uint32_t mapSamples = 0;
+  float avgMAFLevel = 0.0f;
+  uint32_t mafSamples = 0;
+  float flowAcousticBase = 0.0f;
+  float flowBoostBase = 0.0f;
+  float alignAcousticLevel = 0.0f;
+  float alignBoostLevel = 0.0f;
+  bool flowStableNow = false;
+  float flowOscillationKPa = 0.0f;
+  float flowRmsKPa = 0.0f;
+  float flowMadKPa = 0.0f;
+  float flowOutlierRatio = 0.0f;
+  float flowRmsSlope = 0.0f;
+  uint32_t decayStartMillis     = 0;     // instante en que se disparó DECAY (ms)
+  float decayDurationMs = 1500;          // **Base nominal** para la duración del DECAY en ms. Se escala con w/hold.
+  
 
     // ---------- derivada dMAF/dt (medición y filtrado) ----------
     float _dMAFdtRaw = 0.0f;               // derivada instantánea (nivel por segundo, niveles 0..1)
@@ -219,39 +218,39 @@
     // trackear inicio de "hold" (cuando se detecta que hubo presión)
     const float PRESS_EPS = 0.01f;
 
-    // --- Dinámica de MAF (antes TPS) para clasificar ataques ---
-    static constexpr float MAF_ATTACK_SLOW_DTPS = 0.02f;   // nivel/sec considerado subida lenta
-    static constexpr float MAF_ATTACK_FAST_DTPS = 0.15f;   // nivel/sec considerado ataque rápido
-    static constexpr float MAF_ATTACK_MIN_GAIN  = 0.75f;   // factor aplicado al power cuando el ataque es muy lento
-    static constexpr float MAF_ATTACK_MAX_GAIN  = 1.25f;   // factor cuando el ataque es muy rápido
-    static constexpr float MAF_RELEASE_REF_DTPS = -0.12f;  // referencia (nivel/sec) para detectar soltado rápido
-  //Bájalo por debajo de 0.10f si quieres que BEAM se dispare con ataques más suaves
-  //Súbelo si deseas exigir pisadas más bruscas antes de considerar el ataque “válido”.
-    static constexpr float BEAM_MAF_ATTACK_MIN_DERIV   = 0.04f;  // nivel/sec mínimo para considerar un ataque rápido
-    static constexpr float BEAM_VACUUM_PCT_ON    = -3.0f;  // vacio mínima (en %) para permitir BEAM
-    static constexpr float BEAM_VACUUM_PCT_OFF    = -1.0f;  // vacio max (en %) para romper BEAM
-    static constexpr float BEAM_VACUUM_DELTA_MIN = 1.0f;   // delta mínimo de vacio (%)
-  static constexpr uint32_t MIN_BEAM_DELAY_MS = 50u; // m segundos minimos antes de permitir BEAM
-  static constexpr uint32_t BEAM_MIN_STREAM_MS = 50u; // tiempo minimo en BEAM antes de pasar a DECAY
+  // --- Dinámica de MAF (antes TPS) para clasificar ataques ---
+  static constexpr float MAF_ATTACK_SLOW_DTPS = 0.02f;   // nivel/sec considerado subida lenta
+  static constexpr float MAF_ATTACK_FAST_DTPS = 0.15f;   // nivel/sec considerado ataque rápido
+  static constexpr float MAF_ATTACK_MIN_GAIN  = 0.75f;   // factor aplicado al power cuando el ataque es muy lento
+  static constexpr float MAF_ATTACK_MAX_GAIN  = 1.25f;   // factor cuando el ataque es muy rápido
+  static constexpr float MAF_RELEASE_REF_DTPS = -0.12f;  // referencia (nivel/sec) para detectar soltado rápido
+  static constexpr float BEAM_MAF_ATTACK_MIN_DERIV   = 0.04f;  // nivel/sec mínimo para considerar un ataque rápido
 
-    // BEAM_COND_MIN_HOLD_MS
-    // Qué controla: tiempo mínimo que la condición de entrada a BEAM
-    // (readyForBEAM) debe mantenerse verdadera de forma continua antes
-    // de permitir la transición. Ayuda a filtrar falsos positivos.
-    // Rango recomendado: 100 .. 500 ms
-    // Ajuste: aumentar si aún hay falsos positivos; reducir para respuesta más rápida.
-    static constexpr uint32_t BEAM_COND_MIN_HOLD_MS = 50u; // Tiempo necesario activando condicionales para entrar a BEAM
-  
-    static constexpr float BEAM_VORTEX_ENTRY_LEVEL      = 0.85f;
-    static constexpr float BEAM_VORTEX_RAMP_TAU_FAST_MS = 60.0f;
-    static constexpr float BEAM_VORTEX_RAMP_TAU_SLOW_MS = 260.0f;
+  // --- Calidad de flujo (HX710B) ---
+  static constexpr float FLOW_OSCILLATION_KPA_MAX = 0.35f;
+  static constexpr float FLOW_RMS_KPA_MAX = 0.25f;
+  static constexpr float FLOW_MAD_KPA_MAX = 0.20f;
+  static constexpr float FLOW_OUTLIER_RATIO_MAX = 0.10f;
+  static constexpr float FLOW_RMS_SLOPE_KPA_S_MAX = 0.08f;
+  static constexpr uint32_t FLOW_STABLE_HOLD_MS = 250u;
+  static constexpr uint32_t FLOW_UNSTABLE_HOLD_MS = 120u;
 
-    // --- Métricas de flujo (para diagnóstico en BOOST, sin cambiar FSM) ---
-    static constexpr float FLOW_OSCILLATION_KPA_MAX = 0.35f;
-    static constexpr float FLOW_RMS_KPA_MAX = 0.25f;
-    static constexpr float FLOW_MAD_KPA_MAX = 0.20f;
-    static constexpr float FLOW_OUTLIER_RATIO_MAX = 0.10f;
-    static constexpr float FLOW_RMS_SLOPE_KPA_S_MAX = 0.08f;
+  // --- Vacío / motor activo ---
+  static constexpr float VACUUM_PCT_ON = -0.5f;
+  static constexpr float VACUUM_PCT_OFF = -0.2f;
+
+  // --- Comportamiento ALIGN ---
+  static constexpr float ALIGN_ACOUSTIC_SEED = 0.02f;
+  static constexpr float ALIGN_ACOUSTIC_STEP = 0.01f;
+  static constexpr float ALIGN_ACOUSTIC_MAX = 1.0f;
+  static constexpr float ALIGN_BOOST_SEED = 0.05f;
+
+  uint32_t _flowStableStartMs = 0;
+  uint32_t _flowUnstableStartMs = 0;
+
+  static constexpr float BEAM_VORTEX_ENTRY_LEVEL      = 0.85f;
+  static constexpr float BEAM_VORTEX_RAMP_TAU_FAST_MS = 60.0f;
+  static constexpr float BEAM_VORTEX_RAMP_TAU_SLOW_MS = 260.0f;
 
     // Seguimiento de la condición BEAM sostenida
     uint32_t _beamCondStartMs = 0;   // instante en que se detecto la condicion por primera vez
@@ -262,6 +261,3 @@
     float updateBeamVortexRamp(float mafPower);
 
 };
-
-
-

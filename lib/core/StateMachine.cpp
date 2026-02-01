@@ -39,10 +39,22 @@ void StateMachine::begin(bool hasCalibration,
     _pressurePercent = 0.0f;
     _pressureDelta = 0.0f;
     _lastPressurePercent = 0.0f;
-    lastDeltaMAFLevelForBOOST      = 0.0f;
-    lastDeltaMAPLevelForBOOST      = 0.0f;
     _dMAFdtRaw = 0.0f;
     _dMAFdtEMA = 0.0f;
+    flowAcousticBase = 0.0f;
+    flowBoostBase = 0.0f;
+    alignAcousticLevel = 0.0f;
+    alignBoostLevel = 0.0f;
+    flowOscillationKPa = 0.0f;
+    flowRmsKPa = 0.0f;
+    flowMadKPa = 0.0f;
+    flowOutlierRatio = 0.0f;
+    flowRmsSlope = 0.0f;
+    flowStableNow = false;
+    _flowStableStartMs = 0;
+    _flowUnstableStartMs = 0;
+    lastDeltaMAFLevelForBEAM = 0.0f;
+    lastDeltaMAPLevelForBEAM = 0.0f;
 
     if (actuators) {
         actuators->stopAcoustic();
@@ -56,18 +68,6 @@ void StateMachine::begin(bool hasCalibration,
 
 float StateMachine::getLevel() const {
     return mafNormalized;
-}
-
-bool StateMachine::readyForBOOST(float mapLoad, float mafLoad) {
-    bool mafFallback = (mafLoad >= thresholds.BOOST_TPS_ON);
-    return (mafFallback);
-}
-
-bool StateMachine::readyForBEAM(float mapLoad, float mafLoad) {
-    bool vacuumReady = (_pressurePercent <= BEAM_VACUUM_PCT_ON);
-    // Permitir disparo principalmente por vacio; MAF se usa solo para potencia
-    return vacuumReady;
-
 }
 
 void StateMachine::update(float mapLoadPercent,
@@ -109,9 +109,6 @@ void StateMachine::update(float mapLoadPercent,
     _pressureDelta   = _pressurePercent - _lastPressurePercent;
     _lastPressurePercent = _pressurePercent;
 
-    currentDeltaMAFLevelForBOOST = sensors->getRelativeMAFLevel(thresholds.BOOST_TPS_ON);
-    currentDeltaMAPLevelForBOOST = sensors->getRelativeMAPLevel(thresholds.BOOST_MAP_ON);
-
     currentDeltaMAFLevelForBEAM = sensors->getRelativeMAFLevel(thresholds.BEAM_TPS_ON);
     currentDeltaMAPLevelForBEAM = sensors->getRelativeMAPLevel(thresholds.BEAM_MAP_ON);
 
@@ -120,17 +117,42 @@ void StateMachine::update(float mapLoadPercent,
 
     compute_dMAFdt_and_hold(mafBuffer[4], mafBuffer[0], currentDeltaMAFLevelForBEAM);
 
+    uint32_t now = millis();
+    bool vacuumOn = (_pressurePercent <= VACUUM_PCT_ON);
+    bool vacuumOff = (_pressurePercent >= VACUUM_PCT_OFF);
+    flowOscillationKPa = sensors ? sensors->computeOscillationAmplitude() : 0.0f;
+    flowRmsKPa = sensors ? sensors->computeRMS() : 0.0f;
+    flowMadKPa = sensors ? sensors->computeMAD() : 0.0f;
+    flowOutlierRatio = sensors ? sensors->computeOutlierRatio() : 0.0f;
+    flowRmsSlope = sensors ? sensors->computeRMSSlope() : 0.0f;
+    flowStableNow = (flowRmsKPa <= FLOW_RMS_KPA_MAX)
+                 && (flowMadKPa <= FLOW_MAD_KPA_MAX)
+                 && (fabsf(flowRmsSlope) <= FLOW_RMS_SLOPE_KPA_S_MAX);
+                //(flowOscillationKPa <= FLOW_OSCILLATION_KPA_MAX)
+               // && (flowOutlierRatio <= FLOW_OUTLIER_RATIO_MAX)
+
+
+    if (flowStableNow) {
+        if (_flowStableStartMs == 0) _flowStableStartMs = now;
+        _flowUnstableStartMs = 0;
+    } else {
+        if (_flowUnstableStartMs == 0) _flowUnstableStartMs = now;
+        _flowStableStartMs = 0;
+    }
+
+    bool flowStableHold = flowStableNow && ((now - _flowStableStartMs) >= FLOW_STABLE_HOLD_MS);
+    bool flowUnstableHold = !flowStableNow && ((now - _flowUnstableStartMs) >= FLOW_UNSTABLE_HOLD_MS);
 
     switch (current) {
         static uint32_t offStartMillis = 0;
 
         case SystemState::OFF:
-            if (offStartMillis == 0) offStartMillis = millis();
+            if (offStartMillis == 0) offStartMillis = now;
             if (actuators) {
                 actuators->stopAcoustic();
                 actuators->stopVortex();
             }
-            if ((millis() - offStartMillis) > 500
+            if ((now - offStartMillis) > 500
              && _mapLoadPercent > thresholds.MAP_WAKEUP_PERCENT) {
                 current = SystemState::IDLE;
                 offStartMillis = 0;
@@ -152,170 +174,43 @@ void StateMachine::update(float mapLoadPercent,
             break;
 
         case SystemState::IDLE:
-            if (readyForBOOST(_mapLoadPercent, _mafLoadPercent)) {
-                current = SystemState::BOOST;
+            if (vacuumOn && calibLoaded) {
+                current = SystemState::ALIGN;
                 if (sensors) {
                     mafInitialPercent = sensors->readMAFLoadPercent();
                     mapInitialPercent = sensors->readMAPLoadPercent();
                 }
-                if (actuators) {
-                    actuators->startVortex();
-                    // Semilla temprana del inyector para solapar con BOOST (nivel maximo se ajusta en BEAM)
-                    actuators->startAcoustic(0.01f, _dMAFdtEMA);
-                    vortexPending     = true;
-                    vortexStartMillis = millis();
-                }
             }
             break;
 
-        case SystemState::BOOST:
-            {
-            bool vacuum = (_pressurePercent <= BEAM_VACUUM_PCT_ON);
-            bool mafRising = (_dMAFdtEMA >= BEAM_MAF_ATTACK_MIN_DERIV);
-            unsigned long now = millis();
-
-            bool beamGate = readyForBEAM(_mapLoadPercent, _mafLoadPercent);
-
-            if (beamGate) {
-                if (_beamCondStartMs == 0) _beamCondStartMs = now;
-            } else {
-                _beamCondStartMs = 0; // reset si la condicion se rompe
-            }
-
-            if (beamGate && (now - _beamCondStartMs) >= BEAM_COND_MIN_HOLD_MS) {
-                resetBeamTracking();
-                current = SystemState::BEAM;
-                _beamCondStartMs = 0; // reset tracker al entrar
-                _beamStreamStartMs = now;
-                if (actuators) {
-                    actuators->stopAcoustic();
-                    actuators->startAcoustic(0.005f, _dMAFdtEMA);
-                }
-                resetBeamVortexRamp(currentDeltaMAFLevelForBEAM);
-            }
-
-            if (_mafLoadPercent <= thresholds.BOOST_TPS_OFF){
-                current = SystemState::IDLE;
-                sensors->resetMetrics();
-            }
-            }
-            break;
-
-        case SystemState::BEAM: {
-            // detectar caída usando derivada suavizada (unidades: nivel/sec)
-            float deriv = _dMAFdtEMA; // ya calculada por compute_dMAFdt_and_hold
-            bool dropDetected = (deriv <= -DERIV_DROP_THRESHOLD);
-            belowThresholds = (_mafLoadPercent <= thresholds.BEAM_TPS_OFF);
-            bool beamExit = (_pressurePercent >= BEAM_VACUUM_PCT_OFF);
-            unsigned long now = millis();
-            if (_beamStreamStartMs == 0) {
-                _beamStreamStartMs = now;
-            }
-            bool beamMinTimeMet = (now - _beamStreamStartMs) >= BEAM_MIN_STREAM_MS;
-            if (belowThresholds && !beamMinTimeMet) {
-                belowThresholds = false;
-            }
-
-            if (beamExit) {
-
-                // calcular hold_ms si estuvo activo
-                unsigned long holdMs = 0;
-                if (_holdActive && _holdStartMillis != 0) {
-                    holdMs = now - _holdStartMillis;
-                }
-
-                // normalizar hold
-                float holdNorm = float(min<unsigned long>(holdMs, H_SCALE_MS)) / float(H_SCALE_MS); // 0..1
-
-                // sigmoide para mezcla entre toque y hold
-                float x = (holdNorm - SIGMOID_H0) * SIGMOID_K;
-                float w = 1.0f / (1.0f + expf(-x)); // peso_sustain 0..1
-
-                // g_fast desde derivada negativa
-                float gFastRaw = 0.0f;
-                if (deriv < 0.0f) {
-                    gFastRaw = constrain((-deriv) / DERIV_NORM, 0.0f, 1.0f);
-                }
-
-                // g_sustain desde holdNorm
-                float gSustainRaw = constrain(holdNorm, 0.0f, 1.0f);
-
-                // mezclar gains usando w: w=0 -> todo toque (gFast), w=1 -> todo hold (gSustain)
-                float gFast = (1.0f - w) * gFastRaw;
-                float gSustain = w * gSustainRaw;
-
-                float durationMsF = float(decayDurationMs) * (MIN_SCALE * (1.0f - w) + MAX_SCALE * w);
-                uint32_t durationMs = uint32_t(constrain(durationMsF, 1.0f, 60000.0f)); // limita rango seguro
-
-                // tiempos explícitos que ya usas
-                float tFast = _tFastMs;
-                float tSustain = _tSustainMs;
-
-                // disparar DECAY con parámetros ahora dinámicos
-                decayStartMillis = now;
+        case SystemState::ALIGN:
+            if (!calibLoaded || vacuumOff) {
                 current = SystemState::DECAY;
-                sensors->resetMetrics();
-                _beamStreamStartMs = 0;
-                vortexPending = false;
-                actuators->getAcousticInjector().setDecayParameters(durationMs, avgMAFLevel,
-                                                                    gFast, gSustain, (uint32_t)tFast, (uint32_t)tSustain);
-                actuators->getAcousticInjector().startDecay(now);
-                resetBeamTracking();
-
-
-                // reset hold tracker
-                _holdActive = false;
-                _holdStartMillis = 0;
-
+            } else if (flowStableHold) {
+                current = SystemState::FLOW;
             }
-
             break;
-        }
+
+        case SystemState::FLOW:
+            if (!calibLoaded || vacuumOff) {
+                current = SystemState::DECAY;
+            } else if (flowUnstableHold) {
+                current = SystemState::ALIGN;
+            }
+            break;
 
         case SystemState::DECAY:
-            // Interrumpir decay solo si la condicion BEAM se mantiene
-            {
-            unsigned long now = millis();
-            bool beamGate = readyForBEAM(_mapLoadPercent, _mafLoadPercent);
-            static uint32_t _decayDbgLast = 0;
-        
-            if (beamGate) {
-                if (_beamCondStartMs == 0) _beamCondStartMs = now;
-            } else {
-                _beamCondStartMs = 0;
+            //if (actuators && actuators->decayFinished()) {
+            if (vacuumOn){
+                current = SystemState::ALIGN;
             }
+            if (actuators && actuators->decayFinished()) {
 
-            bool minDelayOk = (now - decayStartMillis >= MIN_BEAM_DELAY_MS);
-            bool holdOk = (_beamCondStartMs != 0) && ((now - _beamCondStartMs) >= BEAM_COND_MIN_HOLD_MS);
-            if (beamGate && minDelayOk && holdOk) {
-                resetBeamTracking();
-                current = SystemState::BEAM;  // o BEAM si asi lo quieres
-                _beamCondStartMs = 0;
-                if (sensors) {
-                    mafInitialPercent = sensors->readMAFLoadPercent();
-                    mapInitialPercent = sensors->readMAPLoadPercent();
-                }
-                if (actuators) {
-                    actuators->stopAcoustic();
-                    actuators->startAcoustic(0.005f, _dMAFdtEMA);
-                    resetBeamVortexRamp(currentDeltaMAFLevelForBEAM);
-                    vortexPending     = true;
-                    vortexStartMillis = now;
-                }
-                break; // salimos del case para no seguir decay
-            }
-            }
 
-            // Mantener lógica original de tiempo
-            if (actuators->decayFinished()) {
                 current = SystemState::IDLE;
-                if (actuators) {
-                    actuators->stopAcoustic();
-                    actuators->stopVortex();
-                    vortexPending = false;
-                }
             }
             break;
+
         case SystemState::DEBUG:
             break;
 
@@ -324,21 +219,130 @@ void StateMachine::update(float mapLoadPercent,
             break;
     }
 
-    if ((current == SystemState::BOOST && sensors) or (current == SystemState::BEAM && sensors)) {
+    if (current != lastState) {
+        if (current == SystemState::IDLE) {
+            if (actuators) {
+                actuators->stopAcoustic();
+                actuators->stopVortex();
+            }
+            _flowStableStartMs = 0;
+            _flowUnstableStartMs = 0;
+        } else if (current == SystemState::ALIGN) {
+            if (actuators && (lastState == SystemState::IDLE || lastState == SystemState::DECAY)) {
+                actuators->startVortex();
+                actuators->startAcoustic(ALIGN_ACOUSTIC_SEED, _dMAFdtEMA);
+                alignBoostLevel = ALIGN_BOOST_SEED;
+                alignAcousticLevel = actuators->getAcousticLevel();
+            } else if (actuators && lastState == SystemState::FLOW) {
+                alignBoostLevel = actuators->getTurboLevel();
+                alignAcousticLevel = actuators->getAcousticLevel();
+            }
+        } else if (current == SystemState::FLOW) {
+            if (actuators && lastState == SystemState::ALIGN) {
+                flowAcousticBase = actuators->getAcousticLevel();
+                flowBoostBase = actuators->getTurboLevel();
+            }
+        } else if (current == SystemState::DECAY && actuators) {
+            resetBeamTracking();
+            float deriv = _dMAFdtEMA;
+            unsigned long holdMs = 0;
+            if (_holdActive && _holdStartMillis != 0) {
+                holdMs = now - _holdStartMillis;
+            }
+
+            float holdNorm = float(min<unsigned long>(holdMs, H_SCALE_MS)) / float(H_SCALE_MS);
+            float x = (holdNorm - SIGMOID_H0) * SIGMOID_K;
+            float w = 1.0f / (1.0f + expf(-x));
+
+            float gFastRaw = 0.0f;
+            if (deriv < 0.0f) {
+                gFastRaw = constrain((-deriv) / DERIV_NORM, 0.0f, 1.0f);
+            }
+            float gSustainRaw = constrain(holdNorm, 0.0f, 1.0f);
+
+            float gFast = (1.0f - w) * gFastRaw;
+            float gSustain = w * gSustainRaw;
+
+            float durationMsF = float(decayDurationMs) * (MIN_SCALE * (1.0f - w) + MAX_SCALE * w);
+            uint32_t durationMs = uint32_t(constrain(durationMsF, 1.0f, 60000.0f));
+
+            float tFast = _tFastMs;
+            float tSustain = _tSustainMs;
+
+            decayStartMillis = now;
+            actuators->stopVortex();
+            actuators->getAcousticInjector().setDecayParameters(durationMs, avgMAFLevel,
+                                                                gFast, gSustain,
+                                                                (uint32_t)tFast, (uint32_t)tSustain);
+            actuators->getAcousticInjector().startDecay(now);
+            _holdActive = false;
+            _holdStartMillis = 0;
+        }
+        lastState = current;
+    }
+
+}
+
+void StateMachine::handleActions() {
+    if (!sensors || !actuators || !calibMgr) return;
+
+    if (current == SystemState::ALIGN) {
+        if (thresholdManager) {
+            thresholds = thresholdManager->getThresholds();
+        }
+
+        mapSamples++;
+        mafSamples++;
+
+        avgMAPLevel += (currentDeltaMAPLevelForBEAM - avgMAPLevel) / float(mapSamples);
+        avgMAFLevel += (currentDeltaMAFLevelForBEAM - avgMAFLevel) / float(mafSamples);
+
+        float powerInput = currentDeltaMAFLevelForBEAM;
+        float attackNorm = (_dMAFdtEMA - MAF_ATTACK_SLOW_DTPS)
+                         / (MAF_ATTACK_FAST_DTPS - MAF_ATTACK_SLOW_DTPS);
+        attackNorm = constrain(attackNorm, 0.0f, 1.0f);
+        float attackGain = MAF_ATTACK_MIN_GAIN
+                         + attackNorm * (MAF_ATTACK_MAX_GAIN - MAF_ATTACK_MIN_GAIN);
+
+        float power = powerInput * attackGain;
+        if (_dMAFdtEMA < 0.0f) {
+            float releaseNorm = constrain(_dMAFdtEMA / MAF_RELEASE_REF_DTPS, 0.0f, 1.0f);
+            power *= (1.0f - 0.5f * releaseNorm);
+        }
+        power = constrain(power, 0.0f, 1.0f);
+
+        if (!flowStableNow) {
+            float oscNorm = flowOscillationKPa / FLOW_OSCILLATION_KPA_MAX;
+            float rmsNorm = flowRmsKPa / FLOW_RMS_KPA_MAX;
+            float madNorm = flowMadKPa / FLOW_MAD_KPA_MAX;
+            float outlierNorm = flowOutlierRatio / FLOW_OUTLIER_RATIO_MAX;
+            float slopeNorm = fabsf(flowRmsSlope) / FLOW_RMS_SLOPE_KPA_S_MAX;
+            float turb = max(max(oscNorm, rmsNorm), max(max(madNorm, outlierNorm), slopeNorm));
+            alignAcousticLevel = constrain(alignAcousticLevel + (ALIGN_ACOUSTIC_STEP * turb), 0.0f, ALIGN_ACOUSTIC_MAX);
+        } else {
+            alignAcousticLevel = max(alignAcousticLevel, power);
+        }
+
+        actuators->setAcousticParameters(alignAcousticLevel, alignAcousticLevel);
+        lastDeltaMAFLevelForBEAM = currentDeltaMAFLevelForBEAM;
+        lastDeltaMAPLevelForBEAM = currentDeltaMAPLevelForBEAM;
+
+        actuators->updateVortexLevel(alignBoostLevel, alignBoostLevel);
+        actuators->updateInjector();
                 // ── BOOST metrics throttled ─────────────────────────────
         static uint32_t lastMetricsPrintMs = 0;
-        const uint32_t METRICS_PERIOD_MS = 120;
+        const uint32_t METRICS_PERIOD_MS = 200;
 
         uint32_t now = millis();
-
-        if (sensors && (now - lastMetricsPrintMs >= METRICS_PERIOD_MS)) {
+        if ((now - lastMetricsPrintMs >= METRICS_PERIOD_MS)) {
             lastMetricsPrintMs = now;
-            float osc = sensors->readOscillationAmplitude();
-            float rms = sensors->readRMS();
-            float median = sensors->readMedianPressure();
-            float mad = sensors->readMAD();
-            float outlierRatio = sensors->readOutlierRatio();
-            float rmsSlope = sensors->readRMSSlope();
+
+            float osc = sensors->computeOscillationAmplitude();
+            float rms = sensors->computeRMS();
+            float median = sensors->computeMedianPressure();
+            float mad = sensors->computeMAD();
+            float outlierRatio = sensors->computeOutlierRatio();
+            float rmsSlope = sensors->computeRMSSlope();
             bool oscOk = (osc <= FLOW_OSCILLATION_KPA_MAX);
             bool rmsOk = (rms <= FLOW_RMS_KPA_MAX);
             bool madOk = (mad <= FLOW_MAD_KPA_MAX);
@@ -360,69 +364,20 @@ void StateMachine::update(float mapLoadPercent,
                 slopeOk ? "OK" : "NO",
                 flowStable ? "FLOW" : "ALIGN");
         }
-        lastState = current;
+ 
     }
 
-}
-
-void StateMachine::handleActions() {
-    if (!sensors || !actuators || !calibMgr) return;
-
-    if (current == SystemState::BOOST) {
-    // Solo turbo / vortex
-    if (abs(currentDeltaMAFLevelForBOOST - lastDeltaMAFLevelForBOOST) > 0.01f
-        || abs(currentDeltaMAPLevelForBOOST  - lastDeltaMAPLevelForBOOST ) > 0.01f) {
-        //Usando solo MAF temporalmente
-        actuators->updateVortexLevel(currentDeltaMAFLevelForBOOST, currentDeltaMAFLevelForBOOST);
-        lastDeltaMAFLevelForBOOST = currentDeltaMAFLevelForBOOST;
-        lastDeltaMAPLevelForBOOST = currentDeltaMAPLevelForBOOST;
-        }
-    }
-
-    if (current == SystemState::BEAM) {
-        if (thresholdManager) {
-            thresholds = thresholdManager->getThresholds();
-            }
-        mapSamples++;
-        mafSamples++;
-
-        avgMAPLevel += (currentDeltaMAPLevelForBEAM - avgMAPLevel) / float(mapSamples);
-        avgMAFLevel += (currentDeltaMAFLevelForBEAM - avgMAFLevel) / float(mafSamples);
-
-        // Dinámica de MAF (antes TPS): ajustar potencia según rapidez
-        float powerInput = currentDeltaMAFLevelForBEAM;
-        float attackNorm = ( _dMAFdtEMA - MAF_ATTACK_SLOW_DTPS )
-                         / (MAF_ATTACK_FAST_DTPS - MAF_ATTACK_SLOW_DTPS);
-        attackNorm = constrain(attackNorm, 0.0f, 1.0f);
-        float attackGain = MAF_ATTACK_MIN_GAIN
-                         + attackNorm * (MAF_ATTACK_MAX_GAIN - MAF_ATTACK_MIN_GAIN);
-
-        float power = powerInput * attackGain;
-        if (_dMAFdtEMA < 0.0f) {
-            float releaseNorm = constrain(_dMAFdtEMA / MAF_RELEASE_REF_DTPS, 0.0f, 1.0f);
-            power *= (1.0f - 0.5f * releaseNorm); // reduce hasta 50 % en soltados rápidos
-        }
-        power = constrain(power, 0.0f, 1.0f);
-
-        bool levelChanged = (abs(currentDeltaMAFLevelForBEAM - lastDeltaMAFLevelForBEAM) > 0.01f
-                          || abs(currentDeltaMAPLevelForBEAM  - lastDeltaMAPLevelForBEAM ) > 0.01f);
-
-        if (levelChanged) {
-            actuators->setAcousticParameters(power, power);
-            lastDeltaMAFLevelForBEAM = currentDeltaMAFLevelForBEAM;
-            lastDeltaMAPLevelForBEAM = currentDeltaMAPLevelForBEAM;
-        }
-
-        float vortexLevel = updateBeamVortexRamp(power);
-        actuators->updateVortexLevel(vortexLevel, vortexLevel);
+    if (current == SystemState::FLOW) {
+        float scale = constrain(mafNormalized, 0.0f, 1.0f);
+        float acousticLevel = constrain(flowAcousticBase * scale, 0.0f, 1.0f);
+        float boostLevel = constrain(flowBoostBase * scale, 0.0f, 1.0f);
+        actuators->setAcousticParameters(acousticLevel, acousticLevel);
+        actuators->updateVortexLevel(boostLevel, boostLevel);
         actuators->updateInjector();
     }
 
-        // ──────── DECAY ───────────────────────────────────────────────────
     if (current == SystemState::DECAY) {
-
         actuators->getAcousticInjector().updateDecayState();
-
     }
 }
 
@@ -441,7 +396,6 @@ void StateMachine::resetBeamTracking() {
   avgMAFLevel = 0.0f;
   lastDeltaMAFLevelForBEAM = 0.0f;
   lastDeltaMAPLevelForBEAM = 0.0f;
-  mafMinOnBeam = 100.0f;
   _holdActive = false;
   _holdStartMillis = 0;
   _beamVortexLevel = BEAM_VORTEX_ENTRY_LEVEL;
@@ -486,8 +440,8 @@ String StateMachine::getStateName() const {
         case SystemState::NO_CALIB: return "NO_CALIB";
         case SystemState::CALIBRATION: return "CALIBRATION";
         case SystemState::IDLE: return "IDLE";
-        case SystemState::BOOST: return "BOOST";
-        case SystemState::BEAM: return "BEAM";
+        case SystemState::ALIGN: return "ALIGN";
+        case SystemState::FLOW: return "FLOW";
         case SystemState::DECAY: return "DECAY";
         case SystemState::DEBUG: return "DEBUG";
         case SystemState::UNKNOWN: return "UNKNOWN";
