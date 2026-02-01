@@ -19,6 +19,12 @@ void SensorManager::begin(uint8_t pinPressureData, uint8_t pinPressureSCK, uint8
   for (size_t i = 0; i < PRESSURE_BUFFER_SIZE; i++) pressureKPABuffer[i] = 0.0f;
   bufferIndex = 0;
   pressureCount = 0;
+  pressureMedianKPa = 0.0f;
+  pressureMadKPa = 0.0f;
+  pressureOutlierRatio = 0.0f;
+  pressureRmsSlope = 0.0f;
+  lastPressureRms = 0.0f;
+  lastPressureRmsMs = 0;
 }
 
 
@@ -123,12 +129,16 @@ void SensorManager::updatePressure() {
     // Guardar en buffer
     pressureKPABuffer[bufferIndex++] = pKPa;
     if(bufferIndex >= PRESSURE_BUFFER_SIZE) bufferIndex = 0;
-    if (pressureCount == 0){
+    if (pressureCount < PRESSURE_BUFFER_SIZE) {
       pressureCount++;
     }
 
     // Calcula la amplitud de oscilación en cada ciclo
     amplitudeOscillation = computeOscillationAmplitude();
+    pressureMedianKPa = computeMedianPressure();
+    pressureMadKPa = computeMAD();
+    pressureOutlierRatio = computeOutlierRatio();
+    pressureRmsSlope = computeRMSSlope();
 
 }
 
@@ -152,8 +162,8 @@ float SensorManager::getPressurePercentSigned() {
 }
 
 float SensorManager::getPressurePercentAbs(){
-  float pKPa getPressureKPAFromBuffer();
-  return((fabsf(pKPa)/40.0f)*100.0f)
+  float pKPa = getPressureKPAFromBuffer();
+  return (fabsf(pKPa) / 40.0f) * 100.0f;
 }
 
 // Devuelve la presión del buffer en PSI
@@ -249,3 +259,82 @@ float SensorManager::computeRMS() {
     }
     return sqrt(sumSq / count);
   }
+
+float SensorManager::computeMedianPressure() {
+    const size_t count = pressureCount;
+    if (count == 0) {
+      return 0.0f;
+    }
+    std::vector<float> tmp;
+    tmp.reserve(count);
+    for (size_t i = 0; i < count; ++i) {
+      tmp.push_back(pressureKPABuffer[i]);
+    }
+    size_t mid = count / 2;
+    std::nth_element(tmp.begin(), tmp.begin() + mid, tmp.end());
+    float med = tmp[mid];
+    if ((count % 2) == 0) {
+      auto maxIt = std::max_element(tmp.begin(), tmp.begin() + mid);
+      med = (*maxIt + med) * 0.5f;
+    }
+    return med;
+}
+
+float SensorManager::computeMAD() {
+    const size_t count = pressureCount;
+    if (count == 0) {
+      return 0.0f;
+    }
+    float median = computeMedianPressure();
+    std::vector<float> devs;
+    devs.reserve(count);
+    for (size_t i = 0; i < count; ++i) {
+      devs.push_back(fabsf(pressureKPABuffer[i] - median));
+    }
+    size_t mid = count / 2;
+    std::nth_element(devs.begin(), devs.begin() + mid, devs.end());
+    float mad = devs[mid];
+    if ((count % 2) == 0) {
+      auto maxIt = std::max_element(devs.begin(), devs.begin() + mid);
+      mad = (*maxIt + mad) * 0.5f;
+    }
+    return mad;
+}
+
+float SensorManager::computeOutlierRatio(float k) {
+    const size_t count = pressureCount;
+    if (count == 0) {
+      return 0.0f;
+    }
+    float median = computeMedianPressure();
+    float mad = computeMAD();
+    if (mad <= 0.0f) {
+      return 0.0f;
+    }
+    float threshold = k * mad;
+    size_t outliers = 0;
+    for (size_t i = 0; i < count; ++i) {
+      if (fabsf(pressureKPABuffer[i] - median) > threshold) {
+        outliers++;
+      }
+    }
+    return static_cast<float>(outliers) / static_cast<float>(count);
+}
+
+float SensorManager::computeRMSSlope() {
+    float rms = computeRMS();
+    uint32_t now = millis();
+    if (lastPressureRmsMs == 0) {
+      lastPressureRms = rms;
+      lastPressureRmsMs = now;
+      return 0.0f;
+    }
+    float dt = (now - lastPressureRmsMs) / 1000.0f;
+    float slope = 0.0f;
+    if (dt > 0.0f) {
+      slope = (rms - lastPressureRms) / dt;
+    }
+    lastPressureRms = rms;
+    lastPressureRmsMs = now;
+    return slope;
+}
