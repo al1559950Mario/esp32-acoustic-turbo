@@ -252,6 +252,13 @@ const float MIN_TAIL_MS = 10.0f;
   static constexpr float BEAM_VORTEX_RAMP_TAU_FAST_MS = 60.0f;
   static constexpr float BEAM_VORTEX_RAMP_TAU_SLOW_MS = 260.0f;
 
+  // --- Métricas de flujo (para diagnóstico en BOOST, sin cambiar FSM) ---
+  static constexpr float FLOW_OSCILLATION_KPA_MAX = 0.35f;
+  static constexpr float FLOW_RMS_KPA_MAX = 0.25f;
+  static constexpr float FLOW_MAD_KPA_MAX = 0.20f;
+  static constexpr float FLOW_OUTLIER_RATIO_MAX = 0.10f;
+  static constexpr float FLOW_RMS_SLOPE_KPA_S_MAX = 0.08f;
+
   // Seguimiento de la condición BEAM sostenida
   uint32_t _beamCondStartMs = 0;   // instante en que se detecto la condicion por primera vez
   uint32_t _beamStreamStartMs = 0;
