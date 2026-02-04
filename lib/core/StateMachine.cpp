@@ -330,14 +330,22 @@ void StateMachine::handleActions() {
         }
         power = constrain(power, 0.0f, 1.0f);
 
+        float oscNorm = flowOscillationKPa / FLOW_OSCILLATION_KPA_MAX;
+        float rmsNorm = flowRmsKPa / FLOW_RMS_KPA_MAX;
+        float madNorm = flowMadKPa / FLOW_MAD_KPA_MAX;
+        float outlierNorm = flowOutlierRatio / FLOW_OUTLIER_RATIO_MAX;
+        float slopeNorm = fabsf(flowRmsSlope) / FLOW_RMS_SLOPE_KPA_S_MAX;
+        float turb = max(max(oscNorm, rmsNorm), max(max(madNorm, outlierNorm), slopeNorm));
+
         if (!flowStableNow) {
-            float oscNorm = flowOscillationKPa / FLOW_OSCILLATION_KPA_MAX;
-            float rmsNorm = flowRmsKPa / FLOW_RMS_KPA_MAX;
-            float madNorm = flowMadKPa / FLOW_MAD_KPA_MAX;
-            float outlierNorm = flowOutlierRatio / FLOW_OUTLIER_RATIO_MAX;
-            float slopeNorm = fabsf(flowRmsSlope) / FLOW_RMS_SLOPE_KPA_S_MAX;
-            float turb = max(max(oscNorm, rmsNorm), max(max(madNorm, outlierNorm), slopeNorm));
-            alignAcousticLevel = constrain(alignAcousticLevel + (ALIGN_ACOUSTIC_STEP * turb), 0.0f, ALIGN_ACOUSTIC_MAX);
+            if (turb > 1.0f) {
+                alignAcousticLevel = constrain(alignAcousticLevel - ALIGN_ACOUSTIC_STEP_DOWN,
+                                               0.0f, ALIGN_ACOUSTIC_MAX);
+            } else {
+                float target = max(power, alignAcousticLevel);
+                float up = ALIGN_ACOUSTIC_STEP_UP * (1.0f - constrain(turb, 0.0f, 1.0f));
+                alignAcousticLevel = constrain(target + up, 0.0f, ALIGN_ACOUSTIC_MAX);
+            }
         } else {
             alignAcousticLevel = max(alignAcousticLevel, power);
         }
