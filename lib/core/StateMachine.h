@@ -241,7 +241,8 @@ private:
 
   // --- Comportamiento ALIGN ---
   static constexpr float ALIGN_ACOUSTIC_SEED = 0.02f;
-  static constexpr float ALIGN_ACOUSTIC_STEP = 0.01f;
+  static constexpr float ALIGN_ACOUSTIC_STEP_UP = 0.01f;
+  static constexpr float ALIGN_ACOUSTIC_STEP_DOWN = 0.015f;
   static constexpr float ALIGN_ACOUSTIC_MAX = 1.0f;
   static constexpr float ALIGN_BOOST_SEED = 0.05f;
 
