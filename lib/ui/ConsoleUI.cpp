@@ -1,5 +1,37 @@
 #include "ConsoleUI.h"
 #include "CalibrationManager.h" 
+#include <math.h>
+
+namespace {
+constexpr float kResonanceFreqStartHz = 4000.0f;
+constexpr float kResonanceFreqEndHz = 6500.0f;
+constexpr float kResonanceFreqStepHz = 250.0f;
+constexpr uint8_t kResonanceFreqCount = 11;
+constexpr uint8_t kResonanceBinCount = 10;
+constexpr float kResonanceBinSizePct = 100.0f / kResonanceBinCount;
+constexpr float kResonanceAmpLevels[3] = {0.3f, 0.5f, 0.7f};
+constexpr uint32_t kRampDurationMs = 5000;
+constexpr uint32_t kBaselineSampleMs = 120;
+constexpr uint32_t kPulseDurationMs = 180;
+constexpr uint32_t kPostSampleMs = 120;
+constexpr float kStrongImproveRatio = 0.15f;
+constexpr float kLightImproveRatio = 0.05f;
+constexpr float kMinBaseline = 0.01f;
+
+float sampleMetric(SensorManager* sensors, uint32_t durationMs) {
+  if (!sensors) return 0.0f;
+  uint32_t start = millis();
+  float sum = 0.0f;
+  uint16_t count = 0;
+  while (millis() - start < durationMs) {
+    sum += sensors->computeOscillationAmplitude();
+    count++;
+    delay(10);
+  }
+  return count > 0 ? (sum / count) : 0.0f;
+}
+
+} // namespace
 
 void ConsoleUI::begin() {
 }
@@ -125,6 +157,10 @@ void ConsoleUI::interpretarComando(char c) {
     case 'c':  // Solicitar calibración por consola
       consoleCalibRequested = true;
       this->println(">> Solicitud de calibración registrada.");
+      break;
+
+    case 'C':  // Calibración rápida de resonancia (1 min aprox)
+      runResonanceCalibration();
       break;
 
     case 'd':  // Activar modo desarrollador
@@ -509,6 +545,7 @@ void ConsoleUI::imprimirHelp() {
   this->println(F("\n📘 Comandos disponibles:"));
   this->println(F("  a  → Activar/Desactivar sistema completo (seguridad/falla)"));
   this->println(F("  c  → Ejecutar rutina de calibración de sensores"));
+  this->println(F("  C  → Calibración rápida de resonancia (1 minuto)"));
   this->println(F("  d  → Activar modo desarrollador"));
   this->println(F("  m  → Mostrar menú de comandos"));
   this->println(F("  s  → Activar/Desactivar dashboard del sistema"));
@@ -523,6 +560,155 @@ void ConsoleUI::imprimirHelp() {
     this->println(F("  v  → Visualizar curva MAF-MAP (pendiente desarrollo)"));
     this->println(F("  x  → Paro manual, volver a IDLE"));
     this->println(F("  z  → Activar/Desactivar modo simulación"));
+  }
+}
+
+void ConsoleUI::runResonanceCalibration() {
+  if (!sensors || !actuators) {
+    this->println("⚠️ No se puede iniciar calibración: faltan sensores o actuadores.");
+    return;
+  }
+
+  bool prevSistema = sistemaActivo;
+  bool prevDashboard = dashboardEnabled;
+  bool prevMirrorSistema = mirror ? mirror->sistemaActivo : false;
+  bool prevMirrorDashboard = mirror ? mirror->dashboardEnabled : false;
+
+  sistemaActivo = false;
+  dashboardEnabled = false;
+  if (mirror) {
+    mirror->sistemaActivo = false;
+    mirror->dashboardEnabled = false;
+  }
+
+  actuators->stopAll();
+
+  this->println("\n=== Calibración rápida de resonancia ===");
+  this->println("Acelera MUY LENTO");
+  this->println("Mantén la rampa suave");
+  this->println("No subas el MAF de golpe");
+
+  resonanceResultsValid = false;
+
+  for (uint8_t freqIndex = 0; freqIndex < kResonanceFreqCount; ++freqIndex) {
+    float freqHz = kResonanceFreqStartHz + kResonanceFreqStepHz * freqIndex;
+    if (freqHz > kResonanceFreqEndHz + 0.1f) {
+      break;
+    }
+
+    resonanceResults[freqIndex].freqHz = freqHz;
+    for (uint8_t bin = 0; bin < kResonanceBinCount; ++bin) {
+      resonanceResults[freqIndex].bins[bin] = {};
+    }
+
+    this->printf("\n>> Frecuencia %.0f Hz | Rampa ~%lu ms\n", freqHz, (unsigned long)kRampDurationMs);
+
+    unsigned long rampStart = millis();
+    while (millis() - rampStart < kRampDurationMs) {
+      float mafPct = sensors->readMAFLoadPercent();
+      if (mafPct < 0.0f) mafPct = 0.0f;
+      if (mafPct > 100.0f) mafPct = 100.0f;
+
+      uint8_t binIndex = static_cast<uint8_t>(mafPct / kResonanceBinSizePct);
+      if (binIndex >= kResonanceBinCount) {
+        binIndex = kResonanceBinCount - 1;
+      }
+
+      ResonanceBinResult& bin = resonanceResults[freqIndex].bins[binIndex];
+      if (!bin.measured) {
+        float baseline = sampleMetric(sensors, kBaselineSampleMs);
+        float amplitude = kResonanceAmpLevels[binIndex % 3];
+
+        actuators->startISRSine(static_cast<uint32_t>(freqHz), amplitude);
+        delay(kPulseDurationMs);
+        actuators->stopISRSine();
+        delay(20);
+
+        float after = sampleMetric(sensors, kPostSampleMs);
+        float denom = fabsf(baseline);
+        if (denom < kMinBaseline) denom = kMinBaseline;
+        float ratio = (after - baseline) / denom;
+
+        ResonanceGrade grade = ResonanceGrade::NONE;
+        if (ratio >= kStrongImproveRatio) {
+          grade = ResonanceGrade::STRONG;
+        } else if (ratio >= kLightImproveRatio) {
+          grade = ResonanceGrade::LIGHT;
+        }
+
+        bin.grade = grade;
+        bin.amplitude = amplitude;
+        bin.improvement = ratio;
+        bin.measured = true;
+
+        uint8_t binStart = static_cast<uint8_t>(binIndex * kResonanceBinSizePct);
+        uint8_t binEnd = static_cast<uint8_t>((binIndex + 1) * kResonanceBinSizePct);
+        const char* gradeText = (grade == ResonanceGrade::STRONG) ? "VERDE"
+                               : (grade == ResonanceGrade::LIGHT) ? "AMARILLO"
+                               : "ROJO";
+        this->printf("Bin %u (%u-%u%%) amp %.0f%% -> %s\n",
+                     binIndex + 1,
+                     binStart,
+                     binEnd,
+                     amplitude * 100.0f,
+                     gradeText);
+      }
+
+      delay(20);
+    }
+
+    this->println("Rampa completada");
+  }
+
+  resonanceResultsValid = true;
+
+  this->println("\n=== Resumen de resonancia ===");
+  for (uint8_t freqIndex = 0; freqIndex < kResonanceFreqCount; ++freqIndex) {
+    float freqHz = resonanceResults[freqIndex].freqHz;
+    if (freqHz <= 0.0f) continue;
+
+    this->printf("\nFrecuencia %.0f Hz:\n", freqHz);
+    this->println("  Mejores rangos (MAF):");
+    bool anyImprovement = false;
+    for (uint8_t binIndex = 0; binIndex < kResonanceBinCount; ++binIndex) {
+      const ResonanceBinResult& bin = resonanceResults[freqIndex].bins[binIndex];
+      if (!bin.measured) continue;
+      if (bin.grade == ResonanceGrade::NONE) continue;
+
+      uint8_t binStart = static_cast<uint8_t>(binIndex * kResonanceBinSizePct);
+      uint8_t binEnd = static_cast<uint8_t>((binIndex + 1) * kResonanceBinSizePct);
+      const char* gradeText = (bin.grade == ResonanceGrade::STRONG) ? "VERDE" : "AMARILLO";
+      this->printf("    %u-%u%% | amp %.0f%% | %s\n",
+                   binStart, binEnd, bin.amplitude * 100.0f, gradeText);
+      anyImprovement = true;
+    }
+    if (!anyImprovement) {
+      this->println("    (sin mejora detectada)");
+    }
+
+    this->println("  Zonas donde no ayuda:");
+    bool anyNoHelp = false;
+    for (uint8_t binIndex = 0; binIndex < kResonanceBinCount; ++binIndex) {
+      const ResonanceBinResult& bin = resonanceResults[freqIndex].bins[binIndex];
+      if (!bin.measured) continue;
+      if (bin.grade != ResonanceGrade::NONE) continue;
+      uint8_t binStart = static_cast<uint8_t>(binIndex * kResonanceBinSizePct);
+      uint8_t binEnd = static_cast<uint8_t>((binIndex + 1) * kResonanceBinSizePct);
+      this->printf("    %u-%u%%\n", binStart, binEnd);
+      anyNoHelp = true;
+    }
+    if (!anyNoHelp) {
+      this->println("    (sin datos)");
+    }
+  }
+
+  actuators->stopAll();
+
+  sistemaActivo = prevSistema;
+  dashboardEnabled = prevDashboard;
+  if (mirror) {
+    mirror->sistemaActivo = prevMirrorSistema;
+    mirror->dashboardEnabled = prevMirrorDashboard;
   }
 }
 
