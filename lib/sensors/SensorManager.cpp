@@ -107,7 +107,7 @@ void SensorManager::updateADS1115() {
   } else
   {
     rawMAPCached = ads.readADC_SingleEnded(0);
-    rawMAFCached = ads.readADC_SingleEnded(3); 
+    rawMAFCached = ads.readADC_SingleEnded(2); 
   }
   // Filtro IIR al raw directamente
   filteredRawMAP = alpha * rawMAPCached + (1 - alpha) * filteredRawMAP;

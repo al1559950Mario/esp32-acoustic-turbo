@@ -5,8 +5,9 @@
 #include "ActuatorManager.h" 
 #include "Logger.h"
 #include "ThresholdManager.h"
+#include "ResonanceCalibrationService.h"
 
-class ConsoleUI {
+class ConsoleUI : public ResonanceCalibrationReporter {
 public:
   virtual void begin() = 0;
   virtual void update();
@@ -49,26 +50,7 @@ protected:
 
   SystemState lastState = SystemState::OFF;
 
-  enum class ResonanceGrade : uint8_t {
-    NONE = 0,
-    LIGHT = 1,
-    STRONG = 2
-  };
-
-  struct ResonanceBinResult {
-    ResonanceGrade grade = ResonanceGrade::NONE;
-    float amplitude = 0.0f; // 0..1
-    float improvement = 0.0f; // ratio
-    bool measured = false;
-  };
-
-  struct ResonanceFrequencyResult {
-    float freqHz = 0.0f;
-    ResonanceBinResult bins[10];
-  };
-
-  bool resonanceResultsValid = false;
-  ResonanceFrequencyResult resonanceResults[11];
+  ResonanceCalibrationService resonanceCalibration;
 
   
 
