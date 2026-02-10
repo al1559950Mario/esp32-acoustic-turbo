@@ -31,7 +31,43 @@ Potencia transferida:
 ## 3. Geometría y Dimensiones  
 | Elemento               | Dimensión        |  
 | ---------------------- | ---------------- |  
-| Tweeter bala Ø         | 38.1 mm          |  
+
+### 8.1 Calibración rápida de resonancia (≈ 1 minuto)
+**Objetivo:** identificar de forma rápida los rangos de MAF donde la resonancia ofrece mejora, para luego refinar con un mapeo más fino.  
+
+**Comando de consola:** `C` (una sola ejecución inicia todo el barrido).  
+
+**Rango de prueba:** 4.0 kHz a 6.5 kHz.  
+**Cobertura rápida (1 min):** 3 frecuencias distribuidas en el rango completo (4.0, 5.25 y 6.5 kHz).  
+**Rampa por frecuencia:** 5 s aprox. (usuario acelera muy lentamente).  
+**Tiempo total estimado:** ~15 s de rampa + overhead mínimo de consola.  
+
+#### Flujo por frecuencia (secuencial)
+1. El sistema fija una frecuencia.  
+2. El usuario realiza **una única rampa lenta** de MAF.  
+3. Durante la rampa, el sistema divide el MAF en **bins porcentuales**.  
+4. Durante toda la rampa se mantiene **streaming acústico continuo**; por bin se rota amplitud: **30% → 50% → 70%** (nunca > 70%).  
+5. Se miden métricas internas y se clasifica el bin:  
+   - **Verde:** mejora fuerte  
+   - **Amarillo:** mejora ligera  
+   - **Rojo:** sin mejora  
+6. Al final de la rampa, se guardan resultados en RAM y se pasa a la siguiente frecuencia.  
+
+#### Resumen final por consola
+Al finalizar todas las frecuencias, se imprime:  
+- Rangos de MAF donde cada frecuencia funcionó mejor.  
+- Amplitud más efectiva por rango.  
+- Zonas donde la resonancia no ayuda.  
+
+#### Instrucciones simples al usuario (texto exacto)
+- “Acelera MUY LENTO”  
+- “Mantén la rampa suave”  
+- “No subas el MAF de golpe”  
+- “Rampa completada”  
+
+#### Restricciones
+- No activar FLOW ni lógica externa.  
+- Proceso rápido y con mínimo esfuerzo del usuario.  
 | Filtro cónico Ø int.   | 88.9 mm          |  
 | Filtro cónico longitud | 101.6 mm         |  
 | Distancia a rotor      | 101.6 mm         |  

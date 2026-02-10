@@ -5,8 +5,9 @@
 #include "ActuatorManager.h" 
 #include "Logger.h"
 #include "ThresholdManager.h"
+#include "ResonanceCalibrationService.h"
 
-class ConsoleUI {
+class ConsoleUI : public ResonanceCalibrationReporter {
 public:
   virtual void begin() = 0;
   virtual void update();
@@ -19,6 +20,9 @@ public:
   virtual void toggleSistema();
   virtual bool isSistemaActivo() const { 
     return sistemaActivo; }
+  virtual bool isCalibrationSessionActive() const {
+    return calibrationSessionActive;
+  }
   virtual void imprimirDashboard();
   virtual int parseValor(const String& linea, const String& clave);
   void setMirror(ConsoleUI* mirrorUI) { this->mirror = mirrorUI; }
@@ -31,6 +35,7 @@ public:
   }
 
   virtual bool isDeveloperMode() const;
+  void runResonanceCalibration();
 protected:
   bool sistemaActivo = true;
   StateMachine*      fsm = nullptr;
@@ -41,12 +46,15 @@ protected:
   bool consoleCalibRequested = false;
   bool developerMode = false;
   bool simulationOnPython = false;
+  bool calibrationSessionActive = false;
 
   unsigned long lastTransitionMS = 0;
   unsigned long tiempoProximaImpresionHUD = 0;
   Logger* logger = nullptr;
 
   SystemState lastState = SystemState::OFF;
+
+  ResonanceCalibrationService resonanceCalibration;
 
   
 

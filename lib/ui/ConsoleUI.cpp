@@ -127,6 +127,10 @@ void ConsoleUI::interpretarComando(char c) {
       this->println(">> Solicitud de calibración registrada.");
       break;
 
+    case 'C':  // Calibración rápida de resonancia (1 min aprox)
+      runResonanceCalibration();
+      break;
+
     case 'd':  // Activar modo desarrollador
       developerMode = true;
       this->println(">> Modo desarrollador ACTIVADO.");
@@ -509,6 +513,7 @@ void ConsoleUI::imprimirHelp() {
   this->println(F("\n📘 Comandos disponibles:"));
   this->println(F("  a  → Activar/Desactivar sistema completo (seguridad/falla)"));
   this->println(F("  c  → Ejecutar rutina de calibración de sensores"));
+  this->println(F("  C  → Calibración rápida de resonancia (1 minuto)"));
   this->println(F("  d  → Activar modo desarrollador"));
   this->println(F("  m  → Mostrar menú de comandos"));
   this->println(F("  s  → Activar/Desactivar dashboard del sistema"));
@@ -524,6 +529,42 @@ void ConsoleUI::imprimirHelp() {
     this->println(F("  x  → Paro manual, volver a IDLE"));
     this->println(F("  z  → Activar/Desactivar modo simulación"));
   }
+}
+
+void ConsoleUI::runResonanceCalibration() {
+  if (!sensors || !actuators) {
+    this->println("⚠️ No se puede iniciar calibración: faltan sensores o actuadores.");
+    return;
+  }
+
+  calibrationSessionActive = true;
+
+  bool prevSistema = sistemaActivo;
+  bool prevDashboard = dashboardEnabled;
+  bool prevMirrorSistema = mirror ? mirror->sistemaActivo : false;
+  bool prevMirrorDashboard = mirror ? mirror->dashboardEnabled : false;
+
+  sistemaActivo = false;
+  dashboardEnabled = false;
+  if (mirror) {
+    mirror->sistemaActivo = false;
+    mirror->dashboardEnabled = false;
+    mirror->calibrationSessionActive = true;
+  }
+
+  actuators->stopAll();
+  resonanceCalibration.run(*sensors, *actuators, *this);
+
+  actuators->stopAll();
+
+  sistemaActivo = prevSistema;
+  dashboardEnabled = prevDashboard;
+  if (mirror) {
+    mirror->sistemaActivo = prevMirrorSistema;
+    mirror->dashboardEnabled = prevMirrorDashboard;
+    mirror->calibrationSessionActive = false;
+  }
+  calibrationSessionActive = false;
 }
 
 
