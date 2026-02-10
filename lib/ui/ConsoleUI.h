@@ -5,8 +5,9 @@
 #include "ActuatorManager.h" 
 #include "Logger.h"
 #include "ThresholdManager.h"
+#include "ResonanceCalibrationService.h"
 
-class ConsoleUI {
+class ConsoleUI : public ResonanceCalibrationReporter {
 public:
   virtual void begin() = 0;
   virtual void update();
@@ -31,6 +32,7 @@ public:
   }
 
   virtual bool isDeveloperMode() const;
+  void runResonanceCalibration();
 protected:
   bool sistemaActivo = true;
   StateMachine*      fsm = nullptr;
@@ -47,6 +49,8 @@ protected:
   Logger* logger = nullptr;
 
   SystemState lastState = SystemState::OFF;
+
+  ResonanceCalibrationService resonanceCalibration;
 
   
 
