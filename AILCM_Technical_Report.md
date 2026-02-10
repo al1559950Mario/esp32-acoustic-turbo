@@ -23,7 +23,8 @@ Modo de operación: excitación forzada a 6.4 kHz para guía de onda y streaming
 Flujo medio estacionario inducido por absorción de onda sonora.  
 
 Intensidad acústica:  
-\(I = rac{p_0^2}{ho\,c},\quad p_0 \propto 	ext{level}\)  
+\(I = rac{p_0^2}{
+ho\,c},\quad p_0 \propto 	ext{level}\)  
 
 Potencia transferida:  
 \(P = I\;A_{	ext{sección}} \quad\Rightarrow\; P\propto 	ext{level}^2\)  

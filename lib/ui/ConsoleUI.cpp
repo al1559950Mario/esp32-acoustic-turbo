@@ -1,5 +1,37 @@
 #include "ConsoleUI.h"
 #include "CalibrationManager.h" 
+#include <math.h>
+
+namespace {
+constexpr float kResonanceFreqStartHz = 4000.0f;
+constexpr float kResonanceFreqEndHz = 6500.0f;
+constexpr float kResonanceFreqStepHz = 250.0f;
+constexpr uint8_t kResonanceFreqCount = 11;
+constexpr uint8_t kResonanceBinCount = 10;
+constexpr float kResonanceBinSizePct = 100.0f / kResonanceBinCount;
+constexpr float kResonanceAmpLevels[3] = {0.3f, 0.5f, 0.7f};
+constexpr uint32_t kRampDurationMs = 5000;
+constexpr uint32_t kBaselineSampleMs = 120;
+constexpr uint32_t kPulseDurationMs = 180;
+constexpr uint32_t kPostSampleMs = 120;
+constexpr float kStrongImproveRatio = 0.15f;
+constexpr float kLightImproveRatio = 0.05f;
+constexpr float kMinBaseline = 0.01f;
+
+float sampleMetric(SensorManager* sensors, uint32_t durationMs) {
+  if (!sensors) return 0.0f;
+  uint32_t start = millis();
+  float sum = 0.0f;
+  uint16_t count = 0;
+  while (millis() - start < durationMs) {
+    sum += sensors->computeOscillationAmplitude();
+    count++;
+    delay(10);
+  }
+  return count > 0 ? (sum / count) : 0.0f;
+}
+
+} // namespace
 
 void ConsoleUI::begin() {
 }
