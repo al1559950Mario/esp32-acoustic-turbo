@@ -23,7 +23,8 @@ Modo de operación: excitación forzada a 6.4 kHz para guía de onda y streaming
 Flujo medio estacionario inducido por absorción de onda sonora.  
 
 Intensidad acústica:  
-\(I = rac{p_0^2}{ho\,c},\quad p_0 \propto 	ext{level}\)  
+\(I = rac{p_0^2}{
+ho\,c},\quad p_0 \propto 	ext{level}\)  
 
 Potencia transferida:  
 \(P = I\;A_{	ext{sección}} \quad\Rightarrow\; P\propto 	ext{level}^2\)  
@@ -38,15 +39,15 @@ Potencia transferida:
 **Comando de consola:** `C` (una sola ejecución inicia todo el barrido).  
 
 **Rango de prueba:** 4.0 kHz a 6.5 kHz.  
-**Resolución rápida (1 min):** 250 Hz por paso → 11 frecuencias (4.0, 4.25, …, 6.5 kHz).  
+**Cobertura rápida (1 min):** 3 frecuencias distribuidas en el rango completo (4.0, 5.25 y 6.5 kHz).  
 **Rampa por frecuencia:** 5 s aprox. (usuario acelera muy lentamente).  
-**Tiempo total estimado:** ~55 s + overhead mínimo de consola.  
+**Tiempo total estimado:** ~15 s de rampa + overhead mínimo de consola.  
 
 #### Flujo por frecuencia (secuencial)
 1. El sistema fija una frecuencia.  
 2. El usuario realiza **una única rampa lenta** de MAF.  
 3. Durante la rampa, el sistema divide el MAF en **bins porcentuales**.  
-4. En cada bin, el sistema ejecuta un pulso corto con amplitudes rotadas: **30% → 50% → 70%** (nunca > 70%).  
+4. Durante toda la rampa se mantiene **streaming acústico continuo**; por bin se rota amplitud: **30% → 50% → 70%** (nunca > 70%).  
 5. Se miden métricas internas y se clasifica el bin:  
    - **Verde:** mejora fuerte  
    - **Amarillo:** mejora ligera  
