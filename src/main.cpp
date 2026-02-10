@@ -149,8 +149,12 @@ void loop() {
   calib.update(ui ? ui->isSimulation() : false);
 
 
+  bool calibrationRunning = usbConsoleUI.isCalibrationSessionActive() || btConsoleUI.isCalibrationSessionActive();
   bool sistemaActivo = usbConsoleUI.isSistemaActivo() || btConsoleUI.isSistemaActivo();
-  if (sistemaActivo) {
+  if (calibrationRunning) {
+    // Durante calibración de resonancia, el servicio controla actuadores de forma exclusiva.
+    // No ejecutar FSM ni stopAll aquí para no cortar el streaming acústico de prueba.
+  } else if (sistemaActivo) {
     float mapLoadPercent = sensors.readMAPLoadPercent();
     float mafLoadPercent = sensors.readMAFLoadPercent();
 
