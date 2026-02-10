@@ -569,6 +569,8 @@ void ConsoleUI::runResonanceCalibration() {
     return;
   }
 
+  calibrationSessionActive = true;
+
   bool prevSistema = sistemaActivo;
   bool prevDashboard = dashboardEnabled;
   bool prevMirrorSistema = mirror ? mirror->sistemaActivo : false;
@@ -579,6 +581,7 @@ void ConsoleUI::runResonanceCalibration() {
   if (mirror) {
     mirror->sistemaActivo = false;
     mirror->dashboardEnabled = false;
+    mirror->calibrationSessionActive = true;
   }
 
   actuators->stopAll();
@@ -591,7 +594,9 @@ void ConsoleUI::runResonanceCalibration() {
   if (mirror) {
     mirror->sistemaActivo = prevMirrorSistema;
     mirror->dashboardEnabled = prevMirrorDashboard;
+    mirror->calibrationSessionActive = false;
   }
+  calibrationSessionActive = false;
 }
 
 

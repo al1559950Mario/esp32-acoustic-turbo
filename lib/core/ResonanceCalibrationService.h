@@ -41,9 +41,10 @@ public:
 
 private:
   static constexpr float kFreqListHz[kFreqCount] = {4000.0f, 5250.0f, 6500.0f};
+  static constexpr float kAmpLevels[3] = {0.3f, 0.5f, 0.7f};
+
   static constexpr uint8_t kBinCount = 10;
   static constexpr float kBinSizePct = 100.0f / kBinCount;
-  static constexpr float kAmpLevels[3] = {0.3f, 0.5f, 0.7f};
   static constexpr uint32_t kRampDurationMs = 5000;
   static constexpr uint32_t kBaselineSampleMs = 250;
   static constexpr uint32_t kBinSampleMs = 120;

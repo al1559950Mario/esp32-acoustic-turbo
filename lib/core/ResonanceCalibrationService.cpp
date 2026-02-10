@@ -1,6 +1,9 @@
 #include "ResonanceCalibrationService.h"
 #include <math.h>
 
+constexpr float ResonanceCalibrationService::kFreqListHz[ResonanceCalibrationService::kFreqCount];
+constexpr float ResonanceCalibrationService::kAmpLevels[3];
+
 float ResonanceCalibrationService::sampleMetric(SensorManager& sensors, uint32_t durationMs) const {
   uint32_t start = millis();
   float sum = 0.0f;

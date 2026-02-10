@@ -20,6 +20,9 @@ public:
   virtual void toggleSistema();
   virtual bool isSistemaActivo() const { 
     return sistemaActivo; }
+  virtual bool isCalibrationSessionActive() const {
+    return calibrationSessionActive;
+  }
   virtual void imprimirDashboard();
   virtual int parseValor(const String& linea, const String& clave);
   void setMirror(ConsoleUI* mirrorUI) { this->mirror = mirrorUI; }
@@ -43,6 +46,7 @@ protected:
   bool consoleCalibRequested = false;
   bool developerMode = false;
   bool simulationOnPython = false;
+  bool calibrationSessionActive = false;
 
   unsigned long lastTransitionMS = 0;
   unsigned long tiempoProximaImpresionHUD = 0;
