@@ -41,6 +41,7 @@ public:
   void testSimple();
   // Seno fijo mediante la misma ruta ISR/tabla (sin pre-idle ni sweep)
   void startFixedSine(uint32_t freqHz, float level);
+  void setFixedSineLevel(float level);
   void stopFixedSine() { stop(); }
   void usePullMode(bool enable);
   void setTargetFrequency(float freq) {
@@ -421,5 +422,4 @@ uint32_t _lastDecayPrintMs = 0;
 
 
 };
-
 

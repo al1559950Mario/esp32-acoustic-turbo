@@ -112,6 +112,10 @@ void ActuatorManager::startISRSine(uint32_t freqHz, float level) {
     injector.startFixedSine(freqHz, level);
 }
 
+void ActuatorManager::setISRSineLevel(float level) {
+    injector.setFixedSineLevel(level);
+}
+
 void ActuatorManager::stopISRSine() {
     injector.stopFixedSine();
 }
