@@ -27,7 +27,7 @@ public:
 
   struct FrequencyResult {
     float freqHz = 0.0f;
-    BinResult bins[10];
+    BinResult bins[6];
   };
 
   static constexpr uint8_t kFreqCount = 3;
@@ -41,21 +41,42 @@ public:
 
 private:
   static constexpr float kFreqListHz[kFreqCount] = {4000.0f, 5250.0f, 6500.0f};
-  static constexpr uint8_t kBinCount = 10;
+  static constexpr uint8_t kBinCount = 6;
   static constexpr float kBinSizePct = 100.0f / kBinCount;
   static constexpr float kAmpLevels[3] = {0.3f, 0.5f, 0.7f};
-  static constexpr uint32_t kRampDurationMs = 5000;
-  static constexpr uint32_t kBaselineSampleMs = 250;
-  static constexpr uint32_t kBinSampleMs = 120;
+  static constexpr uint32_t kFreqWarmupMs = 80;
+  static constexpr uint32_t kLevelSettleMs = 120;
+  static constexpr uint32_t kBaselineSampleMs = 280;
+  static constexpr uint32_t kBinSampleMs = 260;
+  static constexpr uint32_t kFreqCooldownMs = 20;
   static constexpr float kStrongImproveRatio = 0.15f;
   static constexpr float kLightImproveRatio = 0.05f;
   static constexpr float kMinBaseline = 0.01f;
+  static constexpr float kMafRiseEpsPct = 0.25f;
+  static constexpr uint32_t kLivePrintPeriodMs = 120;
 
   bool resultsValid = false;
   FrequencyResult results[kFreqCount];
 
-  float sampleMetric(SensorManager& sensors, uint32_t durationMs) const;
+  float sampleMetric(SensorManager& sensors,
+                     ResonanceCalibrationReporter& reporter,
+                     float freqHz,
+                     float amplitude,
+                     uint32_t durationMs,
+                     const char* phase) const;
+  float measureWithStreaming(SensorManager& sensors,
+                             ActuatorManager& actuators,
+                             ResonanceCalibrationReporter& reporter,
+                             float freqHz,
+                             float amplitude,
+                             uint32_t durationMs,
+                             const char* phase) const;
+  uint32_t estimateBinTestTimeMs() const;
+  bool waitForBinEntry(SensorManager& sensors,
+                       ResonanceCalibrationReporter& reporter,
+                       uint8_t binIndex,
+                       float& lastAcceptedMaf) const;
   static const char* gradeText(Grade grade);
-  String formatBinLine(uint8_t binIndex, float amp, Grade grade) const;
+  String formatBinLine(uint8_t binIndex, float freq, float amp, Grade grade, float ratio) const;
+  uint8_t findBestFreqForBin(uint8_t binIndex) const;
 };
-
