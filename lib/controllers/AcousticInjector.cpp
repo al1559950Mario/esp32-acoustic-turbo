@@ -742,6 +742,15 @@ void AcousticInjector::startFixedSine(uint32_t freqHz, float level) {
   }
 }
 
+void AcousticInjector::setFixedSineLevel(float level) {
+  // Ruta directa para calibraciones con seno fijo en pull-mode:
+  // aplicar nivel instantáneo sin depender de update().
+  _targetLevel = constrain(level, 0.0f, 1.0f);
+  _level = _targetLevel;
+  float amp = mapLevelForAmplitude(_level);
+  _levelInt = uint8_t(constrain(amp * 255.0f, 0.0f, 255.0f));
+}
+
 void AcousticInjector::usePullMode(bool enable) {
   _pullMode = enable;
   if (enable && _timer) {
@@ -1268,7 +1277,6 @@ float AcousticInjector::freqGainFactor(float hz) {
     return g2 + t * (g3 - g2);
   }
 }
-
 
 
 

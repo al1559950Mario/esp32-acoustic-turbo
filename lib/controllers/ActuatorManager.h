@@ -52,6 +52,7 @@ public:
 
   // ISR pipeline sine (uses AcousticInjector ISR)
   void startISRSine(uint32_t freqHz = 1000, float level = 0.3f);
+  void setISRSineLevel(float level);
   void stopISRSine();
 
   // Exponer stats de audio
