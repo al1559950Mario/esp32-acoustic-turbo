@@ -60,7 +60,8 @@ bool ResonanceCalibrationService::waitForBinEntry(SensorManager& sensors,
                                                   ResonanceCalibrationReporter& reporter,
                                                   uint8_t binIndex,
                                                   float& lastAcceptedMaf) const {
-  const float binStart = float(binIndex) * kBinSizePct;
+  const float binStart = kMafMapMinPct + (float(binIndex) * kBinSizePct);
+  const float binEnd = kMafMapMinPct + (float(binIndex + 1) * kBinSizePct);
   uint32_t lastMsgMs = 0;
   while (true) {
     float mafPct = sensors.readMAFLoadPercent();
@@ -77,7 +78,7 @@ bool ResonanceCalibrationService::waitForBinEntry(SensorManager& sensors,
     if (now - lastMsgMs > 1200) {
       lastMsgMs = now;
       reporter.println("[MAPEO] Esperando subida de MAF para entrar a bin " + String(binIndex + 1) +
-                       " (" + String((int)binStart) + "-" + String((int)(binStart + kBinSizePct)) +
+                       " (" + String((int)binStart) + "-" + String((int)binEnd) +
                        "%). MAF actual=" + String(mafPct, 1) + "%");
       reporter.println("Acelera MUY LENTO (sin saltos)");
     }
@@ -98,8 +99,8 @@ String ResonanceCalibrationService::formatBinLine(uint8_t binIndex,
                                                   float amp,
                                                   Grade grade,
                                                   float ratio) const {
-  const uint8_t binStart = static_cast<uint8_t>(binIndex * kBinSizePct);
-  const uint8_t binEnd = static_cast<uint8_t>((binIndex + 1) * kBinSizePct);
+  const uint8_t binStart = static_cast<uint8_t>(kMafMapMinPct + (binIndex * kBinSizePct));
+  const uint8_t binEnd = static_cast<uint8_t>(kMafMapMinPct + ((binIndex + 1) * kBinSizePct));
   String line = "Bin ";
   line += String(binIndex + 1);
   line += " (";
@@ -143,6 +144,8 @@ bool ResonanceCalibrationService::run(SensorManager& sensors,
 
   reporter.println("\n=== Calibración de resonancia (mapeo por bin MAF) ===");
   reporter.println("Se prueban 3 frecuencias dentro de CADA bin de MAF.");
+  reporter.println("Mapeo de bins limitado a " + String(kMafMapMinPct, 0) + "-" +
+                   String(kMafMapMaxPct, 0) + "% de MAF.");
   reporter.println("Acelera MUY LENTO");
   reporter.println("Mantén la rampa suave");
   reporter.println("No subas el MAF de golpe");
@@ -156,8 +159,8 @@ bool ResonanceCalibrationService::run(SensorManager& sensors,
       return false;
     }
 
-    const uint8_t binStart = static_cast<uint8_t>(binIndex * kBinSizePct);
-    const uint8_t binEnd = static_cast<uint8_t>((binIndex + 1) * kBinSizePct);
+    const uint8_t binStart = static_cast<uint8_t>(kMafMapMinPct + (binIndex * kBinSizePct));
+    const uint8_t binEnd = static_cast<uint8_t>(kMafMapMinPct + ((binIndex + 1) * kBinSizePct));
     reporter.println("\n[MAPEO] Bin activo " + String(binIndex + 1) + " (" + String(binStart) +
                      "-" + String(binEnd) + "%) | MAF=" + String(lastAcceptedMaf, 1) + "%");
 
@@ -224,8 +227,8 @@ bool ResonanceCalibrationService::run(SensorManager& sensors,
     for (uint8_t binIndex = 0; binIndex < kBinCount; ++binIndex) {
       const BinResult& bin = freqResult.bins[binIndex];
       if (!bin.measured || bin.grade == Grade::NONE) continue;
-      const uint8_t binStart = static_cast<uint8_t>(binIndex * kBinSizePct);
-      const uint8_t binEnd = static_cast<uint8_t>((binIndex + 1) * kBinSizePct);
+      const uint8_t binStart = static_cast<uint8_t>(kMafMapMinPct + (binIndex * kBinSizePct));
+      const uint8_t binEnd = static_cast<uint8_t>(kMafMapMinPct + ((binIndex + 1) * kBinSizePct));
       reporter.println("  " + String(binStart) + "-" + String(binEnd) + "% | amp " +
                        String(bin.amplitude * 100.0f, 0) + "% | " + gradeText(bin.grade));
       anyImprovement = true;
@@ -237,8 +240,8 @@ bool ResonanceCalibrationService::run(SensorManager& sensors,
   for (uint8_t binIndex = 0; binIndex < kBinCount; ++binIndex) {
     const uint8_t bestFreqIdx = findBestFreqForBin(binIndex);
     const BinResult& bestBin = results[bestFreqIdx].bins[binIndex];
-    const uint8_t binStart = static_cast<uint8_t>(binIndex * kBinSizePct);
-    const uint8_t binEnd = static_cast<uint8_t>((binIndex + 1) * kBinSizePct);
+    const uint8_t binStart = static_cast<uint8_t>(kMafMapMinPct + (binIndex * kBinSizePct));
+    const uint8_t binEnd = static_cast<uint8_t>(kMafMapMinPct + ((binIndex + 1) * kBinSizePct));
 
     String line = String(binStart) + "-" + String(binEnd) + "% -> ";
     if (!bestBin.measured) {

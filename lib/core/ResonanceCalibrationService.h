@@ -40,9 +40,11 @@ public:
   const FrequencyResult* getResults() const { return results; }
 
 private:
-  static constexpr float kFreqListHz[kFreqCount] = {4000.0f, 5250.0f, 6500.0f};
-  static constexpr uint8_t kBinCount = 6;
-  static constexpr float kBinSizePct = 100.0f / kBinCount;
+  static constexpr float kFreqListHz[kFreqCount] = {5000.0f, 5250.0f, 5500.0f};
+  static constexpr uint8_t kBinCount = 3;
+  static constexpr float kMafMapMinPct = 20.0f;
+  static constexpr float kMafMapMaxPct = 40.0f;
+  static constexpr float kBinSizePct = (kMafMapMaxPct - kMafMapMinPct) / kBinCount;
   static constexpr float kAmpLevels[3] = {0.3f, 0.5f, 0.7f};
   static constexpr uint32_t kFreqWarmupMs = 80;
   static constexpr uint32_t kLevelSettleMs = 120;
