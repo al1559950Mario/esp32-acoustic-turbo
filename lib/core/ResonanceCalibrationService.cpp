@@ -135,19 +135,24 @@ bool ResonanceCalibrationService::waitForMafRiseAfterBaseline(SensorManager& sen
                                                               float baselineMafPct) const {
   const float binStart = kMafMapMinPct + (float(binIndex) * kBinSizePct);
   const float binEnd = kMafMapMinPct + (float(binIndex + 1) * kBinSizePct);
-  float targetMaf = baselineMafPct + kMafPostBaselineRisePct;
+  float baselineInBin = baselineMafPct;
+  if (baselineInBin < binStart) baselineInBin = binStart;
+  if (baselineInBin > binEnd) baselineInBin = binEnd;
+
+  float targetMaf = baselineInBin + kMafPostBaselineRisePct;
   if (targetMaf > binEnd) {
     targetMaf = binEnd;
   }
 
+  const uint32_t start = millis();
   uint32_t lastMsgMs = 0;
-  while (true) {
+  while ((millis() - start) < kMafPostBaselineTimeoutMs) {
     float mafPct = sensors.readMAFLoadPercent();
     if (mafPct < 0.0f) mafPct = 0.0f;
     if (mafPct > 100.0f) mafPct = 100.0f;
 
-    const bool insideBin = (mafPct >= binStart && mafPct <= binEnd);
-    if (insideBin && mafPct >= targetMaf) {
+    const bool insideOrSlightlyAboveBin = (mafPct >= binStart && mafPct <= (binEnd + kMafRiseEpsPct));
+    if (insideOrSlightlyAboveBin && mafPct >= targetMaf) {
       return true;
     }
 
@@ -157,10 +162,19 @@ bool ResonanceCalibrationService::waitForMafRiseAfterBaseline(SensorManager& sen
       reporter.println("[MAPEO] Esperando subida de MAF tras baseline en bin " + String(binIndex + 1) +
                        ": baseline=" + String(baselineMafPct, 1) + "% -> objetivo=" +
                        String(targetMaf, 1) + "% | actual=" + String(mafPct, 1) + "%");
-      reporter.println("Acelera suavemente para continuar pruebas");
+      if (mafPct < targetMaf) {
+        reporter.println("Acelera suavemente para continuar pruebas");
+      } else if (mafPct > (binEnd + kMafRiseEpsPct)) {
+        reporter.println("Suelta un poco el pedal: te saliste del bin");
+      } else {
+        reporter.println("Mantén pedal estable para continuar pruebas");
+      }
     }
     delay(40);
   }
+
+  reporter.println("[MAPEO] Aviso: timeout esperando subida post-baseline, se continúa para evitar bloqueo");
+  return false;
 }
 
 ResonanceCalibrationService::RepeatStats ResonanceCalibrationService::measureMedianWithRepeats(
@@ -358,7 +372,12 @@ bool ResonanceCalibrationService::run(SensorManager& sensors,
       float baselineMafPct = sensors.readMAFLoadPercent();
       if (baselineMafPct < 0.0f) baselineMafPct = 0.0f;
       if (baselineMafPct > 100.0f) baselineMafPct = 100.0f;
-      waitForMafRiseAfterBaseline(sensors, reporter, binIndex, baselineMafPct);
+      reporter.println("[MAPEO] Esperando avance post-baseline (sin acústico: nivel 0%)");
+      const bool postBaselineAdvanced =
+          waitForMafRiseAfterBaseline(sensors, reporter, binIndex, baselineMafPct);
+      if (!postBaselineAdvanced) {
+        reporter.println("[MAPEO] Continuando sin bloqueo por timeout post-baseline");
+      }
 
       Grade bestGrade = Grade::NONE;
       float bestAmp = kAmpLevels[0];
