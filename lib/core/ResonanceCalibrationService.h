@@ -62,6 +62,7 @@ private:
   static constexpr float kMinBaseline = 0.01f;
   static constexpr float kMafRiseEpsPct = 0.25f;
   static constexpr float kMafPostBaselineRisePct = 0.8f;
+  static constexpr uint32_t kMafPostBaselineTimeoutMs = 8000;
   static constexpr uint32_t kLivePrintPeriodMs = 120;
 
   bool resultsValid = false;
