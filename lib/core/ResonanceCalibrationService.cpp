@@ -2,7 +2,25 @@
 #include <math.h>
 
 constexpr float ResonanceCalibrationService::kFreqListHz[ResonanceCalibrationService::kFreqCount];
-constexpr float ResonanceCalibrationService::kAmpLevels[3];
+constexpr float ResonanceCalibrationService::kAmpLevels[4];
+
+namespace {
+void sortSmall(float* values, uint8_t count) {
+  for (uint8_t i = 0; i + 1 < count; ++i) {
+    uint8_t minIdx = i;
+    for (uint8_t j = i + 1; j < count; ++j) {
+      if (values[j] < values[minIdx]) {
+        minIdx = j;
+      }
+    }
+    if (minIdx != i) {
+      float tmp = values[i];
+      values[i] = values[minIdx];
+      values[minIdx] = tmp;
+    }
+  }
+}
+}  // namespace
 
 float ResonanceCalibrationService::sampleMetric(SensorManager& sensors,
                                               ResonanceCalibrationReporter& reporter,
@@ -10,13 +28,17 @@ float ResonanceCalibrationService::sampleMetric(SensorManager& sensors,
                                               float amplitude,
                                               uint32_t durationMs,
                                               const char* phase) const {
+  // Aísla cada medición (baseline/test) para evitar arrastrar historial
+  // de bins o corridas anteriores.
+  sensors.resetPressureMetrics();
+
   const uint32_t start = millis();
   uint32_t lastPrintMs = 0;
   float sum = 0.0f;
   uint16_t count = 0;
 
   while (millis() - start < durationMs) {
-    const float metric = sensors.computeOscillationAmplitude();
+    const float metric = sensors.computeOscillationAmplitudeWindow(durationMs);
     sum += metric;
     ++count;
 
@@ -53,10 +75,162 @@ float ResonanceCalibrationService::measureWithStreaming(SensorManager& sensors,
 
 uint32_t ResonanceCalibrationService::estimateBinTestTimeMs() const {
   const uint32_t perFreqMs = kFreqWarmupMs +
-                             kLevelSettleMs + kBaselineSampleMs +
-                             (3 * (kLevelSettleMs + kBinSampleMs)) +
+                             (kRepeatCount * (kLevelSettleMs + kBaselineSampleMs)) +
+                             (kAmpCount * kRepeatCount * (kLevelSettleMs + kBinSampleMs)) +
                              kFreqCooldownMs;
-  return perFreqMs * kFreqCount;
+
+  const uint32_t confirmMs = kFreqWarmupMs +
+                             (kConfirmRepeatCount * (kLevelSettleMs + kBaselineSampleMs)) +
+                             (kConfirmRepeatCount * (kLevelSettleMs + kBinSampleMs)) +
+                             kFreqCooldownMs;
+
+  return (perFreqMs * kFreqCount) + confirmMs;
+}
+
+bool ResonanceCalibrationService::ensureStableInBin(SensorManager& sensors,
+                                                    ResonanceCalibrationReporter& reporter,
+                                                    uint8_t binIndex) const {
+  const float binStart = kMafMapMinPct + (float(binIndex) * kBinSizePct);
+  const float binEnd = kMafMapMinPct + (float(binIndex + 1) * kBinSizePct);
+  const float stableMin = binStart + kBinStabilityTolPct;
+  const float stableMax = binEnd - kBinStabilityTolPct;
+
+  if (stableMax <= stableMin) {
+    return true;
+  }
+
+  const uint32_t start = millis();
+  uint32_t stableSince = 0;
+  uint32_t lastMsgMs = 0;
+
+  while (millis() - start < 6000) {
+    float mafPct = sensors.readMAFLoadPercent();
+    if (mafPct < 0.0f) mafPct = 0.0f;
+    if (mafPct > 100.0f) mafPct = 100.0f;
+
+    const bool inStableBand = (mafPct >= stableMin && mafPct <= stableMax);
+    if (inStableBand) {
+      if (stableSince == 0) stableSince = millis();
+      if ((millis() - stableSince) >= kBinStabilityHoldMs) {
+        return true;
+      }
+    } else {
+      stableSince = 0;
+      const uint32_t now = millis();
+      if (now - lastMsgMs > 1000) {
+        lastMsgMs = now;
+        reporter.println("[MAPEO] Ajusta pedal para estabilizar bin " + String(binIndex + 1) +
+                         " (" + String((int)binStart) + "-" + String((int)binEnd) +
+                         "%). MAF=" + String(mafPct, 1) + "%");
+      }
+    }
+    delay(25);
+  }
+
+  reporter.println("[MAPEO] Aviso: no se estabilizó totalmente el bin " + String(binIndex + 1) +
+                   ", se continúa con la medición");
+  return false;
+}
+
+bool ResonanceCalibrationService::waitForMafRiseAfterBaseline(SensorManager& sensors,
+                                                              ResonanceCalibrationReporter& reporter,
+                                                              uint8_t binIndex,
+                                                              float baselineMafPct) const {
+  const float binStart = kMafMapMinPct + (float(binIndex) * kBinSizePct);
+  const float binEnd = kMafMapMinPct + (float(binIndex + 1) * kBinSizePct);
+  float targetMaf = baselineMafPct + kMafPostBaselineRisePct;
+  if (targetMaf > binEnd) {
+    targetMaf = binEnd;
+  }
+
+  uint32_t lastMsgMs = 0;
+  while (true) {
+    float mafPct = sensors.readMAFLoadPercent();
+    if (mafPct < 0.0f) mafPct = 0.0f;
+    if (mafPct > 100.0f) mafPct = 100.0f;
+
+    const bool insideBin = (mafPct >= binStart && mafPct <= binEnd);
+    if (insideBin && mafPct >= targetMaf) {
+      return true;
+    }
+
+    const uint32_t now = millis();
+    if (now - lastMsgMs > 1000) {
+      lastMsgMs = now;
+      reporter.println("[MAPEO] Esperando subida de MAF tras baseline en bin " + String(binIndex + 1) +
+                       ": baseline=" + String(baselineMafPct, 1) + "% -> objetivo=" +
+                       String(targetMaf, 1) + "% | actual=" + String(mafPct, 1) + "%");
+      reporter.println("Acelera suavemente para continuar pruebas");
+    }
+    delay(40);
+  }
+}
+
+ResonanceCalibrationService::RepeatStats ResonanceCalibrationService::measureMedianWithRepeats(
+    SensorManager& sensors,
+    ActuatorManager& actuators,
+    ResonanceCalibrationReporter& reporter,
+    float freqHz,
+    float amplitude,
+    uint32_t durationMs,
+    const char* phase,
+    uint8_t binIndex,
+    uint8_t repeats) const {
+  if (repeats == 0) {
+    return {};
+  }
+
+  float values[5] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
+  const uint8_t cappedRepeats = repeats > 5 ? 5 : repeats;
+
+  for (uint8_t r = 0; r < cappedRepeats; ++r) {
+    ensureStableInBin(sensors, reporter, binIndex);
+    values[r] = measureWithStreaming(sensors, actuators, reporter, freqHz, amplitude, durationMs, phase);
+  }
+
+  sortSmall(values, cappedRepeats);
+
+  RepeatStats stats;
+  stats.min = values[0];
+  stats.max = values[cappedRepeats - 1];
+  stats.median = values[cappedRepeats / 2];
+  return stats;
+}
+
+bool ResonanceCalibrationService::confirmBestCandidateInBin(SensorManager& sensors,
+                                                            ActuatorManager& actuators,
+                                                            ResonanceCalibrationReporter& reporter,
+                                                            uint8_t binIndex,
+                                                            uint8_t bestFreqIdx) const {
+  const float freqHz = results[bestFreqIdx].freqHz;
+  const BinResult& bestBin = results[bestFreqIdx].bins[binIndex];
+
+  actuators.startISRSine(static_cast<uint32_t>(freqHz), 0.0f);
+  delay(kFreqWarmupMs);
+
+  const RepeatStats baselineStats = measureMedianWithRepeats(
+      sensors, actuators, reporter, freqHz, 0.0f, kBaselineSampleMs, " confirm-baseline", binIndex,
+      kConfirmRepeatCount);
+
+  float baselineMafPct = sensors.readMAFLoadPercent();
+  if (baselineMafPct < 0.0f) baselineMafPct = 0.0f;
+  if (baselineMafPct > 100.0f) baselineMafPct = 100.0f;
+  waitForMafRiseAfterBaseline(sensors, reporter, binIndex, baselineMafPct);
+
+  const RepeatStats testStats = measureMedianWithRepeats(
+      sensors, actuators, reporter, freqHz, bestBin.amplitude, kBinSampleMs, " confirm-test", binIndex,
+      kConfirmRepeatCount);
+
+  actuators.stopISRSine();
+  delay(kFreqCooldownMs);
+
+  float denom = fabsf(baselineStats.median);
+  if (denom < kMinBaseline) denom = kMinBaseline;
+  const float confirmRatio = (testStats.median - baselineStats.median) / denom;
+
+  reporter.println("[MAPEO] Confirmación bin " + String(binIndex + 1) +
+                   " | ratio=" + String(confirmRatio * 100.0f, 1) + "%");
+  return confirmRatio >= kLightImproveRatio;
 }
 
 bool ResonanceCalibrationService::waitForBinEntry(SensorManager& sensors,
@@ -122,11 +296,17 @@ String ResonanceCalibrationService::formatBinLine(uint8_t binIndex,
 
 uint8_t ResonanceCalibrationService::findBestFreqForBin(uint8_t binIndex) const {
   uint8_t bestFreq = 0;
+  Grade bestGrade = Grade::NONE;
   float bestImprovement = -9999.0f;
   for (uint8_t freqIndex = 0; freqIndex < kFreqCount; ++freqIndex) {
     const BinResult& b = results[freqIndex].bins[binIndex];
     if (!b.measured) continue;
-    if (b.improvement > bestImprovement) {
+    const bool betterGrade = static_cast<uint8_t>(b.grade) > static_cast<uint8_t>(bestGrade);
+    const bool sameGradeBetterRatio =
+        (static_cast<uint8_t>(b.grade) == static_cast<uint8_t>(bestGrade) &&
+         b.improvement > bestImprovement);
+    if (betterGrade || sameGradeBetterRatio) {
+      bestGrade = b.grade;
       bestImprovement = b.improvement;
       bestFreq = freqIndex;
     }
@@ -146,6 +326,10 @@ bool ResonanceCalibrationService::run(SensorManager& sensors,
 
   reporter.println("\n=== Calibración de resonancia (mapeo por bin MAF) ===");
   reporter.println("Se prueban 3 frecuencias dentro de CADA bin de MAF.");
+  reporter.println("Mapeo de bins limitado a " + String(kMafMapMinPct, 0) + "-" +
+                   String(kMafMapMaxPct, 0) + "% de MAF.");
+  reporter.println("Amplitud acústica de prueba: 30-100%");
+  reporter.println("Avance post-baseline: requiere +" + String(kMafPostBaselineRisePct, 1) + "% MAF");
   reporter.println("Acelera MUY LENTO");
   reporter.println("Mantén la rampa suave");
   reporter.println("No subas el MAF de golpe");
@@ -169,20 +353,39 @@ bool ResonanceCalibrationService::run(SensorManager& sensors,
       actuators.startISRSine(static_cast<uint32_t>(freqHz), 0.0f);
       delay(kFreqWarmupMs);
 
-      const float baseline = measureWithStreaming(sensors, actuators, reporter, freqHz, 0.0f, kBaselineSampleMs, " baseline");
+      const RepeatStats baselineStats = measureMedianWithRepeats(
+          sensors, actuators, reporter, freqHz, 0.0f, kBaselineSampleMs, " baseline", binIndex,
+          kRepeatCount);
+      const float baseline = baselineStats.median;
+      float baselineMafPct = sensors.readMAFLoadPercent();
+      if (baselineMafPct < 0.0f) baselineMafPct = 0.0f;
+      if (baselineMafPct > 100.0f) baselineMafPct = 100.0f;
+      waitForMafRiseAfterBaseline(sensors, reporter, binIndex, baselineMafPct);
 
       Grade bestGrade = Grade::NONE;
       float bestAmp = kAmpLevels[0];
       float bestRatio = -9999.0f;
 
-      for (uint8_t ampIndex = 0; ampIndex < 3; ++ampIndex) {
+      for (uint8_t ampIndex = 0; ampIndex < kAmpCount; ++ampIndex) {
         const float amp = kAmpLevels[ampIndex];
         reporter.println("[INJ] freq=" + String(freqHz, 0) + " Hz | level=" + String(amp * 100.0f, 0) + "%");
 
-        const float measured = measureWithStreaming(sensors, actuators, reporter, freqHz, amp, kBinSampleMs, " test");
+        const RepeatStats testStats = measureMedianWithRepeats(
+            sensors, actuators, reporter, freqHz, amp, kBinSampleMs, " test", binIndex, kRepeatCount);
+        const float measured = testStats.median;
         float denom = fabsf(baseline);
         if (denom < kMinBaseline) denom = kMinBaseline;
-        const float ratio = (measured - baseline) / denom;
+        const float rawRatio = (measured - baseline) / denom;
+
+        float spreadDenom = fabsf(measured);
+        if (spreadDenom < kMinBaseline) spreadDenom = kMinBaseline;
+        const float spreadRatio = (testStats.max - testStats.min) / spreadDenom;
+        const float ratio = rawRatio - (kRepeatSpreadPenalty * spreadRatio);
+
+        reporter.println("[INJ] rep-med=" + String(measured, 3) +
+                         " | spread=" + String((testStats.max - testStats.min), 3) +
+                         " | raw=" + String(rawRatio * 100.0f, 1) + "% | adj=" +
+                         String(ratio * 100.0f, 1) + "%");
 
         Grade grade = Grade::NONE;
         if (ratio >= kStrongImproveRatio) {
@@ -210,7 +413,16 @@ bool ResonanceCalibrationService::run(SensorManager& sensors,
     }
 
     const uint8_t bestFreqIdx = findBestFreqForBin(binIndex);
-    const BinResult& bestBin = results[bestFreqIdx].bins[binIndex];
+    BinResult& bestBin = results[bestFreqIdx].bins[binIndex];
+
+    const bool confirmed = confirmBestCandidateInBin(sensors, actuators, reporter, binIndex, bestFreqIdx);
+    if (!confirmed && bestBin.grade != Grade::NONE) {
+      reporter.println("[MAPEO] Confirmación fallida en bin " + String(binIndex + 1) +
+                       ": se degrada a ROJO");
+      bestBin.grade = Grade::NONE;
+      bestBin.improvement = 0.0f;
+    }
+
     reporter.println("[MAPEO] Mejor para bin " + String(binIndex + 1) + ": " +
                      String(results[bestFreqIdx].freqHz, 0) + " Hz | amp " +
                      String(bestBin.amplitude * 100.0f, 0) + "% | " + gradeText(bestBin.grade));

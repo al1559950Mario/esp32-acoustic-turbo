@@ -55,7 +55,9 @@ public:
   float getPressurePercentAbs();
   float getPressurePSI();
   float computeOscillationAmplitude();  
-  float readOscillationAmplitude();
+  float computeOscillationAmplitudeWindow(uint32_t windowMs, float samplePeriodMs = 12.5f) const;
+  float readOscillationAmplitude(); 
+  void resetPressureMetrics();
   float getPressureMedianKPa() const { return pressureMedianKPa; }
   float getPressureMADKPa() const { return pressureMadKPa; }
   float getPressureOutlierRatio() const { return pressureOutlierRatio; }
