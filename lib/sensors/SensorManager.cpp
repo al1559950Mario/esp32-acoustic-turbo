@@ -17,14 +17,7 @@ void SensorManager::begin(uint8_t pinPressureData, uint8_t pinPressureSCK, uint8
   pressureSensor.begin(pinPressureData, pinPressureSCK);
       // Inicializar buffer
   for (size_t i = 0; i < PRESSURE_BUFFER_SIZE; i++) pressureKPABuffer[i] = 0.0f;
-  bufferIndex = 0;
-  pressureCount = 0;
-  pressureMedianKPa = 0.0f;
-  pressureMadKPa = 0.0f;
-  pressureOutlierRatio = 0.0f;
-  pressureRmsSlope = 0.0f;
-  lastPressureRms = 0.0f;
-  lastPressureRmsMs = 0;
+  resetPressureMetrics();
 }
 
 
@@ -194,8 +187,53 @@ float SensorManager::computeOscillationAmplitude() {
     return (highVal > lowVal) ? (highVal - lowVal) : 0.0f;
 }
 
+float SensorManager::computeOscillationAmplitudeWindow(uint32_t windowMs, float samplePeriodMs) const {
+    if (pressureCount == 0) {
+      return 0.0f;
+    }
+
+    const size_t maxSamples = static_cast<size_t>(windowMs / samplePeriodMs);
+    size_t n = pressureCount;
+    if (maxSamples > 0 && maxSamples < n) {
+      n = maxSamples;
+    }
+
+    std::vector<float> tmp;
+    tmp.reserve(n);
+
+    for (size_t i = 0; i < n; ++i) {
+      const size_t idx = (bufferIndex + PRESSURE_BUFFER_SIZE - n + i) % PRESSURE_BUFFER_SIZE;
+      tmp.push_back(pressureKPABuffer[idx]);
+    }
+
+    const float low_pct = 0.05f;
+    const float high_pct = 0.95f;
+    const size_t idxLow  = static_cast<size_t>(floorf(low_pct * (n - 1)));
+    const size_t idxHigh = static_cast<size_t>(floorf(high_pct * (n - 1)));
+
+    std::nth_element(tmp.begin(), tmp.begin() + idxLow, tmp.end());
+    const float lowVal = tmp[idxLow];
+
+    std::nth_element(tmp.begin(), tmp.begin() + idxHigh, tmp.end());
+    const float highVal = tmp[idxHigh];
+
+    return (highVal > lowVal) ? (highVal - lowVal) : 0.0f;
+}
+
 float SensorManager::readOscillationAmplitude() {
     return amplitudeOscillation;
+}
+
+void SensorManager::resetPressureMetrics() {
+    pressureCount = 0;
+    bufferIndex = 0;
+    amplitudeOscillation = 0.0f;
+    pressureMedianKPa = 0.0f;
+    pressureMadKPa = 0.0f;
+    pressureOutlierRatio = 0.0f;
+    pressureRmsSlope = 0.0f;
+    lastPressureRms = 0.0f;
+    lastPressureRmsMs = 0;
 }
 
  // Tau: tiempo de decaimiento de picos (>37% del valor máximo del pico)
