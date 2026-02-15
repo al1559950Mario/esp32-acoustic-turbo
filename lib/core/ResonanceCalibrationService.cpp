@@ -1,6 +1,9 @@
 #include "ResonanceCalibrationService.h"
 #include <math.h>
 
+constexpr float ResonanceCalibrationService::kFreqListHz[ResonanceCalibrationService::kFreqCount];
+constexpr float ResonanceCalibrationService::kAmpLevels[4];
+
 namespace {
 void sortSmall(float* values, uint8_t count) {
   for (uint8_t i = 0; i + 1 < count; ++i) {
@@ -52,13 +55,30 @@ float ResonanceCalibrationService::sampleMetric(SensorManager& sensors,
 
   const uint32_t start = millis();
   uint32_t lastPrintMs = 0;
-  float sum = 0.0f;
-  uint16_t count = 0;
+  float lastAcceptedMetric = -1.0f;
+  float metrics[48] = {0.0f};
+  uint8_t metricCount = 0;
 
   while (millis() - start < durationMs) {
     const float metric = sensors.computeOscillationAmplitudeWindow(durationMs, 10.0f);
-    sum += metric;
-    ++count;
+
+    bool accepted = false;
+    if (isfinite(metric) && metric >= 0.0f && metric <= kMetricMaxValidOsc) {
+      if (lastAcceptedMetric < 0.0f) {
+        accepted = true;
+      } else {
+        const float delta = fabsf(metric - lastAcceptedMetric);
+        const float jumpLimit = kMetricSpikeJumpFactor * lastAcceptedMetric;
+        accepted = (delta <= jumpLimit) || (delta <= kMetricSpikeJumpAbs);
+      }
+    }
+
+    if (accepted) {
+      if (metricCount < 48) {
+        metrics[metricCount++] = metric;
+      }
+      lastAcceptedMetric = metric;
+    }
 
     const uint32_t now = millis();
     if ((now - lastPrintMs) >= kLivePrintPeriodMs) {
@@ -67,17 +87,31 @@ float ResonanceCalibrationService::sampleMetric(SensorManager& sensors,
       if (mafPct < 0.0f) mafPct = 0.0f;
       if (mafPct > 100.0f) mafPct = 100.0f;
 
+      const float shownMetric = accepted ? metric : lastAcceptedMetric;
       reporter.println(String("[LIVE]") + phase +
                        " | MAF=" + String(mafPct, 1) + "%" +
                        " | freq=" + String(freqHz, 0) + " Hz" +
                        " | level=" + String(amplitude * 100.0f, 0) + "%" +
-                       " | osc=" + String(metric, 3) +
+                       " | osc=" + String(shownMetric >= 0.0f ? shownMetric : metric, 3) +
                        " | n=" + String((int)sensors.getPressureSampleCount()));
     }
 
     delay(10);
   }
-  return count > 0 ? (sum / count) : 0.0f;
+
+  if (metricCount < kMetricMinAcceptedPoints) {
+    reporter.println("[LIVE]" + String(phase) +
+                     " | MUESTRA OSC INESTABLE (pts=" + String((int)metricCount) + ")");
+    return NAN;
+  }
+
+  sortSmall(metrics, metricCount);
+  if ((metricCount % 2) == 0) {
+    const uint8_t hi = metricCount / 2;
+    const uint8_t lo = hi - 1;
+    return (metrics[lo] + metrics[hi]) * 0.5f;
+  }
+  return metrics[metricCount / 2];
 }
 
 float ResonanceCalibrationService::measureWithStreaming(SensorManager& sensors,
