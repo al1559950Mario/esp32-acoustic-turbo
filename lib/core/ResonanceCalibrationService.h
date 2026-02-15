@@ -69,6 +69,10 @@ private:
   static constexpr uint8_t kMetricMinSamplesHard = 6;
   static constexpr uint8_t kMetricMinSamplesTarget = 12;
   static constexpr uint32_t kMetricPrimeTimeoutMs = 450;
+  static constexpr float kMetricMaxValidOsc = 12.0f;
+  static constexpr float kMetricSpikeJumpFactor = 2.0f;
+  static constexpr float kMetricSpikeJumpAbs = 1.5f;
+  static constexpr uint8_t kMetricMinAcceptedPoints = 4;
 
   bool resultsValid = false;
   FrequencyResult results[kFreqCount];
