@@ -1,10 +1,10 @@
-﻿#pragma once
+﻿  #pragma once
 
-#include "ActuatorManager.h"
-#include "DebugManager.h"
-#include "ThresholdManager.h"
-#include "CalibrationManager.h"
-#include "SensorManager.h"
+  #include "ActuatorManager.h"
+  #include "DebugManager.h"
+  #include "ThresholdManager.h"
+  #include "CalibrationManager.h"
+  #include "SensorManager.h"
 
 
 /**
@@ -23,45 +23,45 @@ enum class SystemState {
   UNKNOWN       ///< Estado de debug (solo con forzar)
 };
 
-/**
- * @class StateMachine
- * @brief Gestiona las transiciones y acciones de los estados del sistema.
- *
- * Usa lecturas de vacío MAP (inHg) y flujo (% MAF), además de peticiones de
- * calibración por consola o BLE, para decidir en qué estado operar.
- */
-class StateMachine {
-public:
-
   /**
-   * Inicializa la máquina de estados.
-   * @param hasCalibration true si ya hay datos de calibración válidos.
-   * @param turboRef Puntero al controlador de turbo.
-   * @param injectorRef Puntero al inyector acústico.
+   * @class StateMachine
+   * @brief Gestiona las transiciones y acciones de los estados del sistema.
+   *
+   * Usa lecturas de vacío MAP (inHg) y flujo (% MAF), además de peticiones de
+   * calibración por consola o BLE, para decidir en qué estado operar.
    */
-  void begin(bool hasCalibration, ActuatorManager* actuators, ThresholdManager* thresholdManagerPtr, SensorManager* sensorsPtr, CalibrationManager* calibMgrPtr);
+  class StateMachine {
+  public:
 
-  /**
-   * Realiza la lógica de transición de estados.
-   * @param mapLoadPercent Porcentaje de carga MAP normalizado (0% = vacío máximo, 100% = presión atmosférica)
-   * @param mafPct Lectura del sensor MAF en porcentaje [0-100].
-   * @param consoleCalibReq true si hubo petición de calibración por consola.
-   * @param bleCalibReq true si hubo petición de calibración por BLE.
-   * @param calibLoaded true si la calibracion fue exitosa y hay valores validos para el sistema.
-   * @param dbg Objeto DebugManager que puede forzar estado DEBUG.
-   */
-  void update(float mapLoadPercent,
-              float mafPct,
-              bool serialCalibReq,
-              bool bleCalibReq,
-              bool calibLoaded,
-              const DebugManager& dbg);
+    /**
+     * Inicializa la máquina de estados.
+     * @param hasCalibration true si ya hay datos de calibración válidos.
+     * @param turboRef Puntero al controlador de turbo.
+     * @param injectorRef Puntero al inyector acústico.
+     */
+    void begin(bool hasCalibration, ActuatorManager* actuators, ThresholdManager* thresholdManagerPtr, SensorManager* sensorsPtr, CalibrationManager* calibMgrPtr);
 
-  /**
-   * Ejecuta las acciones de salida según el estado actual.
-   * @param acousticLevel Nivel de inyección acústica normalizado [0–1].
-   */
-  void handleActions();
+    /**
+     * Realiza la lógica de transición de estados.
+     * @param mapLoadPercent Porcentaje de carga MAP normalizado (0% = vacío máximo, 100% = presión atmosférica)
+     * @param mafPct Lectura del sensor MAF en porcentaje [0-100].
+     * @param consoleCalibReq true si hubo petición de calibración por consola.
+     * @param bleCalibReq true si hubo petición de calibración por BLE.
+     * @param calibLoaded true si la calibracion fue exitosa y hay valores validos para el sistema.
+     * @param dbg Objeto DebugManager que puede forzar estado DEBUG.
+     */
+    void update(float mapLoadPercent,
+                float mafPct,
+                bool serialCalibReq,
+                bool bleCalibReq,
+                bool calibLoaded,
+                const DebugManager& dbg);
+
+    /**
+     * Ejecuta las acciones de salida según el estado actual.
+     * @param acousticLevel Nivel de inyección acústica normalizado [0–1].
+     */
+    void handleActions();
 
   /**
    * Si el estado actual es DEBUG, lo reemplaza por uno nuevo.
@@ -71,14 +71,14 @@ public:
   float getLevel() const;
   void resetBeamTracking();
 
-  float getMAFInitialForInj(){return mafInitialPercent;};
-  float getMAPInitialForInj(){return mapInitialPercent;};
+    float getMAFInitialForInj(){return mafInitialPercent;};
+    float getMAPInitialForInj(){return mapInitialPercent;};
 
-  CalibStep currentCalibStep = CalibStep::TPS_MIN;
-  unsigned long lastStepTime = 0;
-  SystemState getState() const {return current;}
-  String getStateName () const;
-  void compute_dMAFdt_and_hold(float, float, float currentDeltaMAFLevel);
+    CalibStep currentCalibStep = CalibStep::TPS_MIN;
+    unsigned long lastStepTime = 0;
+    SystemState getState() const {return current;}
+    String getStateName () const;
+    void compute_dMAFdt_and_hold(float, float, float currentDeltaMAFLevel);
 
 private:
   Thresholds thresholds;                         ///< Copia local de los umbrales actuales
@@ -128,95 +128,95 @@ private:
   float decayDurationMs = 1500;          // **Base nominal** para la duración del DECAY en ms. Se escala con w/hold.
   
 
-  // ---------- derivada dMAF/dt (medición y filtrado) ----------
-  float _dMAFdtRaw = 0.0f;               // derivada instantánea (nivel por segundo, niveles 0..1)
-  float _dMAFdtEMA = 0.0f;               // derivada filtrada (usar sin filtrar para respuesta rápida)
-  bool _fastAttackActive = false;        // bandera si hay ataque positivo reciente
+    // ---------- derivada dMAF/dt (medición y filtrado) ----------
+    float _dMAFdtRaw = 0.0f;               // derivada instantánea (nivel por segundo, niveles 0..1)
+    float _dMAFdtEMA = 0.0f;               // derivada filtrada (usar sin filtrar para respuesta rápida)
+    bool _fastAttackActive = false;        // bandera si hay ataque positivo reciente
 
-  // ---------- detección de hold ----------
-  unsigned long _holdStartMillis = 0;    // cuando empezó la presión
-  bool _holdActive = false;              // indica que hubo presión antes de soltar
+    // ---------- detección de hold ----------
+    unsigned long _holdStartMillis = 0;    // cuando empezó la presión
+    bool _holdActive = false;              // indica que hubo presión antes de soltar
 
-  // ---------- mezcla y tiempos de envelope ----------
-  float _gFast = 0.0f;                   // peso componente rápido del envelope (0..1)
-  float _gSustain = 0.0f;                // peso componente sustain/cola (0..1)
-  float _tFastMs = 150.0f;                // tiempo característico del componente rápido (ms). Valores: 10..200
-  float _tSustainMs = 250.0f;            // tiempo característico del sustain/cola (ms). Valores: 200..5000
+    // ---------- mezcla y tiempos de envelope ----------
+    float _gFast = 0.0f;                   // peso componente rápido del envelope (0..1)
+    float _gSustain = 0.0f;                // peso componente sustain/cola (0..1)
+    float _tFastMs = 150.0f;                // tiempo característico del componente rápido (ms). Valores: 10..200
+    float _tSustainMs = 250.0f;            // tiempo característico del sustain/cola (ms). Valores: 200..5000
 
-  // DERIV_NORM
-// Qué controla: normalizador que mapea magnitud de derivada a gFast (0..1).
-// Rango recomendado: 0.5 .. 5.0
-// Ajuste: bajar para que pequeñas caídas activen gFast; subir si hay falsos positivos.
-const float DERIV_NORM = 0.5f;
+    // DERIV_NORM
+  // Qué controla: normalizador que mapea magnitud de derivada a gFast (0..1).
+  // Rango recomendado: 0.5 .. 5.0
+  // Ajuste: bajar para que pequeñas caídas activen gFast; subir si hay falsos positivos.
+  const float DERIV_NORM = 0.5f;
 
-// DERIV_DROP_THRESHOLD
-// Qué controla: umbral en unidades nivel/sec para considerar una caída rápida y disparar DECAY.
-// Rango recomendado: 0.5 .. 5.0 (nivel/sec)
-// Ajuste: subir para evitar triggers por jitter; bajar si falta sensibilidad a releases rápidos.
-const float DERIV_DROP_THRESHOLD = 5.0f;
+  // DERIV_DROP_THRESHOLD
+  // Qué controla: umbral en unidades nivel/sec para considerar una caída rápida y disparar DECAY.
+  // Rango recomendado: 0.5 .. 5.0 (nivel/sec)
+  // Ajuste: subir para evitar triggers por jitter; bajar si falta sensibilidad a releases rápidos.
+  const float DERIV_DROP_THRESHOLD = 5.0f;
 
-// H_SCALE_MS
-// Qué controla: escala temporal para normalizar holdMs → holdNorm (0..1).
-// Rango recomendado: 200 .. 2000 ms
-// Ajuste: reducir para clasificar como hold más rápido; aumentar para requerir presiones más largas.
-const unsigned long H_SCALE_MS = 200;
+  // H_SCALE_MS
+  // Qué controla: escala temporal para normalizar holdMs → holdNorm (0..1).
+  // Rango recomendado: 200 .. 2000 ms
+  // Ajuste: reducir para clasificar como hold más rápido; aumentar para requerir presiones más largas.
+  const unsigned long H_SCALE_MS = 400;
 
-// SIGMOID_H0
-// Qué controla: centro de la sigmoide aplicada a holdNorm que define transición tap→hold.
-// Rango recomendado: 0.0 .. 0.7
-// Ajuste: bajar para que hold se active con menos tiempo; subir para requerir más tiempo.
-const float SIGMOID_H0 = 0.3f;
+  // SIGMOID_H0
+  // Qué controla: centro de la sigmoide aplicada a holdNorm que define transición tap→hold.
+  // Rango recomendado: 0.0 .. 0.7
+  // Ajuste: bajar para que hold se active con menos tiempo; subir para requerir más tiempo.
+  const float SIGMOID_H0 = 0.3f;
 
-// SIGMOID_K
-// Qué controla: pendiente de la sigmoide que suaviza o hace abrupta la transición tap→hold.
-// Rango recomendado: 1.0 .. 12.0
-// Ajuste: aumentar para cambio más brusco; disminuir para transición más gradual.
-const float SIGMOID_K = 12.0f;
+  // SIGMOID_K
+  // Qué controla: pendiente de la sigmoide que suaviza o hace abrupta la transición tap→hold.
+  // Rango recomendado: 1.0 .. 12.0
+  // Ajuste: aumentar para cambio más brusco; disminuir para transición más gradual.
+  const float SIGMOID_K = 12.0f;
 
-// MIN_SCALE
-// Qué controla: factor mínimo aplicado sobre decayDurationMs para toques rápidos.
-// Rango recomendado: 0.2 .. 1.0
-// Ajuste: bajar para colas muy cortas en taps; no bajar demasiado o el sonido se cortará.
-const float MIN_SCALE = 0.2f;
+  // MIN_SCALE
+  // Qué controla: factor mínimo aplicado sobre decayDurationMs para toques rápidos.
+  // Rango recomendado: 0.2 .. 1.0
+  // Ajuste: bajar para colas muy cortas en taps; no bajar demasiado o el sonido se cortará.
+  const float MIN_SCALE = 0.2f;
 
-// MAX_SCALE
-// Qué controla: factor máximo aplicado sobre decayDurationMs para holds largos.
-// Rango recomendado: 1.0 .. 4.0
-// Ajuste: aumentar para colas más largas en holds; limitar si las colas se vuelven irreales.
-const float MAX_SCALE = 0.4f;
+  // MAX_SCALE
+  // Qué controla: factor máximo aplicado sobre decayDurationMs para holds largos.
+  // Rango recomendado: 1.0 .. 4.0
+  // Ajuste: aumentar para colas más largas en holds; limitar si las colas se vuelven irreales.
+  const float MAX_SCALE = 0.4f;
 
-// SOFTCLIP_BETA
-// Qué controla: agresividad del soft clip en la forma del envelope y control de picos.
-// Rango recomendado: 0.1 .. 1.0
-// Ajuste: bajar para clipping más suave; subir para limitar picos con más fuerza.
-const float SOFTCLIP_BETA = 0.3f;
+  // SOFTCLIP_BETA
+  // Qué controla: agresividad del soft clip en la forma del envelope y control de picos.
+  // Rango recomendado: 0.1 .. 1.0
+  // Ajuste: bajar para clipping más suave; subir para limitar picos con más fuerza.
+  const float SOFTCLIP_BETA = 0.3f;
 
-// POW_ALPHA
-// Qué controla: exponente de la ley de potencia que modela la cola lenta (shape de sustain).
-// Rango recomendado: 1.0 .. 2.5
-// Ajuste: incrementar para caída más pronunciada; reducir para cola más larga y suave.
-const float POW_ALPHA = 4.5f;
+  // POW_ALPHA
+  // Qué controla: exponente de la ley de potencia que modela la cola lenta (shape de sustain).
+  // Rango recomendado: 1.0 .. 2.5
+  // Ajuste: incrementar para caída más pronunciada; reducir para cola más larga y suave.
+  const float POW_ALPHA = 4.5f;
 
-// RES_ZERO_THRESH16
-// Qué controla: umbral 16-bit para considerar la envolvente efectivamente cero y terminar DECAY.
-// Rango recomendado: 0 .. 1024 (0..65535 escala)
-// Ajuste: aumentar si el ruido impide llegar a cero; bajar para terminar con niveles más bajos.
-const uint16_t RES_ZERO_THRESH16 = 8;
+  // RES_ZERO_THRESH16
+  // Qué controla: umbral 16-bit para considerar la envolvente efectivamente cero y terminar DECAY.
+  // Rango recomendado: 0 .. 1024 (0..65535 escala)
+  // Ajuste: aumentar si el ruido impide llegar a cero; bajar para terminar con niveles más bajos.
+  const uint16_t RES_ZERO_THRESH16 = 8;
 
-// MIN_TAIL_MS
-// Qué controla: tiempo mínimo de tail que siempre se permite antes de aceptar término del DECAY.
-// Rango recomendado: 10 .. 200 ms
-// Ajuste: aumentar si quieres asegurar un mínimo de decay audible; reducir para finales más cortos.
-const float MIN_TAIL_MS = 10.0f;
+  // MIN_TAIL_MS
+  // Qué controla: tiempo mínimo de tail que siempre se permite antes de aceptar término del DECAY.
+  // Rango recomendado: 10 .. 200 ms
+  // Ajuste: aumentar si quieres asegurar un mínimo de decay audible; reducir para finales más cortos.
+  const float MIN_TAIL_MS = 100.0f;
 
-// ZERO_COUNT_TO_END
-// Qué controla: número de frames consecutivos por debajo del umbral requerido para confirmar fin.
-// Rango recomendado: 1 .. 16
-// Ajuste: aumentar para ser más conservador al terminar; disminuir para terminar más rápido.
-  const uint8_t ZERO_COUNT_TO_END = 1;
+  // ZERO_COUNT_TO_END
+  // Qué controla: número de frames consecutivos por debajo del umbral requerido para confirmar fin.
+  // Rango recomendado: 1 .. 16
+  // Ajuste: aumentar para ser más conservador al terminar; disminuir para terminar más rápido.
+    const uint8_t ZERO_COUNT_TO_END = 1;
 
-  // trackear inicio de "hold" (cuando se detecta que hubo presión)
-  const float PRESS_EPS = 0.01f;
+    // trackear inicio de "hold" (cuando se detecta que hubo presión)
+    const float PRESS_EPS = 0.01f;
 
   // --- Dinámica de MAF (antes TPS) para clasificar ataques ---
   static constexpr float MAF_ATTACK_SLOW_DTPS = 0.02f;   // nivel/sec considerado subida lenta
@@ -265,7 +265,7 @@ const float MIN_TAIL_MS = 10.0f;
   uint32_t _beamStreamStartMs = 0;
 
 
-  void resetBeamVortexRamp(float seedLevel);
-  float updateBeamVortexRamp(float mafPower);
+    void resetBeamVortexRamp(float seedLevel);
+    float updateBeamVortexRamp(float mafPower);
 
 };
