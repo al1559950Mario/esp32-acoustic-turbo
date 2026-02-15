@@ -54,9 +54,11 @@ private:
   static constexpr uint32_t kFreqCooldownMs = 20;
   static constexpr uint32_t kBinStabilityHoldMs = 260;
   static constexpr float kBinStabilityTolPct = 0.9f;
-  static constexpr uint8_t kRepeatCount = 3;
+  static constexpr uint8_t kRepeatCount = 2;
   static constexpr float kRepeatSpreadPenalty = 0.20f;
-  static constexpr uint8_t kConfirmRepeatCount = 2;
+  static constexpr uint8_t kConfirmRepeatCount = 1;
+  static constexpr bool kEnableConfirmPass = false;
+  static constexpr uint32_t kStableWaitMaxMs = 1500;
   static constexpr float kStrongImproveRatio = 0.15f;
   static constexpr float kLightImproveRatio = 0.05f;
   static constexpr float kMinBaseline = 0.01f;
@@ -64,6 +66,8 @@ private:
   static constexpr float kMafPostBaselineRisePct = 0.8f;
   static constexpr uint32_t kMafPostBaselineTimeoutMs = 8000;
   static constexpr uint32_t kLivePrintPeriodMs = 120;
+  static constexpr uint8_t kMetricMinSamples = 10;
+  static constexpr uint32_t kMetricPrimeTimeoutMs = 180;
 
   bool resultsValid = false;
   FrequencyResult results[kFreqCount];

@@ -51,6 +51,7 @@ public:
 
   const float* getPressureBuffer() const { return pressureKPABuffer; }
   size_t getBufferSize() const { return PRESSURE_BUFFER_SIZE; }
+  size_t getPressureSampleCount() const { return pressureCount; }
   float getPressurePercentSigned();
   float getPressurePercentAbs();
   float getPressurePSI();
