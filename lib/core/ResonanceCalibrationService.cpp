@@ -35,16 +35,22 @@ float ResonanceCalibrationService::sampleMetric(SensorManager& sensors,
   // Espera breve para que se llene un mínimo de muestras de presión antes
   // de evaluar oscilación; evita métricas casi cero por ventana vacía.
   const uint32_t primeStart = millis();
-  while (sensors.getPressureSampleCount() < kMetricMinSamples &&
+  while (sensors.getPressureSampleCount() < kMetricMinSamplesHard &&
          (millis() - primeStart) < kMetricPrimeTimeoutMs) {
     delay(5);
   }
 
-  if (sensors.getPressureSampleCount() < kMetricMinSamples) {
+  const size_t primedSamples = sensors.getPressureSampleCount();
+  if (primedSamples < kMetricMinSamplesHard) {
     reporter.println("[LIVE]" + String(phase) + " | MUESTRAS INSUFICIENTES n=" +
-                     String((int)sensors.getPressureSampleCount()) +
-                     " (min=" + String((int)kMetricMinSamples) + ")");
+                     String((int)primedSamples) +
+                     " (min-hard=" + String((int)kMetricMinSamplesHard) + ")");
     return NAN;
+  }
+
+  if (primedSamples < kMetricMinSamplesTarget) {
+    reporter.println("[LIVE]" + String(phase) + " | AVISO n=" + String((int)primedSamples) +
+                     " (target=" + String((int)kMetricMinSamplesTarget) + ")");
   }
 
   const uint32_t start = millis();

@@ -66,8 +66,9 @@ private:
   static constexpr float kMafPostBaselineRisePct = 0.8f;
   static constexpr uint32_t kMafPostBaselineTimeoutMs = 8000;
   static constexpr uint32_t kLivePrintPeriodMs = 120;
-  static constexpr uint8_t kMetricMinSamples = 24;
-  static constexpr uint32_t kMetricPrimeTimeoutMs = 1200;
+  static constexpr uint8_t kMetricMinSamplesHard = 6;
+  static constexpr uint8_t kMetricMinSamplesTarget = 12;
+  static constexpr uint32_t kMetricPrimeTimeoutMs = 450;
 
   bool resultsValid = false;
   FrequencyResult results[kFreqCount];
