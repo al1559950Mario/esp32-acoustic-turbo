@@ -1,6 +1,9 @@
 #include "ResonanceCalibrationService.h"
 #include <math.h>
 
+constexpr float ResonanceCalibrationService::kFreqListHz[ResonanceCalibrationService::kFreqCount];
+constexpr float ResonanceCalibrationService::kAmpLevels[4];
+
 namespace {
 void sortSmall(float* values, uint8_t count) {
   for (uint8_t i = 0; i + 1 < count; ++i) {
