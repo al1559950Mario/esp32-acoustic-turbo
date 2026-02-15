@@ -22,25 +22,6 @@ void sortSmall(float* values, uint8_t count) {
 }
 }  // namespace
 
-
-namespace {
-void sortSmall(float* values, uint8_t count) {
-  for (uint8_t i = 0; i + 1 < count; ++i) {
-    uint8_t minIdx = i;
-    for (uint8_t j = i + 1; j < count; ++j) {
-      if (values[j] < values[minIdx]) {
-        minIdx = j;
-      }
-    }
-    if (minIdx != i) {
-      float tmp = values[i];
-      values[i] = values[minIdx];
-      values[minIdx] = tmp;
-    }
-  }
-}
-}  // namespace
-
 float ResonanceCalibrationService::sampleMetric(SensorManager& sensors,
                                               ResonanceCalibrationReporter& reporter,
                                               float freqHz,
