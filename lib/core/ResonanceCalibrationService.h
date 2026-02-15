@@ -66,9 +66,9 @@ private:
   static constexpr float kMafPostBaselineRisePct = 0.8f;
   static constexpr uint32_t kMafPostBaselineTimeoutMs = 8000;
   static constexpr uint32_t kLivePrintPeriodMs = 120;
-  static constexpr uint8_t kMetricMinSamplesHard = 6;
-  static constexpr uint8_t kMetricMinSamplesTarget = 12;
-  static constexpr uint32_t kMetricPrimeTimeoutMs = 450;
+  static constexpr uint8_t kMetricMinSamplesHard = 5;
+  static constexpr uint8_t kMetricMinSamplesTarget = 10;
+  static constexpr uint32_t kMetricPrimeTimeoutMs = 700;
   static constexpr float kMetricMaxValidOsc = 12.0f;
   static constexpr float kMetricSpikeJumpFactor = 2.0f;
   static constexpr float kMetricSpikeJumpAbs = 1.5f;
