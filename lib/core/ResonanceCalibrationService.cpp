@@ -23,6 +23,24 @@ void sortSmall(float* values, uint8_t count) {
 }  // namespace
 
 
+namespace {
+void sortSmall(float* values, uint8_t count) {
+  for (uint8_t i = 0; i + 1 < count; ++i) {
+    uint8_t minIdx = i;
+    for (uint8_t j = i + 1; j < count; ++j) {
+      if (values[j] < values[minIdx]) {
+        minIdx = j;
+      }
+    }
+    if (minIdx != i) {
+      float tmp = values[i];
+      values[i] = values[minIdx];
+      values[minIdx] = tmp;
+    }
+  }
+}
+}  // namespace
+
 float ResonanceCalibrationService::sampleMetric(SensorManager& sensors,
                                               ResonanceCalibrationReporter& reporter,
                                               float freqHz,
@@ -39,6 +57,13 @@ float ResonanceCalibrationService::sampleMetric(SensorManager& sensors,
   while (sensors.getPressureSampleCount() < kMetricMinSamples &&
          (millis() - primeStart) < kMetricPrimeTimeoutMs) {
     delay(5);
+  }
+
+  if (sensors.getPressureSampleCount() < kMetricMinSamples) {
+    reporter.println("[LIVE]" + String(phase) + " | MUESTRAS INSUFICIENTES n=" +
+                     String((int)sensors.getPressureSampleCount()) +
+                     " (min=" + String((int)kMetricMinSamples) + ")");
+    return NAN;
   }
 
   const uint32_t start = millis();
@@ -209,24 +234,37 @@ ResonanceCalibrationService::RepeatStats ResonanceCalibrationService::measureMed
 
   float values[5] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
   const uint8_t cappedRepeats = repeats > 5 ? 5 : repeats;
+  uint8_t validCount = 0;
 
   ensureStableInBin(sensors, reporter, binIndex);
   for (uint8_t r = 0; r < cappedRepeats; ++r) {
-    values[r] = measureWithStreaming(sensors, actuators, reporter, freqHz, amplitude, durationMs, phase);
+    const float m = measureWithStreaming(sensors, actuators, reporter, freqHz, amplitude, durationMs, phase);
+    if (!isnan(m)) {
+      values[validCount++] = m;
+    }
   }
 
-  sortSmall(values, cappedRepeats);
-
   RepeatStats stats;
+  stats.validCount = validCount;
+  if (validCount == 0) {
+    reporter.println("[MAPEO] Sin muestras válidas para " + String(phase) +
+                     " | freq=" + String(freqHz, 0) + " Hz | level=" +
+                     String(amplitude * 100.0f, 0) + "%");
+    return stats;
+  }
+
+  sortSmall(values, validCount);
+
   stats.min = values[0];
-  stats.max = values[cappedRepeats - 1];
-  if ((cappedRepeats % 2) == 0) {
-    const uint8_t hi = cappedRepeats / 2;
+  stats.max = values[validCount - 1];
+  if ((validCount % 2) == 0) {
+    const uint8_t hi = validCount / 2;
     const uint8_t lo = hi - 1;
     stats.median = (values[lo] + values[hi]) * 0.5f;
   } else {
-    stats.median = values[cappedRepeats / 2];
+    stats.median = values[validCount / 2];
   }
+  stats.valid = true;
   return stats;
 }
 
@@ -244,6 +282,11 @@ bool ResonanceCalibrationService::confirmBestCandidateInBin(SensorManager& senso
   const RepeatStats baselineStats = measureMedianWithRepeats(
       sensors, actuators, reporter, freqHz, 0.0f, kBaselineSampleMs, " confirm-baseline", binIndex,
       kConfirmRepeatCount);
+  if (!baselineStats.valid) {
+    actuators.stopISRSine();
+    delay(kFreqCooldownMs);
+    return false;
+  }
 
   float baselineMafPct = sensors.readMAFLoadPercent();
   if (baselineMafPct < 0.0f) baselineMafPct = 0.0f;
@@ -253,6 +296,11 @@ bool ResonanceCalibrationService::confirmBestCandidateInBin(SensorManager& senso
   const RepeatStats testStats = measureMedianWithRepeats(
       sensors, actuators, reporter, freqHz, bestBin.amplitude, kBinSampleMs, " confirm-test", binIndex,
       kConfirmRepeatCount);
+  if (!testStats.valid) {
+    actuators.stopISRSine();
+    delay(kFreqCooldownMs);
+    return false;
+  }
 
   actuators.stopISRSine();
   delay(kFreqCooldownMs);
@@ -391,6 +439,17 @@ bool ResonanceCalibrationService::run(SensorManager& sensors,
       const RepeatStats baselineStats = measureMedianWithRepeats(
           sensors, actuators, reporter, freqHz, 0.0f, kBaselineSampleMs, " baseline", binIndex,
           kRepeatCount);
+      if (!baselineStats.valid) {
+        reporter.println("[MAPEO] Baseline inválido; se marca frecuencia como ROJO en este bin");
+        BinResult& bin = results[freqIndex].bins[binIndex];
+        bin.grade = Grade::NONE;
+        bin.amplitude = kAmpLevels[0];
+        bin.improvement = -9999.0f;
+        bin.measured = true;
+        actuators.stopISRSine();
+        delay(kFreqCooldownMs);
+        continue;
+      }
       const float baseline = baselineStats.median;
       float baselineMafPct = sensors.readMAFLoadPercent();
       if (baselineMafPct < 0.0f) baselineMafPct = 0.0f;
@@ -412,6 +471,10 @@ bool ResonanceCalibrationService::run(SensorManager& sensors,
 
         const RepeatStats testStats = measureMedianWithRepeats(
             sensors, actuators, reporter, freqHz, amp, kBinSampleMs, " test", binIndex, kRepeatCount);
+        if (!testStats.valid) {
+          reporter.println("[INJ] medición inválida por falta de muestras; se omite este nivel");
+          continue;
+        }
         const float measured = testStats.median;
         float denom = fabsf(baseline);
         if (denom < kMinBaseline) denom = kMinBaseline;
