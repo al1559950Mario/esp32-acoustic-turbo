@@ -89,7 +89,7 @@ void ThresholdManager::loadDefaults() {
     thresholds["MAP_WAKEUP_PERCENT"] = 10.0f;
 
     // 🌪️ BOOST
-    thresholds["BOOST_TPS_ON"]  = 15.0f;
+    thresholds["BOOST_TPS_ON"]  = 25.0f;
     thresholds["BOOST_MAP_ON"]  = 99.0f;
     thresholds["BOOST_TPS_OFF"] = thresholds["BOOST_TPS_ON"] - BOOST_HYSTERESIS;
     thresholds["BOOST_MAP_OFF"] = thresholds["BOOST_MAP_ON"] - BOOST_HYSTERESIS;

@@ -300,6 +300,7 @@ void StateMachine::update(float mapLoadPercent,
         }
         lastState = current;
     }
+
 }
 
 void StateMachine::handleActions() {
@@ -349,6 +350,8 @@ void StateMachine::handleActions() {
         } else {
             alignAcousticLevel = max(alignAcousticLevel, power);
         }
+ 
+    }
 
         actuators->setAcousticParameters(alignAcousticLevel, alignAcousticLevel);
         lastDeltaMAFLevelForBEAM = currentDeltaMAFLevelForBEAM;
