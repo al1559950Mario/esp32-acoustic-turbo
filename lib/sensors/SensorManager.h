@@ -51,11 +51,14 @@ public:
 
   const float* getPressureBuffer() const { return pressureKPABuffer; }
   size_t getBufferSize() const { return PRESSURE_BUFFER_SIZE; }
+  size_t getPressureSampleCount() const { return pressureCount; }
   float getPressurePercentSigned();
   float getPressurePercentAbs();
   float getPressurePSI();
   float computeOscillationAmplitude();  
+  float computeOscillationAmplitudeWindow(uint32_t windowMs, float samplePeriodMs = 12.5f) const;
   float readOscillationAmplitude(); 
+  void resetPressureMetrics();
   float getPressureMedianKPa() const { return pressureMedianKPa; }
   float getPressureMADKPa() const { return pressureMadKPa; }
   float getPressureOutlierRatio() const { return pressureOutlierRatio; }
