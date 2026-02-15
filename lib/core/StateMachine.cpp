@@ -22,7 +22,7 @@ void StateMachine::begin(bool hasCalibration,
                          ThresholdManager* thresholdManagerPtr,
                          SensorManager* sensorsPtr,
                          CalibrationManager* calibMgrPtr) {
-    current           = hasCalibration ? SystemState::IDLE : SystemState::NO_CALIB;
+    current           = hasCalibration ? SystemState::OFF : SystemState::NO_CALIB;
     actuators         = actuatorsPtr;
     sensors           = sensorsPtr;
     thresholdManager  = thresholdManagerPtr;
@@ -125,12 +125,11 @@ void StateMachine::update(float mapLoadPercent,
     flowMadKPa = sensors ? sensors->computeMAD() : 0.0f;
     flowOutlierRatio = sensors ? sensors->computeOutlierRatio() : 0.0f;
     flowRmsSlope = sensors ? sensors->computeRMSSlope() : 0.0f;
-    flowStableNow = (flowRmsKPa <= FLOW_RMS_KPA_MAX)
+    flowStableNow = (flowOscillationKPa <= FLOW_OSCILLATION_KPA_MAX)
+                 && (flowRmsKPa <= FLOW_RMS_KPA_MAX)
                  && (flowMadKPa <= FLOW_MAD_KPA_MAX)
+                 && (flowOutlierRatio <= FLOW_OUTLIER_RATIO_MAX)
                  && (fabsf(flowRmsSlope) <= FLOW_RMS_SLOPE_KPA_S_MAX);
-                //(flowOscillationKPa <= FLOW_OSCILLATION_KPA_MAX)
-               // && (flowOutlierRatio <= FLOW_OUTLIER_RATIO_MAX)
-
 
     if (flowStableNow) {
         if (_flowStableStartMs == 0) _flowStableStartMs = now;
@@ -200,14 +199,8 @@ void StateMachine::update(float mapLoadPercent,
             break;
 
         case SystemState::DECAY:
-            //if (actuators && actuators->decayFinished()) {
-            if (vacuumOn){
-                current = SystemState::ALIGN;
-            }
             if (actuators && actuators->decayFinished()) {
-
-
-                current = SystemState::IDLE;
+                current = (vacuumOn && calibLoaded) ? SystemState::ALIGN : SystemState::IDLE;
             }
             break;
 
@@ -277,6 +270,33 @@ void StateMachine::update(float mapLoadPercent,
             actuators->getAcousticInjector().startDecay(now);
             _holdActive = false;
             _holdStartMillis = 0;
+        if (current == SystemState::BOOST && sensors) {
+            float osc = sensors->computeOscillationAmplitude();
+            float rms = sensors->computeRMS();
+            float median = sensors->computeMedianPressure();
+            float mad = sensors->computeMAD();
+            float outlierRatio = sensors->computeOutlierRatio();
+            float rmsSlope = sensors->computeRMSSlope();
+            bool oscOk = (osc <= FLOW_OSCILLATION_KPA_MAX);
+            bool rmsOk = (rms <= FLOW_RMS_KPA_MAX);
+            bool madOk = (mad <= FLOW_MAD_KPA_MAX);
+            bool outlierOk = (outlierRatio <= FLOW_OUTLIER_RATIO_MAX);
+            bool slopeOk = (fabsf(rmsSlope) <= FLOW_RMS_SLOPE_KPA_S_MAX);
+            bool flowStable = oscOk && rmsOk && madOk && outlierOk && slopeOk;
+            Serial.printf(
+                ">> BOOST metrics | osc=%.3f kPa(%s) | rms=%.3f kPa(%s) | median=%.3f kPa | mad=%.3f kPa(%s) | outliers=%.2f(%s) | rms_slope=%.3f kPa/s(%s) | estado_sugerido=%s\n",
+                osc,
+                oscOk ? "OK" : "NO",
+                rms,
+                rmsOk ? "OK" : "NO",
+                median,
+                mad,
+                madOk ? "OK" : "NO",
+                outlierRatio,
+                outlierOk ? "OK" : "NO",
+                rmsSlope,
+                slopeOk ? "OK" : "NO",
+                flowStable ? "FLOW" : "ALIGN");
         }
         lastState = current;
     }
@@ -330,6 +350,8 @@ void StateMachine::handleActions() {
         } else {
             alignAcousticLevel = max(alignAcousticLevel, power);
         }
+ 
+    }
 
         actuators->setAcousticParameters(alignAcousticLevel, alignAcousticLevel);
         lastDeltaMAFLevelForBEAM = currentDeltaMAFLevelForBEAM;
@@ -337,42 +359,6 @@ void StateMachine::handleActions() {
 
         actuators->updateVortexLevel(alignBoostLevel, alignBoostLevel);
         actuators->updateInjector();
-                // ── BOOST metrics throttled ─────────────────────────────
-        static uint32_t lastMetricsPrintMs = 0;
-        const uint32_t METRICS_PERIOD_MS = 200;
-
-        uint32_t now = millis();
-        if ((now - lastMetricsPrintMs >= METRICS_PERIOD_MS)) {
-            lastMetricsPrintMs = now;
-
-            float osc = sensors->computeOscillationAmplitude();
-            float rms = sensors->computeRMS();
-            float median = sensors->computeMedianPressure();
-            float mad = sensors->computeMAD();
-            float outlierRatio = sensors->computeOutlierRatio();
-            float rmsSlope = sensors->computeRMSSlope();
-            bool oscOk = (osc <= FLOW_OSCILLATION_KPA_MAX);
-            bool rmsOk = (rms <= FLOW_RMS_KPA_MAX);
-            bool madOk = (mad <= FLOW_MAD_KPA_MAX);
-            bool outlierOk = (outlierRatio <= FLOW_OUTLIER_RATIO_MAX);
-            bool slopeOk = (fabsf(rmsSlope) <= FLOW_RMS_SLOPE_KPA_S_MAX);
-            bool flowStable = oscOk && rmsOk && madOk && outlierOk && slopeOk;
-            Serial.printf(
-                ">> BOOST metrics | osc=%.3f kPa(%s) | rms=%.3f kPa(%s) | median=%.3f kPa | mad=%.3f kPa(%s) | outliers=%.2f(%s) | rms_slope=%.3f kPa/s(%s) | estado_sugerido=%s\n",
-                osc,
-                oscOk ? "OK" : "NO",
-                rms,
-                rmsOk ? "OK" : "NO",
-                median,
-                mad,
-                madOk ? "OK" : "NO",
-                outlierRatio,
-                outlierOk ? "OK" : "NO",
-                rmsSlope,
-                slopeOk ? "OK" : "NO",
-                flowStable ? "FLOW" : "ALIGN");
-        }
- 
     }
 
     if (current == SystemState::FLOW) {

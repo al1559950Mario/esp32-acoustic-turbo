@@ -132,9 +132,6 @@ void SensorManager::updatePressure() {
     pressureMadKPa = computeMAD();
     pressureOutlierRatio = computeOutlierRatio();
     pressureRmsSlope = computeRMSSlope();
-    pressureRMS = computeRMS();
-    pressureTau = computeTau(1.0f, 10.0f); // Ajusta parámetros según tu sampling
-    pressureEventRate = computeEventRate(1.0f, 10.0f); // Ajusta parámetros según tu sampling
 
 }
 
@@ -315,8 +312,8 @@ float SensorManager::computeMedianPressure() {
     std::nth_element(tmp.begin(), tmp.begin() + mid, tmp.end());
     float med = tmp[mid];
     if ((count % 2) == 0) {
-      std::nth_element(tmp.begin(), tmp.begin() + mid - 1, tmp.end());
-      med = (tmp[mid - 1] + med) * 0.5f;
+      auto maxIt = std::max_element(tmp.begin(), tmp.begin() + mid);
+      med = (*maxIt + med) * 0.5f;
     }
     return med;
 }
@@ -336,8 +333,8 @@ float SensorManager::computeMAD() {
     std::nth_element(devs.begin(), devs.begin() + mid, devs.end());
     float mad = devs[mid];
     if ((count % 2) == 0) {
-      std::nth_element(devs.begin(), devs.begin() + mid - 1, devs.end());
-      mad = (devs[mid - 1] + mad) * 0.5f;
+      auto maxIt = std::max_element(devs.begin(), devs.begin() + mid);
+      mad = (*maxIt + mad) * 0.5f;
     }
     return mad;
 }
@@ -378,29 +375,4 @@ float SensorManager::computeRMSSlope() {
     lastPressureRms = rms;
     lastPressureRmsMs = now;
     return slope;
-}
-
-// Funciones de lectura para cada métrica
-float SensorManager::readMedianPressure()    { return pressureMedianKPa; }
-float SensorManager::readMAD()               { return pressureMadKPa; }
-float SensorManager::readOutlierRatio()      { return pressureOutlierRatio; }
-float SensorManager::readRMSSlope()          { return pressureRmsSlope; }
-float SensorManager::readRMS()               { return pressureRMS; }
-float SensorManager::readTau()               { return pressureTau; }
-float SensorManager::readEventRate()         { return pressureEventRate; }
-
-void SensorManager::resetMetrics() {
-    for (size_t i = 0; i < PRESSURE_BUFFER_SIZE; i++) pressureKPABuffer[i] = 0.0f;
-    bufferIndex = 0;
-    pressureCount = 0;
-    amplitudeOscillation = 0.0f;
-    pressureMedianKPa = 0.0f;
-    pressureMadKPa = 0.0f;
-    pressureOutlierRatio = 0.0f;
-    pressureRmsSlope = 0.0f;
-    pressureRMS = 0.0f;
-    pressureTau = 0.0f;
-    pressureEventRate = 0.0f;
-    lastPressureRms = 0.0f;
-    lastPressureRmsMs = 0;
 }

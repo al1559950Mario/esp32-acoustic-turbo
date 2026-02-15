@@ -66,8 +66,8 @@ private:
   static constexpr float kMafPostBaselineRisePct = 0.8f;
   static constexpr uint32_t kMafPostBaselineTimeoutMs = 8000;
   static constexpr uint32_t kLivePrintPeriodMs = 120;
-  static constexpr uint8_t kMetricMinSamples = 10;
-  static constexpr uint32_t kMetricPrimeTimeoutMs = 180;
+  static constexpr uint8_t kMetricMinSamples = 24;
+  static constexpr uint32_t kMetricPrimeTimeoutMs = 1200;
 
   bool resultsValid = false;
   FrequencyResult results[kFreqCount];
@@ -76,6 +76,8 @@ private:
     float median = 0.0f;
     float min = 0.0f;
     float max = 0.0f;
+    uint8_t validCount = 0;
+    bool valid = false;
   };
 
   float sampleMetric(SensorManager& sensors,
