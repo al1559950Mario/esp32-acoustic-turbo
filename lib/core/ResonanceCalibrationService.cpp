@@ -63,7 +63,7 @@ float ResonanceCalibrationService::sampleMetric(SensorManager& sensors,
     const float metric = sensors.computeOscillationAmplitudeWindow(durationMs, 10.0f);
 
     bool accepted = false;
-    if (isfinite(metric) && metric >= 0.0f && metric <= kMetricMaxValidOsc) {
+    if (std::isfinite(metric) && metric >= 0.0f && metric <= kMetricMaxValidOsc) {
       if (lastAcceptedMetric < 0.0f) {
         accepted = true;
       } else {
