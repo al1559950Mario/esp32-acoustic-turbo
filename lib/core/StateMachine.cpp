@@ -60,6 +60,7 @@ void StateMachine::begin(bool hasCalibration,
         actuators->stopAcoustic();
         actuators->stopVortex();
     }
+    resetVortexTwoLayerState();
 
     lastState = current;
     Serial.print(">> StateMachine iniciado en estado: ");
@@ -218,6 +219,7 @@ void StateMachine::update(float mapLoadPercent,
                 actuators->stopAcoustic();
                 actuators->stopVortex();
             }
+            resetVortexTwoLayerState();
             _flowStableStartMs = 0;
             _flowUnstableStartMs = 0;
         } else if (current == SystemState::ALIGN) {
@@ -236,6 +238,7 @@ void StateMachine::update(float mapLoadPercent,
                 flowBoostBase = actuators->getTurboLevel();
             }
         } else if (current == SystemState::DECAY && actuators) {
+            resetVortexTwoLayerState();
             resetBeamTracking();
             float deriv = _dMAFdtEMA;
             unsigned long holdMs = 0;
@@ -357,14 +360,15 @@ void StateMachine::handleActions() {
         lastDeltaMAFLevelForBEAM = currentDeltaMAFLevelForBEAM;
         lastDeltaMAPLevelForBEAM = currentDeltaMAPLevelForBEAM;
 
-        actuators->updateVortexLevel(alignBoostLevel, alignBoostLevel);
+        float vortexCmd = computeVortexTwoLayerCmd(millis(), mafNormalized, _pressurePercent);
+        actuators->updateVortexLevel(vortexCmd, vortexCmd);
         actuators->updateInjector();
     }
 
     if (current == SystemState::FLOW) {
         float scale = constrain(mafNormalized, 0.0f, 1.0f);
         float acousticLevel = constrain(flowAcousticBase * scale, 0.0f, 1.0f);
-        float boostLevel = constrain(flowBoostBase * scale, 0.0f, 1.0f);
+        float boostLevel = computeVortexTwoLayerCmd(millis(), scale, _pressurePercent);
         actuators->setAcousticParameters(acousticLevel, acousticLevel);
         actuators->updateVortexLevel(boostLevel, boostLevel);
         actuators->updateInjector();
@@ -394,6 +398,52 @@ void StateMachine::resetBeamTracking() {
   _holdStartMillis = 0;
   _beamVortexLevel = BEAM_VORTEX_ENTRY_LEVEL;
   _beamVortexLastUpdateMs = 0;
+}
+
+void StateMachine::resetVortexTwoLayerState() {
+  _vortexFullActive = false;
+  _vortexFullCondStartMs = 0;
+  _vortexCmd = 0.0f;
+}
+
+float StateMachine::computeVortexTwoLayerCmd(uint32_t nowMs, float mafNorm, float pressurePctSigned) {
+  constexpr float MAF_NEAR_MAX_TH = 0.80f;
+  constexpr uint32_t HOLD_MS = 120u;
+  constexpr float FULL_TARGET = 1.0f;
+  constexpr float PASSIVE_MAX = 0.45f;
+  constexpr float FULL_RAMP_UP_ALPHA = 0.22f;
+  constexpr float FULL_RAMP_DOWN_ALPHA = 0.12f;
+
+  bool vacuumDemandOn = (pressurePctSigned <= VACUUM_PCT_ON);
+  bool vacuumDemandOff = (pressurePctSigned >= VACUUM_PCT_OFF);
+
+  float vacuumNorm = 0.0f;
+  if (pressurePctSigned < 0.0f) {
+    vacuumNorm = constrain((-pressurePctSigned) / 20.0f, 0.0f, 1.0f);
+  }
+  float passiveCmd = vacuumNorm * PASSIVE_MAX;
+
+  bool mafHigh = (mafNorm >= MAF_NEAR_MAX_TH);
+  bool fullCond = vacuumDemandOn && mafHigh;
+
+  if (fullCond) {
+    if (_vortexFullCondStartMs == 0) _vortexFullCondStartMs = nowMs;
+    if ((nowMs - _vortexFullCondStartMs) >= HOLD_MS) {
+      _vortexFullActive = true;
+    }
+  } else {
+    _vortexFullCondStartMs = 0;
+  }
+
+  if (_vortexFullActive && vacuumDemandOff) {
+    _vortexFullActive = false;
+  }
+
+  float target = _vortexFullActive ? FULL_TARGET : passiveCmd;
+  float alpha = _vortexFullActive ? FULL_RAMP_UP_ALPHA : FULL_RAMP_DOWN_ALPHA;
+  _vortexCmd += (target - _vortexCmd) * alpha;
+  _vortexCmd = constrain(_vortexCmd, 0.0f, 1.0f);
+  return _vortexCmd;
 }
 
 float StateMachine::updateBeamVortexRamp(float mafPower) {
