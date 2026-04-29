@@ -263,9 +263,14 @@ private:
   // Seguimiento de la condición BEAM sostenida
   uint32_t _beamCondStartMs = 0;   // instante en que se detecto la condicion por primera vez
   uint32_t _beamStreamStartMs = 0;
+  bool _vortexFullActive = false;
+  uint32_t _vortexFullCondStartMs = 0;
+  float _vortexCmd = 0.0f;
 
 
     void resetBeamVortexRamp(float seedLevel);
     float updateBeamVortexRamp(float mafPower);
+    float computeVortexTwoLayerCmd(uint32_t nowMs, float mafNorm, float pressurePctSigned);
+    void resetVortexTwoLayerState();
 
 };
