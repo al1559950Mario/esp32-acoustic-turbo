@@ -62,8 +62,8 @@ _(Pendiente de completar)_
 ### 8.1 Calibración rápida de resonancia (mapeo por bin MAF)
 **Objetivo:** ubicar rápidamente zonas dulces de resonancia por carga (MAF), validando varias frecuencias en cada rango de pedal.
 **Comando de consola:** `C` (una sola ejecución).
-**Cobertura de frecuencia:** 3 puntos distribuidos en el rango completo (4.0, 5.25 y 6.5 kHz).
-**Bins de MAF:** 6 bins (0-16, 16-33, 33-50, 50-66, 66-83, 83-100%).
+**Cobertura de frecuencia:** 3 puntos enfocados alrededor del mejor resultado observado (5.0, 5.25 y 5.5 kHz).
+**Bins de MAF:** 3 bins en la ventana útil (20-26, 26-33 y 33-40%).
 #### Flujo actual (bin-first)
 1. El sistema espera subida real de MAF para entrar al bin (no avanza si el pedal no sube).
 2. Dentro de cada bin, prueba las 3 frecuencias.

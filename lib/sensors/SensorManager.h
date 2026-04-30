@@ -113,10 +113,4 @@ private:
   float pressureRmsSlope = 0.0f;
   float lastPressureRms = 0.0f;
   uint32_t lastPressureRmsMs = 0;
-
-  float pressureRMS = 0.0f;
-  float pressureTau = 0.0f;
-  float pressureEventRate = 0.0f;
-
-
 };
